@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WALL-E</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "zen-bg": "#FAF9F6",
+                        "zen-cream": "#FDFBF7",
+                        "sage": "#9BAE93",
+                        "sage-light": "#E3EAE0",
+                        "sage-border": "#D1DDCB",
+                        "rose": "#D4A5A5",
+                        "rose-light": "#F5E6E6",
+                        "dusty-rose": "#D4A5A5",
+                        "premium-charcoal": "#333333",
+                        "zen-charcoal": "#4A4947",
+                        "muted-taupe": "#8E8D8A",
+                        "zen-taupe": "#8E8D8A",
+                        "lavender": "#B8B5D0",
+                        "lavender-light": "#EBEAF2",
+                        "sand": "#D6C6B2",
+                        "sand-light": "#F4EFE9",
+                        "ocean": "#9CB5C1",
+                        "ocean-light": "#E6EEF2",
+                        "blue-zen": "#A7BBC7",
+                        "blue-zen-light": "#E6EEF2",
+                        "sage-translucent": "rgba(155, 174, 147, 0.15)",
+                        "blue-translucent": "rgba(167, 187, 199, 0.15)"
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"],
+                        "serif": ["Crimson Pro", "serif"]
+                    },
+                    borderRadius: {
+                        "2xl": "1.25rem",
+                        "3xl": "1.75rem",
+                        "4xl": "2.25rem",
+                    },
+                    boxShadow: {
+                        "soft": "0 4px 20px -2px rgba(0, 0, 0, 0.03)"
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0) rotate(0deg)', opacity: '0.6' },
+                            '50%': { transform: 'translateY(-8px) rotate(5deg)', opacity: '0.9' },
+                        },
+                        sway: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        grow: {
+                            '0%': { transform: 'scale(0.9)', opacity: '0.5' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                        'float': 'float 4s ease-in-out infinite',
+                        'sway': 'sway 3s ease-in-out infinite',
+                        'grow': 'grow 0.5s ease-out forwards',
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background-color: #FAF9F6;
+            min-height: 100vh;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.39.0",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.3",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "xlsx": "https://esm.sh/xlsx@0.18.5"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

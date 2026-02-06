@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 // Removed static import of XLSX to optimize initial load time
 // import * as XLSX from 'xlsx'; 
 import { AppScreen, Transaction, TransactionType } from '../types';
+import { parseIDFCStatement } from '../services/idfcParser';
 import { parseBankStatement as parseWithOllama, checkOllamaStatus } from '../services/ollamaService';
 import { parseBankStatement as parseWithGemini } from '../services/geminiService';
 import { getSymbol } from '../currencyUtils';
@@ -111,6 +112,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Duplicate detection
   const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
   const [showDuplicateInfo, setShowDuplicateInfo] = useState(true);
+  
+  // Parser tracking
+  const [parserUsed, setParserUsed] = useState<string>('');
 
   // Check Ollama status on mount
   useEffect(() => {
@@ -202,69 +206,116 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   const processTransactions = async (data: string, mimeType: string, rawText?: string) => {
     try {
-        // Check Ollama availability first
-        const ollamaCheck = await checkOllamaStatus();
-        const useOllama = ollamaCheck.available && ollamaCheck.models.length > 0;
+        // ═══════════════════════════════════════════════════════════════
+        // PARSING PRIORITY (for IDFC statements):
+        // 1. IDFC Rule-based Parser (fastest, most accurate, validates balance)
+        // 2. Ollama AI (local, offline)
+        // 3. Gemini AI (cloud fallback)
+        // ═══════════════════════════════════════════════════════════════
         
-        updateProgress(useOllama ? "Analyzing with Ollama (local)..." : "Analyzing with Gemini (cloud)...");
-        
-        // Progress messages for user engagement
-        const messages = useOllama ? [
-            "Analyzing with Ollama (local)...",
-            "Extracting text from PDF...",
-            "Processing pages...",
-            "Validating entries...",
-            "Almost there..."
-        ] : [
-            "Analyzing with Gemini (cloud)...",
-            "Processing pages in parallel...",
-            "Extracting transactions...",
-            "Validating entries...",
-            "Almost there..."
-        ];
-        let messageIndex = 0;
-        
-        const timer = setInterval(() => {
-            messageIndex = Math.min(messageIndex + 1, messages.length - 1);
-            setLoadingMessage(messages[messageIndex]);
-        }, 3000);
-
         let rawTransactions: any[] = [];
+        let parserUsed = '';
+        let timer: NodeJS.Timeout | null = null;
         
+        // TRY 1: IDFC RULE-BASED PARSER (FASTEST & MOST ACCURATE)
         try {
-            if (useOllama) {
-                console.log('🦙 Using Ollama (local) for parsing...');
-                rawTransactions = await parseWithOllama(data, mimeType);
-            } else {
-                console.log('☁️ Using Gemini (cloud) for parsing...');
-                rawTransactions = await parseWithGemini(data, mimeType);
-            }
-        } catch (aiError: any) {
-            console.error('Primary parser failed:', aiError.message);
+            console.log('🏦 Trying IDFC rule-based parser...');
+            updateProgress("Parsing IDFC statement (rule-based)...");
             
-            // Try fallback if primary fails
-            if (useOllama) {
-                console.log('🔄 Ollama failed, trying Gemini fallback...');
-                updateProgress("Ollama failed, trying Gemini...");
-                try {
-                    rawTransactions = await parseWithGemini(data, mimeType);
-                } catch (geminiError: any) {
-                    clearInterval(timer);
-                    throw new Error(`Both parsers failed. Ollama: ${aiError.message}. Gemini: ${geminiError.message}`);
+            const result = await parseIDFCStatement(data);
+            
+            if (result.transactions.length > 0) {
+                console.log(`✅ IDFC parser succeeded: ${result.transactions.length} transactions`);
+                console.log(`   Balance validation: ${result.validationPassed ? '✅ PASSED' : '⚠️ WARNINGS'}`);
+                
+                if (!result.validationPassed) {
+                    console.warn('   Validation errors:', result.errors);
                 }
-            } else {
-                clearInterval(timer);
-                throw new Error(`Gemini Error: ${aiError.message}`);
+                
+                rawTransactions = result.transactions;
+                parserUsed = '🏦 Rule-based (IDFC)';
+                setParserUsed(parserUsed);
+                
+                // If validation passed, we're done - best accuracy!
+                if (result.validationPassed) {
+                    updateProgress(`Verified ${rawTransactions.length} transactions with full balance validation ✓`);
+                }
+            }
+        } catch (idfcError: any) {
+            console.log('🏦 IDFC parser not applicable or failed:', idfcError.message);
+        }
+        
+        // TRY 2: OLLAMA AI (if IDFC parser didn't work)
+        if (rawTransactions.length === 0) {
+            try {
+                const ollamaCheck = await checkOllamaStatus();
+                const useOllama = ollamaCheck.available && ollamaCheck.models.length > 0;
+                
+                if (useOllama) {
+                    console.log('🦙 Trying Ollama AI parser...');
+                    updateProgress("Analyzing with Ollama AI (local)...");
+                    
+                    const messages = [
+                        "Analyzing with Ollama AI...",
+                        "Extracting text from PDF...",
+                        "Processing pages...",
+                        "Validating entries...",
+                        "Almost there..."
+                    ];
+                    let messageIndex = 0;
+                    
+                    timer = setInterval(() => {
+                        messageIndex = Math.min(messageIndex + 1, messages.length - 1);
+                        setLoadingMessage(messages[messageIndex]);
+                    }, 3000);
+                    
+                    rawTransactions = await parseWithOllama(data, mimeType);
+                    parserUsed = '🦙 Ollama AI';
+                    setParserUsed(parserUsed);
+                    if (timer) clearInterval(timer);
+                }
+            } catch (ollamaError: any) {
+                console.log('🦙 Ollama failed:', ollamaError.message);
+                if (timer) clearInterval(timer);
             }
         }
         
-        clearInterval(timer);
+        // TRY 3: GEMINI AI (cloud fallback)
+        if (rawTransactions.length === 0) {
+            try {
+                console.log('☁️ Trying Gemini AI parser...');
+                updateProgress("Analyzing with Gemini AI (cloud)...");
+                
+                const messages = [
+                    "Analyzing with Gemini AI...",
+                    "Processing pages in parallel...",
+                    "Extracting transactions...",
+                    "Validating entries...",
+                    "Almost there..."
+                ];
+                let messageIndex = 0;
+                
+                timer = setInterval(() => {
+                    messageIndex = Math.min(messageIndex + 1, messages.length - 1);
+                    setLoadingMessage(messages[messageIndex]);
+                }, 3000);
+                
+                rawTransactions = await parseWithGemini(data, mimeType);
+                parserUsed = '☁️ Gemini AI';
+                setParserUsed(parserUsed);
+                if (timer) clearInterval(timer);
+            } catch (geminiError: any) {
+                if (timer) clearInterval(timer);
+                throw new Error(`All parsers failed. Please ensure this is a valid IDFC bank statement. Error: ${geminiError.message}`);
+            }
+        }
         
         if (!rawTransactions || rawTransactions.length === 0) {
             throw new Error("No transactions could be extracted. Please ensure this is a valid bank statement.");
         }
         
-        updateProgress(`Found ${rawTransactions.length} transactions...`);
+        console.log(`✅ Parsed using: ${parserUsed}`);
+        updateProgress(`Found ${rawTransactions.length} transactions using ${parserUsed}`);
 
         // Map to internal Transaction type (validation already done in geminiService)
         const mappedTransactions: Transaction[] = rawTransactions
@@ -465,7 +516,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         
         {stage === 'IDLE' && (
             <>
-                {/* AI Status Banner */}
+                {/* Parsing Status Banner */}
                 {ollamaStatus.checked && (
                     <div className={`mb-4 p-4 rounded-2xl flex items-center gap-3 ${
                         ollamaStatus.available && ollamaStatus.models.length > 0
@@ -481,12 +532,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             <p className={`text-sm font-semibold ${
                                 ollamaStatus.available && ollamaStatus.models.length > 0 ? 'text-sage' : 'text-blue-700'
                             }`}>
-                                {ollamaStatus.available && ollamaStatus.models.length > 0 ? '🦙 Ollama (Local)' : '☁️ Gemini (Cloud)'}
+                                🏦 Rule-based Parser Priority
                             </p>
                             <p className="text-xs text-muted-taupe mt-0.5">
                                 {ollamaStatus.available && ollamaStatus.models.length > 0
-                                    ? `🦙 Local: ${ollamaStatus.models.slice(0, 2).join(', ')}` 
-                                    : '☁️ Using Gemini (cloud) as fallback'}
+                                    ? `IDFC → 🦙 Ollama (${ollamaStatus.models.slice(0, 2).join(', ')}) → ☁️ Gemini` 
+                                    : 'IDFC → ☁️ Gemini (cloud)'}
                             </p>
                         </div>
                         {!ollamaStatus.available && (
@@ -618,6 +669,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 <p>📅 Dates: {extractedData.length > 0 ? extractedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date + ' to ' + extractedData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].date : 'N/A'}</p>
                                 {duplicateIds.size > 0 && (
                                     <p className="text-blue-500">🔄 Duplicates: {duplicateIds.size} (auto-skipped)</p>
+                                )}
+                                {parserUsed && (
+                                    <p className="text-sage font-semibold">✨ Parser: {parserUsed}</p>
                                 )}
                             </div>
                         )}

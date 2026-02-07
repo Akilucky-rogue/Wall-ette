@@ -42,130 +42,172 @@ function generateIcon(size) {
   const canvas = createCanvas(size, size);
   const ctx = canvas.getContext('2d');
 
-  // Background gradient (Sage green to darker green)
+  // Dark green gradient background (ZEN-R inspired)
   const bgGradient = ctx.createLinearGradient(0, 0, size, size);
-  bgGradient.addColorStop(0, '#A8B89E');
-  bgGradient.addColorStop(1, '#7a8a6e');
+  bgGradient.addColorStop(0, '#1a3a2a');
+  bgGradient.addColorStop(1, '#0d1f18');
   ctx.fillStyle = bgGradient;
   ctx.fillRect(0, 0, size, size);
 
-  // WALL-E Robot
   const centerX = size / 2;
   const centerY = size / 2;
 
-  // Robot body (rectangular, rusty yellow/brown)
-  const bodyWidth = size * 0.5;
-  const bodyHeight = size * 0.4;
-  const bodyY = centerY - bodyHeight / 4;
-  
-  ctx.fillStyle = '#D4A855'; // Rusty yellow
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = size * 0.02;
+  // TURBAN/HEAD (Orange)
+  const turbanY = centerY * 0.5;
+  ctx.fillStyle = '#FF9D3D';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = size * 0.03;
   ctx.shadowOffsetY = size * 0.01;
-  roundRect(ctx, centerX - bodyWidth/2, bodyY, bodyWidth, bodyHeight, size * 0.02);
-
-  // Darker panel lines on body
-  ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = '#9e7e3d';
-  ctx.lineWidth = size * 0.012;
-  ctx.strokeRect(centerX - bodyWidth/2 + size * 0.05, bodyY + size * 0.05, bodyWidth - size * 0.1, bodyHeight - size * 0.1);
-
-  // Compactor door (chest)
-  ctx.fillStyle = '#9e7e3d';
-  roundRect(ctx, centerX - bodyWidth/3, bodyY + bodyHeight * 0.4, bodyWidth * 0.66, bodyHeight * 0.25, size * 0.01);
   
-  // Rupee symbol on chest (small)
-  ctx.fillStyle = '#F5EFE0';
-  ctx.font = `bold ${size * 0.12}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('₹', centerX, bodyY + bodyHeight * 0.525);
-
-  // WALL-E's iconic binocular eyes
-  const eyeY = bodyY - size * 0.08;
-  const eyeSpacing = size * 0.12;
-  const eyeWidth = size * 0.14;
-  const eyeHeight = size * 0.12;
-
-  // Eye necks (cylinders)
-  ctx.fillStyle = '#8f7034';
-  roundRect(ctx, centerX - eyeSpacing - eyeWidth/2, eyeY + eyeHeight * 0.3, eyeWidth, size * 0.06, size * 0.01);
-  roundRect(ctx, centerX + eyeSpacing - eyeWidth/2, eyeY + eyeHeight * 0.3, eyeWidth, size * 0.06, size * 0.01);
-
-  // Eye housings
-  ctx.fillStyle = '#5a5a5a';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-  ctx.shadowBlur = size * 0.015;
-  roundRect(ctx, centerX - eyeSpacing - eyeWidth/2, eyeY, eyeWidth, eyeHeight, size * 0.02);
-  roundRect(ctx, centerX + eyeSpacing - eyeWidth/2, eyeY, eyeWidth, eyeHeight, size * 0.02);
-
-  // Eye lenses (bright, expressive)
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#4A9EAF'; // Blue lens color
+  // Turban shape
   ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing, eyeY + eyeHeight/2, eyeWidth * 0.35, 0, Math.PI * 2);
+  ctx.ellipse(centerX, turbanY - size * 0.05, size * 0.25, size * 0.12, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing, eyeY + eyeHeight/2, eyeWidth * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eye pupils (give character/expression)
-  ctx.fillStyle = '#1a3a44';
-  ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing + size * 0.01, eyeY + eyeHeight/2, eyeWidth * 0.18, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing + size * 0.01, eyeY + eyeHeight/2, eyeWidth * 0.18, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eye highlights (makes eyes "alive")
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing - size * 0.01, eyeY + eyeHeight/2 - size * 0.01, eyeWidth * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing - size * 0.01, eyeY + eyeHeight/2 - size * 0.01, eyeWidth * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Tank treads at bottom
-  const treadY = bodyY + bodyHeight;
-  const treadWidth = bodyWidth * 0.4;
-  const treadHeight = size * 0.1;
-
-  ctx.fillStyle = '#3a3a3a';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-  ctx.shadowBlur = size * 0.01;
-  roundRect(ctx, centerX - bodyWidth/2 + size * 0.05, treadY, treadWidth, treadHeight, size * 0.015);
-  roundRect(ctx, centerX + bodyWidth/2 - treadWidth - size * 0.05, treadY, treadWidth, treadHeight, size * 0.015);
-
-  // Tread details
-  ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = '#5a5a5a';
-  ctx.lineWidth = size * 0.008;
-  for (let i = 0; i < 4; i++) {
-    const x1 = centerX - bodyWidth/2 + size * 0.05 + (i * treadWidth / 4);
-    const x2 = centerX + bodyWidth/2 - treadWidth - size * 0.05 + (i * treadWidth / 4);
+  
+  // Turban folds
+  ctx.fillStyle = '#FF8C00';
+  for (let i = 0; i < 3; i++) {
     ctx.beginPath();
-    ctx.moveTo(x1, treadY + size * 0.02);
-    ctx.lineTo(x1, treadY + treadHeight - size * 0.02);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x2, treadY + size * 0.02);
-    ctx.lineTo(x2, treadY + treadHeight - size * 0.02);
-    ctx.stroke();
+    ctx.arc(centerX - size * 0.1 + (i * size * 0.1), turbanY - size * 0.03, size * 0.04, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // Name text below
-  ctx.fillStyle = '#F5EFE0';
-  ctx.font = `bold ${size * 0.07}px monospace`;
+  // Turban jewel (green dot)
+  ctx.fillStyle = '#2CC99D';
+  ctx.shadowColor = 'rgba(44, 201, 157, 0.6)';
+  ctx.shadowBlur = size * 0.04;
+  ctx.beginPath();
+  ctx.arc(centerX, turbanY - size * 0.08, size * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // BINOCULAR EYES (Large, prominent)
+  const eyeY = turbanY + size * 0.08;
+  const eyeRadius = size * 0.1;
+  const eyeSpacing = size * 0.15;
+
+  // Eye frames (gold/brass)
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#D4A855';
+  ctx.beginPath();
+  ctx.arc(centerX - eyeSpacing, eyeY, eyeRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(centerX + eyeSpacing, eyeY, eyeRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Connecting bridge
+  ctx.fillStyle = '#9e7e3d';
+  ctx.fillRect(centerX - eyeSpacing + eyeRadius * 0.6, eyeY - size * 0.02, (eyeSpacing - eyeRadius) * 2, size * 0.04);
+
+  // Eye lenses (dark)
+  ctx.fillStyle = '#001a1a';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+  ctx.shadowBlur = size * 0.02;
+  ctx.beginPath();
+  ctx.arc(centerX - eyeSpacing, eyeY, eyeRadius * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(centerX + eyeSpacing, eyeY, eyeRadius * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupils (bright blue)
+  ctx.fillStyle = '#00D9FF';
+  ctx.shadowColor = 'rgba(0, 217, 255, 0.8)';
+  ctx.shadowBlur = size * 0.02;
+  ctx.beginPath();
+  ctx.arc(centerX - eyeSpacing, eyeY, eyeRadius * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(centerX + eyeSpacing, eyeY, eyeRadius * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // BODY (Green)
+  const bodyY = eyeY + size * 0.15;
+  const bodyWidth = size * 0.45;
+  const bodyHeight = size * 0.35;
+
+  // Main body (green)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = size * 0.02;
+  ctx.fillStyle = '#2CC99D';
+  roundRect(ctx, centerX - bodyWidth/2, bodyY, bodyWidth, bodyHeight, size * 0.03);
+
+  // Body panel lines
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#1a8a6b';
+  ctx.lineWidth = size * 0.008;
+  ctx.strokeRect(centerX - bodyWidth/2 + size * 0.03, bodyY + size * 0.03, bodyWidth - size * 0.06, bodyHeight - size * 0.06);
+
+  // Chest display (green screen)
+  const screenWidth = bodyWidth * 0.5;
+  const screenHeight = bodyHeight * 0.25;
+  ctx.fillStyle = '#1a6b52';
+  roundRect(ctx, centerX - screenWidth/2, bodyY + bodyHeight * 0.15, screenWidth, screenHeight, size * 0.015);
+
+  // Rupee symbol on chest (golden)
+  ctx.fillStyle = '#FFD700';
+  ctx.font = `bold ${size * 0.16}px Arial`;
   ctx.textAlign = 'center';
-  ctx.fillText('WALL-E', centerX, treadY + treadHeight + size * 0.08);
+  ctx.textBaseline = 'middle';
+  ctx.fillText('₹', centerX, bodyY + bodyHeight * 0.275);
+
+  // Gold shoulders
+  ctx.fillStyle = '#D4A855';
+  ctx.beginPath();
+  ctx.arc(centerX - bodyWidth/2 - size * 0.06, bodyY + size * 0.1, size * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(centerX + bodyWidth/2 + size * 0.06, bodyY + size * 0.1, size * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+
+  // LEGS
+  const legY = bodyY + bodyHeight;
+  const legSpacing = bodyWidth * 0.25;
+
+  // Left leg
+  ctx.fillStyle = '#2CC99D';
+  roundRect(ctx, centerX - legSpacing - size * 0.04, legY, size * 0.08, size * 0.12, size * 0.01);
+  ctx.fillStyle = '#D4A855';
+  ctx.beginPath();
+  ctx.arc(centerX - legSpacing, legY + size * 0.14, size * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Right leg
+  ctx.fillStyle = '#2CC99D';
+  roundRect(ctx, centerX + legSpacing - size * 0.04, legY, size * 0.08, size * 0.12, size * 0.01);
+  ctx.fillStyle = '#D4A855';
+  ctx.beginPath();
+  ctx.arc(centerX + legSpacing, legY + size * 0.14, size * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ornamental base (Gold)
+  const baseY = legY + size * 0.14;
+  ctx.fillStyle = '#D4A855';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+  roundRect(ctx, centerX - bodyWidth/2 - size * 0.05, baseY, bodyWidth + size * 0.1, size * 0.04, size * 0.01);
+
+  // Base ornament
+  ctx.shadowColor = 'transparent';
+  for (let i = 0; i < 3; i++) {
+    const peakX = centerX - bodyWidth/2 + size * 0.1 + (i * bodyWidth * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(peakX, baseY);
+    ctx.lineTo(peakX + size * 0.03, baseY - size * 0.05);
+    ctx.lineTo(peakX + size * 0.06, baseY);
+    ctx.fill();
+  }
+
+  // WALL-E text
+  ctx.fillStyle = '#FFD700';
+  ctx.font = `bold ${size * 0.06}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText('WALL-E', centerX, baseY + size * 0.1);
 
   return canvas;
 }
 
 // Generate icons for all densities
-console.log('🎨 Generating WALL-E app icons...\n');
+console.log('🎨 Generating WALL-E app icons (ZEN-R style)...\n');
 
 Object.entries(sizes).forEach(([density, size]) => {
   const canvas = generateIcon(size);

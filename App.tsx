@@ -7,6 +7,8 @@ import SplashScreen, { SplashVariant } from './components/SplashScreen';
 import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 // Lazy Load Non-Critical Screens
 const TransactionHistory = React.lazy(() => import('./components/TransactionHistory'));
@@ -27,6 +29,28 @@ function AppContent() {
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Auto-logout when app goes to background (Mobile Security)
+  useEffect(() => {
+    if (!user) return;
+    
+    // Only enable on native mobile platforms
+    if (Capacitor.isNativePlatform()) {
+      const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) {
+          // App went to background - auto logout for security
+          console.log('🔒 App backgrounded - Auto logout triggered');
+          import('./services/firebase').then(({ auth }) => {
+            auth.signOut();
+          });
+        }
+      });
+
+      return () => {
+        listener.remove();
+      };
+    }
+  }, [user]);
 
   // Inactivity Lock Timer
   useEffect(() => {

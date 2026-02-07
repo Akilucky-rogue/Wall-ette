@@ -126,8 +126,8 @@ async function extractTextFromPDF(base64Data: string): Promise<string[]> {
     // Dynamic import of pdf.js
     const pdfjsLib = await import('pdfjs-dist');
     
-    // Set worker source
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // Use unpkg CDN for reliable worker loading
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
     
     // Decode base64 to ArrayBuffer
     const binaryString = atob(base64Data);

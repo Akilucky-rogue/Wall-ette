@@ -113,6 +113,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   
   const [extractedData, setExtractedData] = useState<Transaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
+  const [showDuplicateInfo, setShowDuplicateInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -208,6 +210,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   const processTransactions = async (data: string, mimeType: string, rawText?: string) => {
     try {
+        console.log('📤 processTransactions called');
+        console.log('   File ref available:', !!fileInputRef.current?.files?.[0]);
+        console.log('   File name:', fileInputRef.current?.files?.[0]?.name);
+        console.log('   File size:', fileInputRef.current?.files?.[0]?.size);
+        console.log('   MimeType param:', mimeType);
+        
         // ═══════════════════════════════════════════════════════════════
         // PARSING PRIORITY (RULE-BASED ONLY):
         // 1. IDFCBankParser (Excel/CSV + PDF)
@@ -362,8 +370,18 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    console.log('🎯 handleFileSelect triggered');
+    console.log('   File detected:', !!file);
+    console.log('   File name:', file?.name);
+    console.log('   File size:', file?.size);
+    console.log('   File type:', file?.type);
+    
+    if (!file) {
+      console.warn('❌ No file found in input!');
+      return;
+    }
 
+    console.log('✅ File selected:', file.name);
     setStage('PROCESSING');
     setError(null);
     setExtractedData([]);
@@ -371,34 +389,103 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
     // Check for Excel files
     if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type.includes('sheet') || file.type.includes('excel')) {
+        console.log('📊 Excel file detected, using IDFCBankParser directly');
         try {
-            // DYNAMIC IMPORT: Load the heavy XLSX library only when actually needed
-            updateProgress("Initializing spreadsheet engine...");
-            const XLSX = await import('xlsx');
-
-            const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-                reader.onerror = reject;
-                reader.readAsArrayBuffer(file);
-            });
-
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const csvText = XLSX.utils.sheet_to_csv(worksheet);
+            updateProgress("Parsing Excel with enhanced IDFC parser...");
             
-            if (!csvText || csvText.length < 10) {
-                throw new Error("Empty or invalid spreadsheet");
-            }
+            // Call IDFCBankParser directly with the file
+            const result = await IDFCBankParser.parseExcel(file);
+            
+            if (result.transactions.length > 0) {
+                console.log(`✅ IDFCBankParser succeeded: ${result.transactions.length} transactions`);
+                console.log(`   Validation: ${result.validation.isValid ? '✅ PASSED' : '⚠️ WARNINGS'}`);
+                console.log(`   Summary: ${result.summary.customerName} (${result.summary.accountNumber})`);
+                
+                if (result.validation.errors.length > 0) {
+                    console.warn('   Errors:', result.validation.errors);
+                }
+                if (result.validation.warnings.length > 0) {
+                    console.warn('   Warnings:', result.validation.warnings);
+                }
+                
+                // Convert to app format
+                const rawTransactions = result.transactions.map((t: any) => ({
+                    date: t.date,
+                    merchant: t.description.substring(0, 100),
+                    amount: t.amount,
+                    type: t.type.toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE',
+                    category: t.category,
+                    note: t.notes || t.description
+                }));
+                
+                // Map to internal Transaction type
+                const mappedTransactions: Transaction[] = rawTransactions
+                    .filter((t: any) => {
+                        if (!t.date || !t.amount || !t.type || !t.merchant) return false;
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
+                        if (typeof t.amount !== 'number' || t.amount <= 0) return false;
+                        if (t.type !== 'INCOME' && t.type !== 'EXPENSE') return false;
+                        return true;
+                    })
+                    .map((t: any, index: number) => {
+                        const cleanMerchant = (t.merchant || 'unknown').replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
+                        const idString = `${t.date}-${t.amount}-${cleanMerchant}-${t.type}-${index}`;
+                        
+                        let hash = 0;
+                        for (let i = 0; i < idString.length; i++) {
+                            const char = idString.charCodeAt(i);
+                            hash = ((hash << 5) - hash) + char;
+                            hash = hash & hash;
+                        }
+                        const uniqueId = `import-${Math.abs(hash)}`;
 
-            await processTransactions(csvText, 'text/csv');
-        } catch (err) {
-            setError("Failed to read Excel file.");
+                        return {
+                            id: uniqueId,
+                            date: t.date,
+                            merchant: t.merchant.trim(),
+                            amount: Math.abs(t.amount),
+                            type: t.type === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE,
+                            category: t.category?.trim() || 'Uncategorized',
+                            note: t.note?.trim() || ''
+                        };
+                    });
+
+                if (mappedTransactions.length === 0) {
+                    throw new Error("No valid transactions found in Excel file.");
+                }
+
+                console.log(`✅ Imported ${mappedTransactions.length} transactions (${mappedTransactions.filter(t => t.type === TransactionType.INCOME).length} income, ${mappedTransactions.filter(t => t.type === TransactionType.EXPENSE).length} expense)`);
+                
+                // Detect duplicates
+                const foundDuplicates = new Set<string>();
+                mappedTransactions.forEach(newTx => {
+                    const isDupe = existingTransactions.some(existingTx => 
+                        isDuplicateTransaction(newTx, existingTx)
+                    );
+                    if (isDupe) {
+                        foundDuplicates.add(newTx.id);
+                    }
+                });
+                
+                console.log(`🔍 Found ${foundDuplicates.size} potential duplicates`);
+                setDuplicateIds(foundDuplicates);
+                setParserUsed('🏦 Enhanced IDFC Parser (Excel)');
+                
+                setExtractedData(mappedTransactions);
+                const nonDuplicateIds = new Set(mappedTransactions.filter(t => !foundDuplicates.has(t.id)).map(t => t.id));
+                setSelectedIds(nonDuplicateIds);
+                setShowDuplicateInfo(foundDuplicates.size > 0);
+                setStage('REVIEW');
+            } else {
+                throw new Error("No transactions found in Excel file.");
+            }
+        } catch (err: any) {
+            console.error('❌ Excel parsing error:', err);
+            setError("Failed to parse Excel file: " + (err.message || "Unknown error"));
             setStage('IDLE');
-            console.error(err);
         }
     } else {
+        console.log('📄 Non-Excel file detected, using PDF/Image parser, type:', file.type);
         // Fallback to Image/PDF processing
         try {
             const base64 = await new Promise<string>((resolve, reject) => {
@@ -406,14 +493,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 reader.onload = () => {
                     const result = reader.result as string;
                     const base64String = result.split(',')[1];
+                    console.log('✅ File read as base64, length:', base64String.length);
                     resolve(base64String);
                 };
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
 
+            console.log('🚀 Calling processTransactions with base64 data');
             await processTransactions(base64, file.type);
         } catch (err) {
+            console.error('❌ File reading error:', err);
             setError("Failed to read file.");
             setStage('IDLE');
         }

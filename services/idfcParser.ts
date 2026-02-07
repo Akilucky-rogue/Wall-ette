@@ -64,7 +64,8 @@ interface ParsedStatement {
 
 async function extractTextFromPDF(base64Data: string): Promise<string> {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // Use unpkg CDN for reliable worker loading
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
     
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
@@ -293,14 +294,57 @@ function parseTransactionLines(text: string): RawTransaction[] {
     const transactions: RawTransaction[] = [];
     const lines = text.split('\n');
     
-    // IDFC format: Date | Description | Chq/Ref | Value Date | Withdrawal | Deposit | Balance
-    // We need to find lines that match this pattern
+    // IDFC format: Date | Description | Chq/Ref | Value Date | Withdrawal/Debit | Deposit/Credit | Balance
+    // First, find the header line to identify column positions
+    let headerFound = false;
+    let debitColIndex = -1;
+    let creditColIndex = -1;
+    
+    console.log('🔍 Searching for transaction table header...');
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Look for header row with column names
+        if (/debit|withdrawal/i.test(line) && /credit|deposit/i.test(line)) {
+            console.log('✅ Found header at line', i, ':', line);
+            
+            // Split by multiple spaces to identify columns
+            const headerParts = line.split(/\s{2,}|\t+/);
+            console.log('   Header columns:', headerParts);
+            
+            // Find column indices
+            for (let j = 0; j < headerParts.length; j++) {
+                const col = headerParts[j].toLowerCase();
+                if (/debit|withdrawal/i.test(col)) {
+                    debitColIndex = j;
+                    console.log('   Debit column at index:', j);
+                }
+                if (/credit|deposit/i.test(col)) {
+                    creditColIndex = j;
+                    console.log('   Credit column at index:', j);
+                }
+            }
+            
+            headerFound = true;
+            break;
+        }
+    }
+    
+    if (!headerFound) {
+        console.warn('⚠️ Could not find header, using default column positions');
+        debitColIndex = -3;  // 3rd from end
+        creditColIndex = -2; // 2nd from end
+    }
+    
+    console.log(`📊 Parsing transactions with debit=${debitColIndex}, credit=${creditColIndex}...`);
+    let transactionCount = 0;
     
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
         // Skip empty lines and headers
-        if (!line || /^(Date|Transaction|S\.?No|Chq)/i.test(line)) continue;
+        if (!line || /^(Date|Transaction|S\.?No|Chq|Debit|Credit|Balance|Withdrawal|Deposit)/i.test(line)) continue;
         
         // Match transaction line - starts with date
         const dateMatch = line.match(/^(\d{1,2}[\s\-\/]\w{3}[\s\-\/]\d{2,4})/i);
@@ -308,24 +352,42 @@ function parseTransactionLines(text: string): RawTransaction[] {
         
         try {
             // Split by multiple spaces or tabs
-            const parts = line.split(/\s{2,}|\t+/);
+            const parts = line.split(/\s{2,}|\t+/).filter(p => p.trim());
             
             if (parts.length < 4) continue; // Need at least date, desc, and amounts
             
             const date = parseDate(parts[0]);
             const description = parts[1] || 'Unknown';
             
-            // Last 3 columns are typically: Withdrawal | Deposit | Balance
-            const withdrawal = parseAmount(parts[parts.length - 3] || '0');
-            const deposit = parseAmount(parts[parts.length - 2] || '0');
-            const balance = parseAmount(parts[parts.length - 1] || '0');
+            // Extract amounts using detected column indices
+            let withdrawal = 0;
+            let deposit = 0;
+            let balance = 0;
+            
+            if (debitColIndex >= 0 && creditColIndex >= 0) {
+                // Use absolute indices
+                withdrawal = parseAmount(parts[debitColIndex] || '0');
+                deposit = parseAmount(parts[creditColIndex] || '0');
+                balance = parseAmount(parts[parts.length - 1] || '0'); // Balance is usually last
+            } else {
+                // Use relative indices (from end)
+                withdrawal = parseAmount(parts[parts.length + debitColIndex] || '0');
+                deposit = parseAmount(parts[parts.length + creditColIndex] || '0');
+                balance = parseAmount(parts[parts.length - 1] || '0');
+            }
             
             const amount = withdrawal > 0 ? withdrawal : deposit;
-            const isCredit = deposit > 0;
+            const isCredit = deposit > 0 && withdrawal === 0;
             
             if (amount === 0) continue;
             
             const classification = classifyTransaction(description, isCredit);
+            
+            transactionCount++;
+            if (transactionCount <= 3) {
+                // Log first 3 transactions for debugging
+                console.log(`   Txn ${transactionCount}: ${date} | ${description.substring(0, 30)} | Dr:${withdrawal} Cr:${deposit} Bal:${balance} | Type:${classification.type}`);
+            }
             
             transactions.push({
                 date,
@@ -343,6 +405,11 @@ function parseTransactionLines(text: string): RawTransaction[] {
         }
     }
     
+    console.log(`✅ Parsed ${transactions.length} transactions total`);
+    const incomeCount = transactions.filter(t => t.type === 'INCOME').length;
+    const expenseCount = transactions.filter(t => t.type === 'EXPENSE').length;
+    console.log(`   ${incomeCount} income, ${expenseCount} expense`);
+    
     return transactions;
 }
 
@@ -358,9 +425,14 @@ function extractHeader(text: string): StatementHeader {
         totalCredit: 0
     };
     
+    console.log('📋 Extracting statement header...');
+    
     // Extract account number
     const accMatch = text.match(PATTERNS.accountNum);
-    if (accMatch) header.accountNumber = accMatch[1];
+    if (accMatch) {
+        header.accountNumber = accMatch[1];
+        console.log('   Account:', header.accountNumber);
+    }
     
     // Extract period
     const periodMatch = text.match(PATTERNS.period);
@@ -369,21 +441,34 @@ function extractHeader(text: string): StatementHeader {
             from: parseDate(periodMatch[1]),
             to: parseDate(periodMatch[2])
         };
+        console.log('   Period:', header.statementPeriod.from, 'to', header.statementPeriod.to);
     }
     
     // Extract balances
     const openingMatch = text.match(PATTERNS.openingBalance);
-    if (openingMatch) header.openingBalance = parseAmount(openingMatch[1]);
+    if (openingMatch) {
+        header.openingBalance = parseAmount(openingMatch[1]);
+        console.log('   Opening Balance:', header.openingBalance);
+    }
     
     const closingMatch = text.match(PATTERNS.closingBalance);
-    if (closingMatch) header.closingBalance = parseAmount(closingMatch[1]);
+    if (closingMatch) {
+        header.closingBalance = parseAmount(closingMatch[1]);
+        console.log('   Closing Balance:', header.closingBalance);
+    }
     
     // Extract totals
     const debitMatch = text.match(PATTERNS.totalDebit);
-    if (debitMatch) header.totalDebit = parseAmount(debitMatch[1]);
+    if (debitMatch) {
+        header.totalDebit = parseAmount(debitMatch[1]);
+        console.log('   Total Debit:', header.totalDebit);
+    }
     
     const creditMatch = text.match(PATTERNS.totalCredit);
-    if (creditMatch) header.totalCredit = parseAmount(creditMatch[1]);
+    if (creditMatch) {
+        header.totalCredit = parseAmount(creditMatch[1]);
+        console.log('   Total Credit:', header.totalCredit);
+    }
     
     header.bankName = 'IDFC FIRST Bank';
     

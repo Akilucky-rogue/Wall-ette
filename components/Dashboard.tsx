@@ -9,7 +9,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { getBalance, getMonthlyIncome, getMonthlyExpense, getTotalIncome, getTotalExpense, transactions, formatAmount, isCloudSyncing, retryCloudConnection } = useWallet();
+  const { getBalance, getMonthlyIncome, getMonthlyExpense, getTotalIncome, getTotalExpense, transactions, formatAmount, isCloudSyncing, retryCloudConnection, openingBalance } = useWallet();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllTime, setShowAllTime] = useState(true); // Default to All Time
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -41,6 +41,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       totalExpenses,
       showAllTime,
       hasMonthlyData,
+      openingBalance,
+      transactionBalance: totalIncome - totalExpenses,
+      expectedBalance: openingBalance + totalIncome - totalExpenses,
       sampleTransactions: transactions.slice(0, 3).map(t => ({
         date: t.date,
         type: t.type,

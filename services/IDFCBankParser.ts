@@ -55,7 +55,11 @@ export class IDFCBankParser {
    */
   static async parseExcel(file: File): Promise<ParseResult> {
     try {
+      console.log('📊 parseExcel called with file:', file.name, 'size:', file.size, 'type:', file.type);
+      
       const buffer = await file.arrayBuffer();
+      console.log('📊 File buffer size:', buffer.byteLength);
+      
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       
       console.log('📊 Excel sheets found:', workbook.SheetNames);
@@ -118,6 +122,9 @@ export class IDFCBankParser {
       const validation = this.validateTransactions(transactions, summary);
 
       console.log(`✅ Parsed ${transactions.length} transactions from Excel`);
+      console.log('🔍 Validation result:', validation);
+      console.log('   Errors:', validation.errors);
+      console.log('   Warnings:', validation.warnings);
 
       return {
         transactions,

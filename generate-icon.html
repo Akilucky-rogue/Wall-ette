@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WALL-E App Icon Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            font-family: system-ui;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        canvas {
+            border: 2px solid #A8B89E;
+            border-radius: 8px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #A8B89E;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #8fa37e;
+        }
+        .sizes {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .info {
+            text-align: center;
+            color: #A8B89E;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 WALL-E App Icon Generator</h1>
+    <div class="info">
+        <p>512x512 icon for Android APK</p>
+        <p>Right-click and "Save image as..." to download</p>
+    </div>
+    <canvas id="icon" width="512" height="512"></canvas>
+    <div class="sizes">
+        <button onclick="generateIcon(192)">192x192 (xxxhdpi)</button>
+        <button onclick="generateIcon(144)">144x144 (xxhdpi)</button>
+        <button onclick="generateIcon(96)">96x96 (xhdpi)</button>
+        <button onclick="generateIcon(72)">72x72 (hdpi)</button>
+        <button onclick="generateIcon(48)">48x48 (mdpi)</button>
+        <button onclick="generateIcon(512)">512x512 (Main)</button>
+    </div>
+
+    <script>
+        function generateIcon(size = 512) {
+            const canvas = document.getElementById('icon');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+
+            // Background gradient (Sage green to darker green)
+            const bgGradient = ctx.createLinearGradient(0, 0, size, size);
+            bgGradient.addColorStop(0, '#A8B89E');
+            bgGradient.addColorStop(1, '#7a8a6e');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, size, size);
+
+            // Add subtle texture
+            for (let i = 0; i < 100; i++) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.03})`;
+                ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+            }
+
+            // Wallet shape (like a simplified wallet with flap)
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const walletWidth = size * 0.6;
+            const walletHeight = size * 0.45;
+            const radius = size * 0.05;
+
+            // Main wallet body
+            ctx.fillStyle = '#2d3a28';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = size * 0.02;
+            ctx.shadowOffsetY = size * 0.01;
+            
+            roundRect(ctx, centerX - walletWidth/2, centerY - walletHeight/2, walletWidth, walletHeight, radius);
+
+            // Wallet flap (top part)
+            ctx.fillStyle = '#3a4a35';
+            roundRect(ctx, centerX - walletWidth/2, centerY - walletHeight/2 - size * 0.08, walletWidth, size * 0.15, radius);
+
+            // Rupee symbol in the center
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = '#F5EFE0';
+            ctx.font = `bold ${size * 0.35}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('₹', centerX, centerY + size * 0.02);
+
+            // WALL-E text below
+            ctx.fillStyle = '#F5EFE0';
+            ctx.font = `bold ${size * 0.08}px monospace`;
+            ctx.fillText('WALL-E', centerX, centerY + walletHeight/2 + size * 0.12);
+
+            // Small decorative lotus petals in corners
+            ctx.fillStyle = 'rgba(245, 239, 224, 0.15)';
+            drawLotus(ctx, size * 0.12, size * 0.12, size * 0.06);
+            drawLotus(ctx, size * 0.88, size * 0.12, size * 0.06);
+            drawLotus(ctx, size * 0.12, size * 0.88, size * 0.06);
+            drawLotus(ctx, size * 0.88, size * 0.88, size * 0.06);
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawLotus(ctx, x, y, size) {
+            ctx.save();
+            ctx.translate(x, y);
+            for (let i = 0; i < 8; i++) {
+                ctx.rotate(Math.PI / 4);
+                ctx.beginPath();
+                ctx.ellipse(0, -size/3, size/4, size/2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // Generate 512x512 on load
+        generateIcon(512);
+    </script>
+</body>
+</html>

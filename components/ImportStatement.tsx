@@ -245,8 +245,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         amount: t.amount,
                         type: t.type.toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE',
                         category: t.category,
-                        note: t.notes || t.description,
-                        nature: this.getTransactionNature(t.category, t.type)
+                        note: t.notes || t.description
                     }));
                     
                     parserUsed = '🏦 Enhanced IDFC Parser';
@@ -255,7 +254,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     updateProgress(`✅ ${rawTransactions.length} transactions (${result.summary.customerName})`);
                 }
             } catch (bankParserError: any) {
-                console.log('🏦 IDFCBankParser failed:', bankParserError.message);
+                console.error('❌ IDFCBankParser failed:', bankParserError);
+                console.error('   Error message:', bankParserError.message);
+                console.error('   Stack:', bankParserError.stack);
             }
         }
         
@@ -280,7 +281,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     }
                 }
             } catch (idfcError: any) {
-                console.log('🏦 Rule-based parser failed:', idfcError.message);
+                console.error('❌ Rule-based parser failed:', idfcError);
+                console.error('   Error message:', idfcError.message);
             }
         }
         

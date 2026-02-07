@@ -58,11 +58,15 @@ export class IDFCBankParser {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       
+      console.log('📊 Excel sheets found:', workbook.SheetNames);
+      
       // Get the main statement sheet
       const sheetName = workbook.SheetNames.find(name => 
         name.toLowerCase().includes('account') || 
         name.toLowerCase().includes('statement')
       ) || workbook.SheetNames[0];
+      
+      console.log('📊 Using sheet:', sheetName);
       
       const worksheet = workbook.Sheets[sheetName];
       const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { 
@@ -81,8 +85,13 @@ export class IDFCBankParser {
         )
       );
 
+      console.log('📊 Header row index:', headerRowIndex);
+      if (headerRowIndex > -1) {
+        console.log('📊 Headers:', data[headerRowIndex].slice(0, 7).join(' | '));
+      }
+
       if (headerRowIndex === -1) {
-        throw new Error('Could not find transaction header row. Please ensure this is a valid IDFC FIRST Bank statement.');
+        throw new Error('Could not find transaction header row. Expected "Transaction Date" column in Excel.');
       }
 
       // Parse transactions starting from next row
@@ -116,7 +125,8 @@ export class IDFCBankParser {
         validation
       };
     } catch (error: any) {
-      throw new Error(`Excel parsing failed: ${error.message}`);
+      console.error('❌ Excel parsing error:', error);
+      throw new Error(`Excel parsing failed: ${error.message} | Please ensure the file is a valid IDFC statement with "Transaction Date" column.`);
     }
   }
 

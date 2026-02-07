@@ -5,7 +5,7 @@ import { AppScreen, Transaction, TransactionType } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
 import { parseBankStatement as parseWithOllama, checkOllamaStatus } from '../services/ollamaService';
-import { parseBankStatement as parseWithGemini } from '../services/geminiService';
+import { parseBankStatement as parseWithClaude } from '../services/claudeService';
 import { getSymbol } from '../currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
@@ -340,15 +340,15 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             }
         }
         
-        // TRY 4: GEMINI AI (cloud fallback)
+        // TRY 4: CLAUDE AI (cloud fallback)
         if (rawTransactions.length === 0) {
             try {
-                console.log('☁️ Trying Gemini AI parser...');
-                updateProgress("Analyzing with Gemini AI (cloud)...");
+                console.log('🤖 Trying Claude AI parser...');
+                updateProgress("Analyzing with Claude AI...");
                 
                 const messages = [
-                    "Analyzing with Gemini AI...",
-                    "Processing pages in parallel...",
+                    "Analyzing with Claude AI...",
+                    "Processing document...",
                     "Extracting transactions...",
                     "Validating entries...",
                     "Almost there..."
@@ -360,13 +360,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     setLoadingMessage(messages[messageIndex]);
                 }, 3000);
                 
-                rawTransactions = await parseWithGemini(data, mimeType);
-                parserUsed = '☁️ Gemini AI';
+                rawTransactions = await parseWithClaude(data, mimeType);
+                parserUsed = '🤖 Claude AI';
                 setParserUsed(parserUsed);
                 if (timer) clearInterval(timer);
-            } catch (geminiError: any) {
+            } catch (claudeError: any) {
                 if (timer) clearInterval(timer);
-                throw new Error(`All parsers failed. Please ensure this is a valid IDFC bank statement. Error: ${geminiError.message}`);
+                throw new Error(`All parsers failed. Please ensure this is a valid IDFC bank statement. Error: ${claudeError.message}`);
             }
         }
         
@@ -596,8 +596,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             </p>
                             <p className="text-xs text-muted-taupe mt-0.5">
                                 {ollamaStatus.available && ollamaStatus.models.length > 0
-                                    ? `IDFC → 🦙 Ollama (${ollamaStatus.models.slice(0, 2).join(', ')}) → ☁️ Gemini` 
-                                    : 'IDFC → ☁️ Gemini (cloud)'}
+                                    ? `IDFC → 🦙 Ollama (${ollamaStatus.models.slice(0, 2).join(', ')}) → 🤖 Claude` 
+                                    : 'IDFC → 🤖 Claude (AI)'}
                             </p>
                         </div>
                         {!ollamaStatus.available && (
@@ -612,7 +612,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 )}
 
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Upload your bank statement (PDF, Excel, or Image). {ollamaStatus.available && ollamaStatus.models.length > 0 ? 'Ollama (local)' : 'Gemini AI'} will categorize your transactions.
+                Upload your bank statement (PDF, Excel, or Image). {ollamaStatus.available && ollamaStatus.models.length > 0 ? 'Ollama (local)' : 'Claude AI'} will categorize your transactions.
                 </p>
                 
                 <div 

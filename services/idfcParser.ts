@@ -218,19 +218,21 @@ function classifyTransaction(description: string, isCredit: boolean): {
     // Check each rule
     for (const [key, rule] of Object.entries(CATEGORY_RULES)) {
         if (rule.pattern.test(description)) {
-            const merchant = rule.extractMerchant 
+            // Extract merchant - use extractMerchant if available, otherwise use default logic
+            const merchant = ('extractMerchant' in rule && typeof rule.extractMerchant === 'function')
                 ? rule.extractMerchant(description)
                 : description.split(/REF|CHQ|TXNID/i)[0].trim();
             
-            const nature = isCredit && (rule as any).categoryIn 
-                ? (rule as any).categoryIn 
-                : rule.category;
+            // Get nature/category
+            const nature = (isCredit && 'categoryIn' in rule && rule.categoryIn) 
+                ? rule.categoryIn as TransactionNature
+                : ('category' in rule ? rule.category as TransactionNature : 'UNCATEGORIZED');
             
             return {
                 merchant: merchant || description.substring(0, 50),
                 nature: nature || 'UNCATEGORIZED',
-                type: rule.type || (isCredit ? 'INCOME' : 'EXPENSE'),
-                incomeSource: rule.incomeSource
+                type: ('type' in rule ? rule.type : (isCredit ? 'INCOME' : 'EXPENSE')) as 'INCOME' | 'EXPENSE',
+                incomeSource: 'incomeSource' in rule ? rule.incomeSource : undefined
             };
         }
     }

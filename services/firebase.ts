@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence, indexedDBLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 
 // Configuration provided for the WALL-E app
@@ -15,6 +15,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Set session persistence based on platform
+// For mobile: use session persistence (clears on app close)
+// For web: use local persistence (stays logged in)
+const isNativePlatform = 'Capacitor' in window;
+if (isNativePlatform) {
+  setPersistence(auth, browserSessionPersistence).catch((error) => {
+    console.warn('Failed to set session persistence:', error);
+  });
+  console.log('🔒 Mobile platform detected - Session persistence enabled (auto-logout on app close)');
+} else {
+  setPersistence(auth, indexedDBLocalPersistence).catch((error) => {
+    console.warn('Failed to set local persistence:', error);
+  });
+}
 
 // Initialize Firestore with persistent cache enabled via the new API
 export const db = initializeFirestore(app, {

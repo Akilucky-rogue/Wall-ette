@@ -4,8 +4,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
-import { parseBankStatement as parseWithOllama, checkOllamaStatus } from '../services/ollamaService';
-import { parseBankStatement as parseWithClaude } from '../services/claudeService';
 import { getSymbol } from '../currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
@@ -124,24 +122,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Ollama status
-  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; models: string[]; checked: boolean }>({
-    available: false, models: [], checked: false
-  });
-  
-  // Duplicate detection
-  const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
-  const [showDuplicateInfo, setShowDuplicateInfo] = useState(true);
-  
   // Parser tracking
   const [parserUsed, setParserUsed] = useState<string>('');
-
-  // Check Ollama status on mount
-  useEffect(() => {
-    checkOllamaStatus().then(status => {
-      setOllamaStatus({ ...status, checked: true });
-    });
-  }, []);
 
   // Flip all types (in case AI got it wrong)
   const flipAllTypes = () => {
@@ -227,16 +209,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const processTransactions = async (data: string, mimeType: string, rawText?: string) => {
     try {
         // ═══════════════════════════════════════════════════════════════
-        // ENHANCED PARSING PRIORITY (merged best of both):
-        // 1. IDFCBankParser (Excel/CSV + PDF) - fastest, 15+ categories
-        // 2. idfcParser (PDF + validation) - strict balance check fallback
-        // 3. Ollama AI (local, offline)
-        // 4. Gemini AI (cloud fallback)
+        // PARSING PRIORITY (RULE-BASED ONLY):
+        // 1. IDFCBankParser (Excel/CSV + PDF)
+        // 2. idfcParser (PDF + validation)
         // ═══════════════════════════════════════════════════════════════
         
         let rawTransactions: any[] = [];
         let parserUsed = '';
-        let timer: NodeJS.Timeout | null = null;
         
         // TRY 1: IDFC BANK PARSER (EXCEL/CSV/PDF WITH ENHANCED FEATURES)
         if (fileInputRef.current?.files?.[0]) {
@@ -305,73 +284,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             }
         }
         
-        // TRY 3: OLLAMA AI (if previous parsers didn't work)
-        if (rawTransactions.length === 0) {
-            try {
-                const ollamaCheck = await checkOllamaStatus();
-                const useOllama = ollamaCheck.available && ollamaCheck.models.length > 0;
-                
-                if (useOllama) {
-                    console.log('🦙 Trying Ollama AI parser...');
-                    updateProgress("Analyzing with Ollama AI (local)...");
-                    
-                    const messages = [
-                        "Analyzing with Ollama AI...",
-                        "Extracting text from PDF...",
-                        "Processing pages...",
-                        "Validating entries...",
-                        "Almost there..."
-                    ];
-                    let messageIndex = 0;
-                    
-                    timer = setInterval(() => {
-                        messageIndex = Math.min(messageIndex + 1, messages.length - 1);
-                        setLoadingMessage(messages[messageIndex]);
-                    }, 3000);
-                    
-                    rawTransactions = await parseWithOllama(data, mimeType);
-                    parserUsed = '🦙 Ollama AI';
-                    setParserUsed(parserUsed);
-                    if (timer) clearInterval(timer);
-                }
-            } catch (ollamaError: any) {
-                console.log('🦙 Ollama failed:', ollamaError.message);
-                if (timer) clearInterval(timer);
-            }
-        }
-        
-        // TRY 4: CLAUDE AI (cloud fallback)
-        if (rawTransactions.length === 0) {
-            try {
-                console.log('🤖 Trying Claude AI parser...');
-                updateProgress("Analyzing with Claude AI...");
-                
-                const messages = [
-                    "Analyzing with Claude AI...",
-                    "Processing document...",
-                    "Extracting transactions...",
-                    "Validating entries...",
-                    "Almost there..."
-                ];
-                let messageIndex = 0;
-                
-                timer = setInterval(() => {
-                    messageIndex = Math.min(messageIndex + 1, messages.length - 1);
-                    setLoadingMessage(messages[messageIndex]);
-                }, 3000);
-                
-                rawTransactions = await parseWithClaude(data, mimeType);
-                parserUsed = '🤖 Claude AI';
-                setParserUsed(parserUsed);
-                if (timer) clearInterval(timer);
-            } catch (claudeError: any) {
-                if (timer) clearInterval(timer);
-                throw new Error(`All parsers failed. Please ensure this is a valid IDFC bank statement. Error: ${claudeError.message}`);
-            }
-        }
-        
         if (!rawTransactions || rawTransactions.length === 0) {
-            throw new Error("No transactions could be extracted. Please ensure this is a valid bank statement.");
+            throw new Error("Could not parse this statement. Try uploading a clear PDF or Excel file from your IDFC bank statement.");
         }
         
         console.log(`✅ Parsed using: ${parserUsed}`);
@@ -576,43 +490,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         
         {stage === 'IDLE' && (
             <>
-                {/* Parsing Status Banner */}
-                {ollamaStatus.checked && (
-                    <div className={`mb-4 p-4 rounded-2xl flex items-center gap-3 ${
-                        ollamaStatus.available && ollamaStatus.models.length > 0
-                            ? 'bg-sage-light/30 border border-sage/20' 
-                            : 'bg-blue-50 border border-blue-200'
-                    }`}>
-                        <span className={`material-symbols-outlined text-[20px] ${
-                            ollamaStatus.available && ollamaStatus.models.length > 0 ? 'text-sage' : 'text-blue-600'
-                        }`}>
-                            {ollamaStatus.available && ollamaStatus.models.length > 0 ? 'check_circle' : 'cloud'}
-                        </span>
-                        <div className="flex-1">
-                            <p className={`text-sm font-semibold ${
-                                ollamaStatus.available && ollamaStatus.models.length > 0 ? 'text-sage' : 'text-blue-700'
-                            }`}>
-                                🏦 Rule-based Parser Priority
-                            </p>
-                            <p className="text-xs text-muted-taupe mt-0.5">
-                                {ollamaStatus.available && ollamaStatus.models.length > 0
-                                    ? `IDFC → 🦙 Ollama (${ollamaStatus.models.slice(0, 2).join(', ')}) → 🤖 Claude` 
-                                    : 'IDFC → 🤖 Claude (AI)'}
-                            </p>
-                        </div>
-                        {!ollamaStatus.available && (
-                            <button 
-                                onClick={() => checkOllamaStatus().then(s => setOllamaStatus({ ...s, checked: true }))}
-                                className="px-3 py-1.5 bg-white rounded-full text-xs font-medium text-premium-charcoal hover:bg-gray-50"
-                            >
-                                Retry
-                            </button>
-                        )}
-                    </div>
-                )}
-
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Upload your bank statement (PDF, Excel, or Image). {ollamaStatus.available && ollamaStatus.models.length > 0 ? 'Ollama (local)' : 'Claude AI'} will categorize your transactions.
+                Upload your IDFC bank statement (PDF, Excel, or Image). Fast, rule-based parsing without AI.
                 </p>
                 
                 <div 

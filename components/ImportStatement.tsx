@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 // import * as XLSX from 'xlsx'; 
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
+import IDFCBankParser from '../services/IDFCBankParser';
 import { parseBankStatement as parseWithOllama, checkOllamaStatus } from '../services/ollamaService';
 import { parseBankStatement as parseWithGemini } from '../services/geminiService';
 import { getSymbol } from '../currencyUtils';
@@ -88,6 +89,25 @@ const isDuplicateTransaction = (
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const { currency, importTransactions, transactions: existingTransactions } = useWallet();
+  
+  // Helper: Convert category to transaction nature
+  const getTransactionNature = (category: string, type: string): string => {
+    const cat = category.toLowerCase();
+    
+    if (type === 'income') {
+      if (cat.includes('salary')) return 'SALARY';
+      if (cat.includes('investment') || cat.includes('interest') || cat.includes('dividend')) return 'INVESTMENT_RETURN';
+      if (cat.includes('refund')) return 'REFUND';
+      if (cat.includes('transfer')) return 'TRANSFER';
+      return 'PASSIVE_INCOME';
+    }
+    
+    if (cat.includes('cash') || cat.includes('atm')) return 'CASH_OUT';
+    if (cat.includes('transfer')) return 'TRANSFER';
+    if (cat.includes('investment')) return 'INVESTMENT_OUTFLOW';
+    
+    return 'CONSUMPTION';
+  };
   
   // Stages: IDLE (Upload), PROCESSING (AI Loading), REVIEW (Selection)
   const [stage, setStage] = useState<'IDLE' | 'PROCESSING' | 'REVIEW'>('IDLE');
@@ -207,45 +227,85 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const processTransactions = async (data: string, mimeType: string, rawText?: string) => {
     try {
         // ═══════════════════════════════════════════════════════════════
-        // PARSING PRIORITY (for IDFC statements):
-        // 1. IDFC Rule-based Parser (fastest, most accurate, validates balance)
-        // 2. Ollama AI (local, offline)
-        // 3. Gemini AI (cloud fallback)
+        // ENHANCED PARSING PRIORITY (merged best of both):
+        // 1. IDFCBankParser (Excel/CSV + PDF) - fastest, 15+ categories
+        // 2. idfcParser (PDF + validation) - strict balance check fallback
+        // 3. Ollama AI (local, offline)
+        // 4. Gemini AI (cloud fallback)
         // ═══════════════════════════════════════════════════════════════
         
         let rawTransactions: any[] = [];
         let parserUsed = '';
         let timer: NodeJS.Timeout | null = null;
         
-        // TRY 1: IDFC RULE-BASED PARSER (FASTEST & MOST ACCURATE)
-        try {
-            console.log('🏦 Trying IDFC rule-based parser...');
-            updateProgress("Parsing IDFC statement (rule-based)...");
-            
-            const result = await parseIDFCStatement(data);
-            
-            if (result.transactions.length > 0) {
-                console.log(`✅ IDFC parser succeeded: ${result.transactions.length} transactions`);
-                console.log(`   Balance validation: ${result.validationPassed ? '✅ PASSED' : '⚠️ WARNINGS'}`);
+        // TRY 1: IDFC BANK PARSER (EXCEL/CSV/PDF WITH ENHANCED FEATURES)
+        if (fileInputRef.current?.files?.[0]) {
+            try {
+                console.log('🏦 Trying IDFCBankParser (Excel/CSV/PDF)...');
+                updateProgress("Parsing with enhanced IDFC parser...");
                 
-                if (!result.validationPassed) {
-                    console.warn('   Validation errors:', result.errors);
+                const file = fileInputRef.current.files[0];
+                const result = await IDFCBankParser.parseExcel(file);
+                
+                if (result.transactions.length > 0) {
+                    console.log(`✅ IDFCBankParser succeeded: ${result.transactions.length} transactions`);
+                    console.log(`   Validation: ${result.validation.isValid ? '✅ PASSED' : '⚠️ WARNINGS'}`);
+                    console.log(`   Summary: ${result.summary.customerName} (${result.summary.accountNumber})`);
+                    
+                    if (result.validation.errors.length > 0) {
+                        console.warn('   Errors:', result.validation.errors);
+                    }
+                    if (result.validation.warnings.length > 0) {
+                        console.warn('   Warnings:', result.validation.warnings);
+                    }
+                    
+                    // Convert to app format
+                    rawTransactions = result.transactions.map((t: any) => ({
+                        date: t.date,
+                        merchant: t.description.substring(0, 100),
+                        amount: t.amount,
+                        type: t.type.toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE',
+                        category: t.category,
+                        note: t.notes || t.description,
+                        nature: this.getTransactionNature(t.category, t.type)
+                    }));
+                    
+                    parserUsed = '🏦 Enhanced IDFC Parser';
+                    setParserUsed(parserUsed);
+                    
+                    updateProgress(`✅ ${rawTransactions.length} transactions (${result.summary.customerName})`);
                 }
-                
-                rawTransactions = result.transactions;
-                parserUsed = '🏦 Rule-based (IDFC)';
-                setParserUsed(parserUsed);
-                
-                // If validation passed, we're done - best accuracy!
-                if (result.validationPassed) {
-                    updateProgress(`Verified ${rawTransactions.length} transactions with full balance validation ✓`);
-                }
+            } catch (bankParserError: any) {
+                console.log('🏦 IDFCBankParser failed:', bankParserError.message);
             }
-        } catch (idfcError: any) {
-            console.log('🏦 IDFC parser not applicable or failed:', idfcError.message);
         }
         
-        // TRY 2: OLLAMA AI (if IDFC parser didn't work)
+        // TRY 2: IDFC RULE-BASED PARSER (PDF VALIDATION FALLBACK)
+        if (rawTransactions.length === 0 && mimeType.includes('pdf')) {
+            try {
+                console.log('🏦 Trying IDFC rule-based parser (validation)...');
+                updateProgress("Validating with rule-based parser...");
+                
+                const result = await parseIDFCStatement(data);
+                
+                if (result.transactions.length > 0) {
+                    console.log(`✅ Rule-based parser succeeded: ${result.transactions.length} transactions`);
+                    console.log(`   Balance validation: ${result.validationPassed ? '✅ PASSED' : '⚠️ WARNINGS'}`);
+                    
+                    rawTransactions = result.transactions;
+                    parserUsed = '🏦 Rule-based (Validation)';
+                    setParserUsed(parserUsed);
+                    
+                    if (result.validationPassed) {
+                        updateProgress(`Verified ${rawTransactions.length} with balance validation ✓`);
+                    }
+                }
+            } catch (idfcError: any) {
+                console.log('🏦 Rule-based parser failed:', idfcError.message);
+            }
+        }
+        
+        // TRY 3: OLLAMA AI (if previous parsers didn't work)
         if (rawTransactions.length === 0) {
             try {
                 const ollamaCheck = await checkOllamaStatus();
@@ -280,7 +340,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             }
         }
         
-        // TRY 3: GEMINI AI (cloud fallback)
+        // TRY 4: GEMINI AI (cloud fallback)
         if (rawTransactions.length === 0) {
             try {
                 console.log('☁️ Trying Gemini AI parser...');
@@ -317,7 +377,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         console.log(`✅ Parsed using: ${parserUsed}`);
         updateProgress(`Found ${rawTransactions.length} transactions using ${parserUsed}`);
 
-        // Map to internal Transaction type (validation already done in geminiService)
+        // Map to internal Transaction type (validation already done in parsers)
         const mappedTransactions: Transaction[] = rawTransactions
             .filter((t: any) => {
                 // Final validation check

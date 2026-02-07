@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
+import { analyzeFinancialHealth, FinancialInsight } from '../services/geminiService';
 
 interface SpendAnalysisProps {
   onNavigate: (screen: AppScreen) => void;
@@ -12,6 +13,11 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [chartMode, setChartMode] = useState<'WEEKLY' | 'DAILY'>('DAILY');
   const [analysisTab, setAnalysisTab] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  
+  // AI Insights State
+  const [aiInsights, setAiInsights] = useState<FinancialInsight | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [showAiInsights, setShowAiInsights] = useState(false);
 
   // Auto-detect the month with most recent transactions
   const latestTxDate = useMemo(() => {
@@ -263,6 +269,28 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const currentTotal = analysisTab === 'EXPENSE' ? totalExpense : totalIncome;
   const currentData = analysisTab === 'EXPENSE' ? filteredExpenses : filteredIncome;
   const chartColor = analysisTab === 'EXPENSE' ? '#E57373' : '#9BAE93';
+
+  // Fetch AI insights when user requests them
+  const fetchAIInsights = async () => {
+    if (loadingInsights) return;
+    
+    setLoadingInsights(true);
+    try {
+      const monthTransactions = transactions.filter(t => {
+        const txDate = new Date(t.date);
+        return txDate.getMonth() === selectedDate.getMonth() &&
+               txDate.getFullYear() === selectedDate.getFullYear();
+      });
+      
+      const insights = await analyzeFinancialHealth(monthTransactions, totalIncome);
+      setAiInsights(insights);
+      setShowAiInsights(true);
+    } catch (err) {
+      console.error('AI Analysis failed:', err);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
@@ -577,6 +605,175 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                 <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{insight.text}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI-Powered Insights */}
+      {currentData.length > 0 && (
+        <div className="px-6 py-4">
+          <div className="bg-gradient-to-br from-purple-50 to-lavender/20 rounded-[24px] p-5 border-2 border-purple-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center">
+                  <WallEMascot mood="happy" size="xs" />
+                </div>
+                <h3 className="text-premium-charcoal text-base font-serif font-semibold">AI Pulse</h3>
+              </div>
+              
+              {!showAiInsights && (
+                <button
+                  onClick={fetchAIInsights}
+                  disabled={loadingInsights}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-lavender text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-md hover:shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {loadingInsights ? (
+                    <>
+                      <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                      Get Insights
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {!showAiInsights && !loadingInsights && (
+              <p className="text-[11px] text-muted-taupe leading-relaxed">
+                Get personalized AI-powered recommendations, anomaly detection, and savings opportunities based on your spending patterns.
+              </p>
+            )}
+
+            {loadingInsights && (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center animate-pulse">
+                  <WallEMascot mood="happy" size="sm" animate />
+                </div>
+                <p className="text-[11px] text-muted-taupe animate-pulse">Analyzing your financial health...</p>
+              </div>
+            )}
+
+            {showAiInsights && aiInsights && (
+              <div className="space-y-4 animate-slide-up">
+                {/* Summary */}
+                <div className="bg-white/80 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-[18px] text-purple-600">insights</span>
+                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Summary</h4>
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-premium-charcoal">{aiInsights.summary}</p>
+                </div>
+
+                {/* Risk Score */}
+                <div className="bg-white/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-purple-600">speed</span>
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Financial Health</h4>
+                    </div>
+                    <span className={`text-sm font-bold ${
+                      aiInsights.riskScore < 30 ? 'text-sage' :
+                      aiInsights.riskScore < 70 ? 'text-amber-600' :
+                      'text-rose'
+                    }`}>{aiInsights.riskScore}/100</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all ${
+                        aiInsights.riskScore < 30 ? 'bg-sage' :
+                        aiInsights.riskScore < 70 ? 'bg-amber-500' :
+                        'bg-rose'
+                      }`}
+                      style={{ width: `${aiInsights.riskScore}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Key Findings */}
+                {aiInsights.keyFindings.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-purple-600">lightbulb</span>
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Key Findings</h4>
+                    </div>
+                    {aiInsights.keyFindings.map((finding, i) => (
+                      <div key={i} className="bg-white/60 rounded-xl p-3 flex items-start gap-2">
+                        <span className="text-purple-500 text-[16px]">•</span>
+                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{finding}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {aiInsights.recommendations.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-sage">check_circle</span>
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-sage">Recommendations</h4>
+                    </div>
+                    {aiInsights.recommendations.map((rec, i) => (
+                      <div key={i} className="bg-sage/10 rounded-xl p-3 flex items-start gap-2 border border-sage/20">
+                        <span className="text-sage text-[16px]">✓</span>
+                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{rec}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Anomalies */}
+                {aiInsights.anomalies.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Unusual Patterns</h4>
+                    </div>
+                    {aiInsights.anomalies.map((anomaly, i) => (
+                      <div key={i} className="bg-amber-50 rounded-xl p-3 flex items-start gap-2 border border-amber-200">
+                        <span className="text-amber-600 text-[16px]">⚠</span>
+                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{anomaly}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Savings Opportunities */}
+                {aiInsights.savingsOpportunities.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-sage">savings</span>
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-sage">Savings Opportunities</h4>
+                    </div>
+                    {aiInsights.savingsOpportunities.map((opp, i) => (
+                      <div key={i} className="bg-sage/10 rounded-xl p-3 flex items-start gap-2 border border-sage/20">
+                        <span className="text-sage text-[16px]">💰</span>
+                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{opp}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Budget Suggestion */}
+                <div className="bg-gradient-to-br from-purple-500 to-lavender rounded-2xl p-4 text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+                    <h4 className="text-[10px] uppercase tracking-widest font-bold">Budget Suggestion</h4>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">{aiInsights.budgetSuggestion}</p>
+                </div>
+
+                <button
+                  onClick={() => setShowAiInsights(false)}
+                  className="w-full px-4 py-2 bg-purple-100 text-purple-600 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-purple-200 transition-all"
+                >
+                  Close Insights
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

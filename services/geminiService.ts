@@ -8,6 +8,109 @@ if (apiKey) {
   ai = new GoogleGenAI({ apiKey });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AI-POWERED FINANCIAL ANALYSIS (PULSE/INSIGHTS)
+// ═══════════════════════════════════════════════════════════════
+
+export interface FinancialInsight {
+  summary: string;
+  keyFindings: string[];
+  recommendations: string[];
+  anomalies: string[];
+  savingsOpportunities: string[];
+  budgetSuggestion: string;
+  riskScore: number; // 0-100
+}
+
+/**
+ * Comprehensive AI analysis of spending patterns
+ */
+export const analyzeFinancialHealth = async (
+  transactions: Array<{date: string; merchant: string; amount: number; category: string; type: string}>,
+  monthlyIncome?: number
+): Promise<FinancialInsight> => {
+  if (!ai) {
+    return {
+      summary: "AI analysis unavailable",
+      keyFindings: ["Connect Gemini API to unlock AI insights"],
+      recommendations: ["Set up your API key in environment variables"],
+      anomalies: [],
+      savingsOpportunities: [],
+      budgetSuggestion: "Configure AI to get personalized budget recommendations",
+      riskScore: 0
+    };
+  }
+
+  try {
+    // Prepare transaction summary
+    const expenses = transactions.filter(t => t.type === 'EXPENSE');
+    const income = transactions.filter(t => t.type === 'INCOME');
+    
+    const categorySpend = expenses.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
+    const totalEarned = income.reduce((sum, t) => sum + t.amount, 0);
+    
+    const prompt = `You are an expert financial advisor. Analyze this financial data and provide actionable insights in JSON format:
+
+TRANSACTION SUMMARY:
+- Period: ${transactions.length > 0 ? `${transactions[0].date} to ${transactions[transactions.length-1].date}` : 'Current month'}
+- Total Expenses: ₹${totalSpent.toFixed(2)}
+- Total Income: ₹${totalEarned.toFixed(2)}
+- Net: ₹${(totalEarned - totalSpent).toFixed(2)}
+- Transaction Count: ${transactions.length}
+
+SPENDING BY CATEGORY:
+${Object.entries(categorySpend).map(([cat, amt]) => `- ${cat}: ₹${amt.toFixed(2)} (${((amt/totalSpent)*100).toFixed(1)}%)`).join('\n')}
+
+TOP 10 TRANSACTIONS:
+${expenses.slice(0, 10).map(t => `- ${t.date}: ${t.merchant} - ₹${t.amount} (${t.category})`).join('\n')}
+
+Provide analysis in this exact JSON structure:
+{
+  "summary": "2-3 sentence overview of financial health",
+  "keyFindings": ["finding1", "finding2", "finding3"],
+  "recommendations": ["actionable advice1", "actionable advice2", "actionable advice3"],
+  "anomalies": ["unusual pattern1", "unusual pattern2"],
+  "savingsOpportunities": ["opportunity1", "opportunity2", "opportunity3"],
+  "budgetSuggestion": "Specific monthly budget breakdown suggestion",
+  "riskScore": 45
+}
+
+Be concise, specific, and actionable. Focus on Indian rupee context.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: prompt,
+      config: {
+        systemInstruction: "You are a mindful, expert financial advisor specializing in personal finance for Indian users. Provide clear, actionable insights in valid JSON format only. Be encouraging but realistic.",
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const analysis = JSON.parse(response.text);
+    return analysis;
+    
+  } catch (error) {
+    console.error("Gemini Analysis Error:", error);
+    return {
+      summary: "Analysis temporarily unavailable. Your spending data is processing.",
+      keyFindings: ["Unable to analyze at this moment", "Try again in a few moments"],
+      recommendations: ["Continue tracking your expenses", "Review your category breakdown manually"],
+      anomalies: [],
+      savingsOpportunities: ["Check your largest expense categories for optimization"],
+      budgetSuggestion: "Set a budget for your top 3 spending categories",
+      riskScore: 50
+    };
+  }
+};
+
+/**
+ * Quick AI spending insight (single sentence)
+ */
 export const analyzeSpendingHabits = async (transactionsContext: string) => {
   if (!ai) return "AI service not configured.";
   

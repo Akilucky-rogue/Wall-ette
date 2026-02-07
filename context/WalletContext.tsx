@@ -13,9 +13,11 @@ interface WalletContextType {
   mfaEnabled: boolean;
   isOnline: boolean;
   isCloudSyncing: boolean;
+  openingBalance: number;
   setCurrency: (code: CurrencyCode) => void;
   setDailyLimit: (limit: number) => void;
   setMfaEnabled: (enabled: boolean) => void;
+  setOpeningBalance: (balance: number) => void;
   addTransaction: (transaction: Transaction) => Promise<boolean>;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
@@ -58,6 +60,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [dailyLimit, setDailyLimitState] = useState<number>(0);
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
   const [lastLoginTime, setLastLoginTime] = useState<Date | null>(null);
+  const [openingBalance, setOpeningBalanceState] = useState<number>(0);
   
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   // Backend ready state to handle cases where DB doesn't exist
@@ -226,6 +229,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               setIgnoreRules(DEFAULT_RULES);
               setDailyLimitState(0);
               setMfaEnabledState(false);
+              setOpeningBalanceState(0);
           } else {
                const localCurrency = loadFromLocal('currency');
                if (localCurrency) setCurrencyState(localCurrency);
@@ -239,6 +243,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                
                const localMfa = loadFromLocal('mfaEnabled');
                if (localMfa !== null) setMfaEnabledState(localMfa);
+               
+               const localOpeningBalance = loadFromLocal('openingBalance');
+               if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
           }
           return;
       }
@@ -266,6 +273,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       setMfaEnabledState(data.mfaEnabled);
                       saveToLocal('mfaEnabled', data.mfaEnabled);
                   }
+                  if (data.openingBalance !== undefined) {
+                      setOpeningBalanceState(data.openingBalance || 0);
+                      saveToLocal('openingBalance', data.openingBalance || 0);
+                  }
               } else {
                   if (isOnline) {
                     setDoc(settingsRef, { 
@@ -284,6 +295,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               const localRules = loadFromLocal('ignoreRules');
               if (localRules) setIgnoreRules(localRules);
               else setIgnoreRules(DEFAULT_RULES);
+              
+              const localOpeningBalance = loadFromLocal('openingBalance');
+              if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
           });
       } catch (e) {
            const localCurrency = loadFromLocal('currency');
@@ -292,6 +306,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
            const localRules = loadFromLocal('ignoreRules');
            if (localRules) setIgnoreRules(localRules);
            else setIgnoreRules(DEFAULT_RULES);
+           
+           const localOpeningBalance = loadFromLocal('openingBalance');
+           if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
       }
 
       return () => unsubscribe();
@@ -330,6 +347,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { mfaEnabled: enabled }, { merge: true });
+          } catch (e) { console.warn("Backend update failed", e); }
+      }
+  };
+
+  const setOpeningBalance = async (balance: number) => {
+      setOpeningBalanceState(balance);
+      saveToLocal('openingBalance', balance);
+      if (user && isOnline && isBackendReady) {
+          try {
+              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+              await setDoc(settingsRef, { openingBalance: balance }, { merge: true });
           } catch (e) { console.warn("Backend update failed", e); }
       }
   };
@@ -409,6 +437,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const clearAllTransactions = async () => {
     setTransactions([]);
     saveToLocal('transactions', []);
+    setOpeningBalanceState(0);
+    saveToLocal('openingBalance', 0);
 
     if (user && isBackendReady) {
         try {
@@ -507,9 +537,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const getBalance = () => {
-    return transactions.reduce((acc, curr) => {
+    const transactionBalance = transactions.reduce((acc, curr) => {
       return curr.type === TransactionType.INCOME ? acc + curr.amount : acc - curr.amount;
     }, 0);
+    return openingBalance + transactionBalance;
   };
 
   const getMonthlyIncome = () => {
@@ -568,12 +599,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setCurrency,
       setDailyLimit,
       setMfaEnabled,
+      setOpeningBalance,
       addTransaction,
       editTransaction,
       deleteTransaction,
       clearAllTransactions,
       importTransactions,
       toggleIgnoreRule,
+      openingBalance,
       getBalance,
       getMonthlyIncome,
       getMonthlyExpense,

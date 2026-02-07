@@ -86,7 +86,7 @@ const isDuplicateTransaction = (
 };
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
-  const { currency, importTransactions, transactions: existingTransactions } = useWallet();
+  const { currency, importTransactions, transactions: existingTransactions, setOpeningBalance } = useWallet();
   
   // Helper: Convert category to transaction nature
   const getTransactionNature = (category: string, type: string): string => {
@@ -260,6 +260,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     setParserUsed(parserUsed);
                     
                     updateProgress(`✅ ${rawTransactions.length} transactions (${result.summary.customerName})`);
+                    
+                    // Store opening balance from statement
+                    if (result.summary.openingBalance !== undefined) {
+                        setOpeningBalance(result.summary.openingBalance);
+                        console.log('💰 Opening balance set:', result.summary.openingBalance);
+                    }
                 }
             } catch (bankParserError: any) {
                 console.error('❌ IDFCBankParser failed:', bankParserError);

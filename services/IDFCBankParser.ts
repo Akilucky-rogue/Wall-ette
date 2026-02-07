@@ -183,42 +183,57 @@ export class IDFCBankParser {
     let statementPeriod = '';
     let customerName = '';
 
+    // Find summary row by looking for "Opening Balance" label
+    let summaryLabelRow = -1;
+    let summaryValueRow = -1;
+
     for (let i = 0; i < Math.min(30, data.length); i++) {
+      const row = data[i];
+      if (!row) continue;
+
+      const rowText = row.join(' | ').toLowerCase();
+      
+      // Find header row with balance labels
+      if (rowText.includes('opening balance') && rowText.includes('total debit')) {
+        summaryLabelRow = i;
+        summaryValueRow = i + 1; // Values are typically in next row
+        break;
+      }
+    }
+
+    console.log('📊 Summary rows found - Labels:', summaryLabelRow, 'Values:', summaryValueRow);
+
+    // Extract values from summary
+    if (summaryValueRow > -1 && data[summaryValueRow]) {
+      const valueRow = data[summaryValueRow];
+      console.log('📊 Summary values row:', valueRow.slice(0, 4));
+      
+      // Parse values based on column position
+      if (valueRow[0]) openingBalance = this.parseAmount(valueRow[0]);
+      if (valueRow[1]) totalDebit = this.parseAmount(valueRow[1]);
+      if (valueRow[2]) totalCredit = this.parseAmount(valueRow[2]);
+      if (valueRow[3]) closingBalance = this.parseAmount(valueRow[3]);
+      
+      console.log('📊 Parsed - Opening:', openingBalance, 'Debit:', totalDebit, 'Credit:', totalCredit, 'Closing:', closingBalance);
+    }
+
+    // Extract other metadata from earlier rows
+    for (let i = 0; i < Math.min(20, data.length); i++) {
       const row = data[i];
       if (!row) continue;
 
       const rowText = row.join(' ').toLowerCase();
       
-      if (rowText.includes('account no') || rowText.includes('account number')) {
-        accountNumber = row.find((cell: any) => /^\d+$/.test(cell?.toString()))?.toString() || '';
+      if (rowText.includes('account') && row[1] && /^\d{10,}$/.test(row[1]?.toString())) {
+        accountNumber = row[1].toString();
       }
       
-      if (rowText.includes('customer name')) {
-        customerName = row.find((cell: any) => /[A-Z]/.test(cell?.toString()))?.toString() || '';
+      if (rowText.includes('customer name') && row[1]) {
+        customerName = row[1].toString();
       }
       
-      if (rowText.includes('opening balance')) {
-        const value = row.find((cell: any) => /[\d,]+\./.test(cell?.toString()));
-        if (value) openingBalance = this.parseAmount(value);
-      }
-      
-      if (rowText.includes('total debit') || rowText.includes('total withdrawals')) {
-        const value = row.find((cell: any) => /[\d,]+\./.test(cell?.toString()));
-        if (value) totalDebit = this.parseAmount(value);
-      }
-      
-      if (rowText.includes('total credit') || rowText.includes('total deposits')) {
-        const value = row.find((cell: any) => /[\d,]+\./.test(cell?.toString()));
-        if (value) totalCredit = this.parseAmount(value);
-      }
-      
-      if (rowText.includes('closing balance')) {
-        const value = row.find((cell: any) => /[\d,]+\./.test(cell?.toString()));
-        if (value) closingBalance = this.parseAmount(value);
-      }
-      
-      if (rowText.includes('statement period')) {
-        statementPeriod = row.slice(1).join(' ');
+      if (rowText.includes('statement period') && row[1]) {
+        statementPeriod = row[1].toString();
       }
     }
 

@@ -83,7 +83,7 @@ Provide analysis in this exact JSON structure:
 Be concise, specific, and actionable. Focus on Indian rupee context.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         systemInstruction: "You are a mindful, expert financial advisor specializing in personal finance for Indian users. Provide clear, actionable insights in valid JSON format only. Be encouraging but realistic.",
@@ -116,7 +116,7 @@ export const analyzeSpendingHabits = async (transactionsContext: string) => {
   
   try {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-1.5-flash',
         contents: `Analyze these spending habits and provide a brief, mindful insight: ${transactionsContext}`,
         config: {
             systemInstruction: "You are a mindful financial assistant. Keep responses short, calming, and insightful.",
@@ -134,7 +134,7 @@ export const categorizeTransaction = async (description: string) => {
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-1.5-flash',
             contents: `Categorize this transaction description into a single word category (e.g., Groceries, Transport, Entertainment): ${description}`,
         });
         return response.text?.trim() || "Uncategorized";
@@ -1398,7 +1398,7 @@ Return JSON only.`
     parts.push({ text: prompts[Math.min(attempt - 1, prompts.length - 1)] });
 
     // Choose model based on attempt (using only available models)
-    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash'];
+    const models = ['gemini-1.5-flash', 'gemini-1.5-flash', 'gemini-1.5-flash'];
     const model = models[Math.min(attempt - 1, models.length - 1)];
 
     const response = await ai!.models.generateContent({

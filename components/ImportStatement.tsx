@@ -262,11 +262,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     updateProgress(`✅ ${rawTransactions.length} transactions (${result.summary.customerName})`);
                     
                     // Store opening balance ONLY on first import (when no transactions exist)
+                    console.log('🔍 Opening balance check - Existing transactions:', existingTransactions.length, 'Statement opening:', result.summary.openingBalance);
                     if (result.summary.openingBalance !== undefined && existingTransactions.length === 0) {
                         setOpeningBalance(result.summary.openingBalance);
                         console.log('💰 Opening balance set (first import):', result.summary.openingBalance);
                     } else if (existingTransactions.length > 0) {
-                        console.log('📝 Skipping opening balance (preserving existing)');
+                        console.log('📝 Skipping opening balance (preserving existing - already have', existingTransactions.length, 'transactions)');
                     }
                 }
             } catch (bankParserError: any) {

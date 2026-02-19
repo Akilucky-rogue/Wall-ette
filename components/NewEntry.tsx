@@ -117,6 +117,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none appearance-none"
+                title="Category"
+                aria-label="Category"
               >
                 <option value="" disabled>Select Category</option>
                 <option value="Groceries">Groceries</option>
@@ -143,7 +145,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
               <p className="text-premium-charcoal text-[15px] font-serif font-semibold">
-                {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {selectedDate.toLocaleDateString('en-GB')}
               </p>
             </div>
             <span className="material-symbols-outlined text-muted-taupe opacity-40">expand_more</span>
@@ -204,6 +206,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                     setSelectedDate(new Date(e.target.value + 'T00:00:00'));
                   }}
                   className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal font-serif"
+                  title="Custom date"
+                  placeholder="Select date"
+                  aria-label="Custom date"
                 />
               </div>
               <button 
@@ -227,6 +232,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                title="Note"
+                aria-label="Note"
               />
             </div>
           </div>

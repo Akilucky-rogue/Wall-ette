@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import styles from './Profile.module.css';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +24,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       convertToBase
   } = useWallet();
 
-  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? (dailyLimit * 1).toString() : ''); // Show as is (base) or convert? 
+  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? (dailyLimit * 1).toString() : '');
+  const [limitSaved, setLimitSaved] = useState(false);
   // Daily Limit is stored in base currency (INR). We should display it in selected currency, but for simplicity let's assume input is in Base or handle conversion.
   // Actually, keeping it simple: Input amount in Base Currency (INR) for now, or assume the input is in current currency and convert before save.
   // Let's do: Input in Current Currency.
@@ -37,22 +39,23 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
   
   // Init state on load
   React.useEffect(() => {
-      // Approximate reverse conversion for display if we wanted to be perfect, 
-      // but for "Settings" inputs, it's safer to just handle raw numbers or explicit values.
-      // Let's just allow user to enter a value, and we save it.
-      // To avoid confusion, let's treat the input as "Base Currency (INR)" effectively, 
-      // OR better: Just treat the limit as a value in the context of the user's primary currency 
-      // but stored as a number.
-      // If I switch currency, the limit number stays 5000. 5000 INR != 5000 USD.
-      // So the limit should probably be stored in Base.
-      setLimitInput(dailyLimit > 0 ? dailyLimit.toString() : '');
+    setLimitInput(dailyLimit > 0 ? dailyLimit.toString() : '');
   }, [dailyLimit]);
 
   const handleSaveLimit = () => {
-      const val = parseFloat(limitInput);
-      if (!isNaN(val) && val >= 0) {
-          setDailyLimit(val);
-      }
+    let val = parseFloat(limitInput);
+    if (limitInput.trim() === '' || isNaN(val)) {
+      setDailyLimit(0);
+      setLimitInput('');
+      setLimitSaved(true);
+      setTimeout(() => setLimitSaved(false), 1200);
+      return;
+    }
+    if (val < 0) val = 0;
+    setDailyLimit(val);
+    setLimitInput(val === 0 ? '' : val.toString());
+    setLimitSaved(true);
+    setTimeout(() => setLimitSaved(false), 1200);
   };
 
   return (
@@ -104,7 +107,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
             <div className="bg-white px-4 py-2 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
                 <span className="text-[10px] text-muted-taupe uppercase tracking-wider">Last Login</span>
                 <span className="text-xs font-semibold text-premium-charcoal">
-                    {lastLoginTime ? lastLoginTime.toLocaleDateString() + ' ' + lastLoginTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+                    {lastLoginTime ? lastLoginTime.toLocaleDateString('en-GB') + ' ' + lastLoginTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
                 </span>
             </div>
         </div>
@@ -147,14 +150,45 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                           </div>
                       </div>
                       <div className="flex items-center gap-2">
-                          <input 
-                            type="number" 
+                        <label htmlFor="daily-limit-input" className="sr-only">Daily spend limit</label>
+                        <div className="relative flex items-center">
+                          <input
+                            id="daily-limit-input"
+                            type="number"
+                            min="0"
                             value={limitInput}
-                            onChange={(e) => setLimitInput(e.target.value)}
+                            onChange={e => {
+                              // Only allow numbers and empty string
+                              const val = e.target.value;
+                              if (/^\d*$/.test(val) || val === '') setLimitInput(val);
+                              setLimitSaved(false);
+                            }}
                             onBlur={handleSaveLimit}
                             placeholder="No Limit"
-                            className="w-20 text-right bg-zen-bg border-none rounded-lg py-1.5 px-2 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage"
+                            title="Daily spend limit"
+                            aria-label="Daily spend limit"
+                            className={`w-20 text-right bg-zen-bg border-none rounded-lg py-1.5 px-2 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage transition-colors ${limitSaved ? styles.limitSaved : ''}`}
                           />
+                          {limitInput && (
+                            <button
+                              type="button"
+                              aria-label="Clear daily limit"
+                              className={`absolute right-1 text-muted-taupe hover:text-rose text-xs ${styles.clearButton}`}
+                              tabIndex={0}
+                              onClick={() => {
+                                setLimitInput('');
+                                setDailyLimit(0);
+                                setLimitSaved(true);
+                                setTimeout(() => setLimitSaved(false), 1200);
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                          {limitSaved && (
+                            <span className="absolute left-1 text-sage text-xs" aria-live="polite" title="Saved">✔</span>
+                          )}
+                        </div>
                       </div>
                   </div>
               </div>

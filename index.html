@@ -83,12 +83,15 @@
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
         }
+        /* Hide scrollbar for Chrome, Safari and Opera */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
+        /* Hide scrollbar for IE, Edge and Firefox */
         .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none;    /* Firefox */
+            /* Note: scrollbar-width is not supported by Chrome <121, Safari, iOS Safari, Samsung Internet. */
         }
     </style>
 <script type="importmap">

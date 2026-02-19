@@ -1,0 +1,27 @@
+/* CategorySplit.module.css: Utility classes for dynamic backgrounds and color chips */
+
+.categoryPieBg {
+  /* fallback color */
+  background: #D6C6B2;
+}
+.categoryPieBg[data-gradient] {
+  background: var(--pie-gradient, #D6C6B2);
+}
+
+.categoryColorChip {
+  /* fallback color */
+  background: #eee;
+  color: #333;
+}
+.categoryColorChip[data-bg][data-fg] {
+  /* Dynamic color via inline style in React, fallback here is #eee/#333. */
+  /* background-color and color are set via style prop for compatibility. */
+  /* If you want to support a fixed palette, add .categoryColorChip-sage, etc. */
+  background-color: #eee;
+  color: #333;
+}
+
+/* Utility for 10px (2.5) size if not using Tailwind */
+.w-2_5 { width: 10px; }
+.h-2_5 { height: 10px; }
+.p-2_5 { padding: 10px; }

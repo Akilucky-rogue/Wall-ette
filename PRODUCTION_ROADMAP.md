@@ -1,7 +1,7 @@
-# WALL-ET: Production Roadmap
+# Wall-ette: Production Roadmap
 ## Complete Path to Web App → Android Migration
 
----
+**Status**: 🎯 On Track | 🔐 Security Active | 💾 Real-time Sync Live
 
 ## 📋 **PHASE 1: Foundation (This Week) - CRITICAL**
 
@@ -35,14 +35,13 @@ service cloud.firestore {
 }
 ```
 
-### 1.2 🎯 **Missing Critical Features**
+### 1.2 🎯 **Critical Features (Week 1-2)**
 
-- [ ] **Edit Transactions** - Can only delete, need edit
-- [ ] **Search/Filter** - Find transactions by date, amount, category
-- [ ] **Undo Feature** - Undo last transaction
-- [ ] **Logout Button** - Currently no way to logout
-- [ ] **Session Timeout** - Add inactivity timeout
-- [ ] **Export Data** - Download transactions as CSV/PDF
+- [ ] **Edit Transactions** - Can only delete, need edit (HIGH PRIORITY)
+- [ ] **Search/Filter** - Find transactions by date, amount, category (HIGH PRIORITY)
+- [ ] **Input Validation** - Prevent invalid data entry (HIGH PRIORITY)
+- [ ] **Undo Feature** - Undo last transaction (MEDIUM)
+- [ ] **Export Data** - Download transactions as CSV/PDF (MEDIUM)
 
 ### 1.3 ⚡ **Performance Optimization**
 

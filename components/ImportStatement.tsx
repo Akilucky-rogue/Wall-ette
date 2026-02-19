@@ -7,6 +7,7 @@ import IDFCBankParser from '../services/IDFCBankParser';
 import { getSymbol } from '../currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
+import styles from './ImportStatement.module.css';
 
 // Comprehensive category list for better classification
 const CATEGORIES = [
@@ -63,9 +64,9 @@ const isDuplicateTransaction = (
   if (newTx.type !== existingTx.type) return false;
   
   // Merchant comparison (fuzzy match)
-  if (existingTx.merchant) {
-    const newMerchant = normalizeMerchant(newTx.merchant);
-    const existingMerchant = normalizeMerchant(existingTx.merchant);
+    if (existingTx.merchant) {
+        const newMerchant = normalizeMerchant(newTx.merchant || '');
+        const existingMerchant = normalizeMerchant(existingTx.merchant);
     
     // Check if one contains the other or they're similar
     if (newMerchant.length > 3 && existingMerchant.length > 3) {
@@ -116,6 +117,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
   const [showDuplicateInfo, setShowDuplicateInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [parsedOpeningBalance, setParsedOpeningBalance] = useState<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Edit modal state
@@ -261,13 +263,16 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     
                     updateProgress(`✅ ${rawTransactions.length} transactions (${result.summary.customerName})`);
                     
-                    // Store opening balance ONLY on first import (when no transactions exist)
+                    // Store opening balance for later use in confirmImport
                     console.log('🔍 Opening balance check - Existing transactions:', existingTransactions.length, 'Statement opening:', result.summary.openingBalance);
                     if (result.summary.openingBalance !== undefined && existingTransactions.length === 0) {
-                        setOpeningBalance(result.summary.openingBalance);
-                        console.log('💰 Opening balance set (first import):', result.summary.openingBalance);
+                        console.log('💰 Storing opening balance for import:', result.summary.openingBalance);
+                        setParsedOpeningBalance(result.summary.openingBalance);
+                        console.log('💰 Opening balance stored in state');
                     } else if (existingTransactions.length > 0) {
                         console.log('📝 Skipping opening balance (preserving existing - already have', existingTransactions.length, 'transactions)');
+                    } else {
+                        console.warn('⚠️ Opening balance undefined in parsed result:', result.summary);
                     }
                 }
             } catch (bankParserError: any) {
@@ -465,6 +470,20 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
                 console.log(`✅ Imported ${mappedTransactions.length} transactions (${mappedTransactions.filter(t => t.type === TransactionType.INCOME).length} income, ${mappedTransactions.filter(t => t.type === TransactionType.EXPENSE).length} expense)`);
                 
+                // Store opening balance from Excel parsing
+                console.log('🔍 DEBUG: result.summary object:', result.summary);
+                console.log('🔍 DEBUG: result.summary.openingBalance =', result.summary.openingBalance);
+                console.log('🔍 DEBUG: existingTransactions.length =', existingTransactions.length);
+                if (result.summary.openingBalance !== undefined && existingTransactions.length === 0) {
+                    console.log('💰 Storing opening balance from Excel:', result.summary.openingBalance);
+                    setParsedOpeningBalance(result.summary.openingBalance);
+                    console.log('✅ setParsedOpeningBalance called');
+                } else if (existingTransactions.length > 0) {
+                    console.log('📝 Skipping opening balance (preserving existing - already have', existingTransactions.length, 'transactions)');
+                } else {
+                    console.warn('⚠️ Opening balance undefined in parsed result');
+                }
+                
                 // Detect duplicates
                 const foundDuplicates = new Set<string>();
                 mappedTransactions.forEach(newTx => {
@@ -541,8 +560,20 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   };
 
   const confirmImport = () => {
+      console.log('🎬 confirmImport triggered');
+      console.log('   Total transactions in review:', extractedData.length);
+      console.log('   Selected IDs count:', selectedIds.size);
+      
       const toImport = extractedData.filter(t => selectedIds.has(t.id));
-      if (toImport.length === 0) return;
+      
+      console.log('🎬 Filter result:', toImport.length, 'transactions to import');
+      console.log('🎬 First transaction:', toImport[0]);
+      console.log('🎬 Last transaction:', toImport[toImport.length - 1]);
+      
+      if (toImport.length === 0) {
+        console.warn('🎬 No transactions selected - aborting import');
+        return;
+      }
       
       console.log('🔄 IMPORTING:', {
         count: toImport.length,
@@ -552,8 +583,15 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         merchants: toImport.slice(0, 3).map(t => t.merchant)
       });
       
-      importTransactions(toImport);
+      console.log('🎬 Calling importTransactions...');
+      console.log('💰 DEBUG: parsedOpeningBalance value RIGHT NOW:', parsedOpeningBalance);
+      // Pass opening balance to import function - it will set it before transactions
+      importTransactions(toImport, parsedOpeningBalance);
+      
+      console.log('🎬 importTransactions called. Now navigating to Dashboard...');
       onNavigate(AppScreen.DASHBOARD);
+      
+      console.log('🎬 Navigation completed to Dashboard');
   }
 
   const handleDiscard = () => {
@@ -620,6 +658,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         className="hidden" 
                         type="file" 
                         onChange={handleFileSelect}
+                        title="Upload bank statement file"
+                        aria-label="Upload bank statement file"
                     />
                 </div>
 
@@ -647,7 +687,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     
                     {/* Sparkles */}
                     <div className="absolute -top-2 -right-2 text-lg animate-pulse">✨</div>
-                    <div className="absolute -bottom-1 -left-3 text-sm animate-pulse" style={{ animationDelay: '0.3s' }}>✨</div>
+                    <div className="absolute -bottom-1 -left-3 text-sm animate-pulse animation-delay-03s">✨</div>
                 </div>
                 <h3 className="text-xl font-serif font-semibold text-premium-charcoal mb-2">{loadingMessage}</h3>
                 <p className="text-muted-taupe text-xs animate-pulse">WALL-E is analyzing your document</p>
@@ -832,6 +872,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     value={editingTx.merchant}
                                     onChange={e => setEditingTx({...editingTx, merchant: e.target.value})}
                                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-premium-charcoal font-medium focus:outline-none focus:border-sage"
+                                    placeholder="Merchant name"
+                                    title="Merchant name"
+                                    aria-label="Merchant name"
                                 />
                             </div>
                             
@@ -847,6 +890,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                         value={editingTx.amount}
                                         onChange={e => setEditingTx({...editingTx, amount: Math.abs(parseFloat(e.target.value) || 0)})}
                                         className="w-full pl-8 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-premium-charcoal font-medium focus:outline-none focus:border-sage"
+                                        placeholder="Amount"
+                                        title="Amount"
+                                        aria-label="Amount"
                                     />
                                 </div>
                             </div>
@@ -873,12 +919,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             {/* Category Dropdown */}
                             <div className="mb-4">
                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Category</label>
-                                <select
-                                    value={editingTx.category}
-                                    onChange={e => setEditingTx({...editingTx, category: e.target.value})}
-                                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-premium-charcoal font-medium focus:outline-none focus:border-sage appearance-none cursor-pointer"
-                                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
-                                >
+                                                                <select
+                                                                        value={editingTx.category}
+                                                                        onChange={e => setEditingTx({...editingTx, category: e.target.value})}
+                                                                        className={styles.categorySelect}
+                                                                        title="Category"
+                                                                        aria-label="Category"
+                                                                >
                                     {CATEGORIES.map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
                                     ))}
@@ -893,6 +940,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     value={editingTx.date}
                                     onChange={e => setEditingTx({...editingTx, date: e.target.value})}
                                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-premium-charcoal font-medium focus:outline-none focus:border-sage"
+                                    placeholder="Date"
+                                    title="Date"
+                                    aria-label="Date"
                                 />
                             </div>
                             

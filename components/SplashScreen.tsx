@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import styles from './SplashScreen.module.css';
 
 export type SplashVariant = 'launch' | 'login' | 'register' | 'logout';
 
@@ -10,16 +11,27 @@ interface SplashScreenProps {
 // === ECO & INDIAN DESIGN DECORATIVE ELEMENTS ===
 
 // Floating leaf component
-export const FloatingLeaf: React.FC<{ className?: string; delay?: number; color?: string }> = ({ className = '', delay = 0, color = '#8B9E82' }) => (
-  <svg 
-    className={`absolute animate-float ${className}`} 
-    style={{ animationDelay: `${delay}s` }}
-    width="16" height="20" viewBox="0 0 16 20" fill="none"
-  >
-    <path d="M8 0C8 0 2 6 2 12C2 16 4.5 19 8 19C11.5 19 14 16 14 12C14 6 8 0 8 0Z" fill={color} fillOpacity="0.6"/>
-    <path d="M8 4V16M5 8C5 8 8 10 11 8" stroke={color} strokeWidth="0.5" strokeOpacity="0.8"/>
-  </svg>
-);
+export const FloatingLeaf: React.FC<{ className?: string; delay?: number; color?: string }> = ({ className = '', delay = 0, color = '#8B9E82' }) => {
+  // Map delay to utility class
+  let delayClass = '';
+  if (delay === 0) delayClass = styles['animation-delay-0s'];
+  else if (delay === 0.2) delayClass = styles['animation-delay-02s'];
+  else if (delay === 0.3) delayClass = styles['animation-delay-03s'];
+  else if (delay === 0.4) delayClass = styles['animation-delay-04s'];
+  else if (delay === 0.5) delayClass = styles['animation-delay-05s'];
+  else if (delay === 0.8) delayClass = styles['animation-delay-08s'];
+  else if (delay === 1) delayClass = styles['animation-delay-1s'];
+  else delayClass = '';
+  return (
+    <svg 
+      className={`absolute animate-float ${className} ${delayClass}`}
+      width="16" height="20" viewBox="0 0 16 20" fill="none"
+    >
+      <path d="M8 0C8 0 2 6 2 12C2 16 4.5 19 8 19C11.5 19 14 16 14 12C14 6 8 0 8 0Z" fill={color} fillOpacity="0.6"/>
+      <path d="M8 4V16M5 8C5 8 8 10 11 8" stroke={color} strokeWidth="0.5" strokeOpacity="0.8"/>
+    </svg>
+  );
+};
 
 // Small plant/sprout
 export const Sprout: React.FC<{ className?: string; size?: 'sm' | 'md' }> = ({ className = '', size = 'sm' }) => {
@@ -36,11 +48,10 @@ export const Sprout: React.FC<{ className?: string; size?: 'sm' | 'md' }> = ({ c
 // Rangoli corner pattern
 export const RangoliCorner: React.FC<{ className?: string; color?: string; mirror?: boolean }> = ({ className = '', color = '#8B9E82', mirror = false }) => (
   <svg 
-    className={className} 
+    className={`${className} ${mirror ? styles.mirrorX : ''}`}
     width="40" height="40" 
     viewBox="0 0 40 40" 
     fill="none"
-    style={{ transform: mirror ? 'scaleX(-1)' : 'none' }}
   >
     <circle cx="8" cy="8" r="2" fill={color} fillOpacity="0.4"/>
     <circle cx="16" cy="4" r="1.5" fill={color} fillOpacity="0.3"/>
@@ -74,11 +85,10 @@ export const LotusFlower: React.FC<{ className?: string; size?: 'sm' | 'md' | 'l
 // Paisley pattern element
 export const Paisley: React.FC<{ className?: string; color?: string; flip?: boolean }> = ({ className = '', color = '#C4A98E', flip = false }) => (
   <svg 
-    className={className} 
+    className={`${className} ${flip ? styles.mirrorX : ''}`}
     width="18" height="24" 
     viewBox="0 0 18 24" 
     fill="none"
-    style={{ transform: flip ? 'scaleX(-1)' : 'none' }}
   >
     <path 
       d="M9 2C4 2 2 8 2 12C2 18 6 22 10 22C14 22 16 18 16 14C16 8 12 4 9 2Z" 
@@ -147,11 +157,10 @@ export const PottedPlant: React.FC<{ className?: string; size?: 'sm' | 'md' }> =
 // Vine decoration
 export const VineDecoration: React.FC<{ className?: string; direction?: 'left' | 'right' }> = ({ className = '', direction = 'left' }) => (
   <svg 
-    className={className} 
+    className={`${className} ${direction === 'right' ? styles.mirrorX : ''}`}
     width="60" height="100" 
     viewBox="0 0 60 100" 
     fill="none"
-    style={{ transform: direction === 'right' ? 'scaleX(-1)' : 'none' }}
   >
     <path d="M30 0C30 0 10 20 15 40C20 60 5 80 10 100" stroke="#8B9E82" strokeWidth="1" strokeOpacity="0.4" fill="none"/>
     <ellipse cx="12" cy="25" rx="6" ry="10" fill="#8B9E82" fillOpacity="0.3" transform="rotate(-20 12 25)"/>
@@ -188,9 +197,7 @@ export const WallEEyes: React.FC<{
       {/* Left Eye */}
       <div className={`${s.eye} bg-premium-charcoal/90 rounded-lg flex items-center justify-center shadow-inner relative overflow-hidden ${
         animate ? 'animate-pulse' : ''
-      } ${expression === 'wink' ? 'scale-y-[0.2]' : ''} ${expression === 'sleepy' ? 'scale-y-[0.6]' : ''}`}
-        style={{ transition: 'transform 0.3s' }}
-      >
+      } ${expression === 'wink' ? 'scale-y-[0.2]' : ''} ${expression === 'sleepy' ? 'scale-y-[0.6]' : ''} transition-transform-03s`}>
         <div className={`absolute top-0.5 left-0.5 ${s.shine} bg-white/40 rounded-full`} />
         <div className={`${s.iris} ${eyeColor} rounded-full flex items-center justify-center`}>
           <div className={`${s.pupil} ${pupilColor} rounded-full`} />
@@ -199,9 +206,7 @@ export const WallEEyes: React.FC<{
       {/* Right Eye */}
       <div className={`${s.eye} bg-premium-charcoal/90 rounded-lg flex items-center justify-center shadow-inner relative overflow-hidden ${
         animate ? 'animate-pulse' : ''
-      } ${expression === 'sleepy' ? 'scale-y-[0.6]' : ''}`}
-        style={{ transition: 'transform 0.3s', animationDelay: animate ? '0.15s' : '0s' }}
-      >
+      } ${expression === 'sleepy' ? 'scale-y-[0.6]' : ''} transition-transform-03s ${animate ? styles['animation-delay-03s'] : styles['animation-delay-0s']}`}>
         <div className={`absolute top-0.5 left-0.5 ${s.shine} bg-white/40 rounded-full`} />
         <div className={`${s.iris} ${eyeColor} rounded-full flex items-center justify-center`}>
           <div className={`${s.pupil} ${pupilColor} rounded-full`} />
@@ -350,8 +355,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         }`} />
         <div className={`absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-3xl animate-pulse ${
           variant === 'register' ? 'bg-sage/10' : variant === 'login' ? 'bg-sage/10' : 'bg-rose/5'
-        }`} style={{ animationDelay: '0.5s' }} />
-        <div className="absolute top-1/3 right-1/4 w-32 h-32 bg-lavender/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+        } ${styles['animation-delay-05s']}`} />
+        <div className={`absolute top-1/3 right-1/4 w-32 h-32 bg-lavender/10 rounded-full blur-2xl animate-pulse ${styles['animation-delay-1s']}`} />
         
         {/* Floating eco elements */}
         <FloatingLeaf className="top-20 right-16 opacity-40" delay={0} />
@@ -382,10 +387,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         )}
         
         {/* Floating coins for wealth context */}
-        <div className="absolute top-1/4 left-[15%] w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-20 animate-bounce" style={{ animationDelay: '0.2s', animationDuration: '2s' }}>
+        <div className={`absolute top-1/4 left-[15%] w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-20 animate-bounce ${styles['animation-delay-02s']} ${styles['animation-duration-2s']}`}>
           <span className="flex items-center justify-center h-full text-amber-700 text-[8px] font-bold">₹</span>
         </div>
-        <div className="absolute bottom-1/3 right-[10%] w-4 h-4 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-15 animate-bounce" style={{ animationDelay: '0.8s', animationDuration: '2.5s' }}>
+        <div className={`absolute bottom-1/3 right-[10%] w-4 h-4 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-15 animate-bounce ${styles['animation-delay-08s']} ${styles['animation-duration-25s']}`}>
           <span className="flex items-center justify-center h-full text-amber-700 text-[6px] font-bold">₹</span>
         </div>
       </div>
@@ -445,10 +450,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         {/* Floating hearts for logout (goodbye) */}
         {variant === 'logout' && phase !== 'logo' && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-4 -left-2 text-rose/60 animate-bounce" style={{ animationDuration: '1.5s' }}>💚</div>
-            <div className="absolute -top-2 -right-4 text-sage/60 animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.8s' }}>🌱</div>
-            <div className="absolute -bottom-3 -left-4 text-sand/60 animate-bounce" style={{ animationDelay: '0.5s', animationDuration: '1.6s' }}>✨</div>
-            <div className="absolute -bottom-2 -right-2 text-lavender/60 animate-bounce" style={{ animationDelay: '0.2s', animationDuration: '2s' }}>🍃</div>
+            <div className={`absolute -top-4 -left-2 text-rose/60 animate-bounce ${styles['animation-duration-15s']}`}>💚</div>
+            <div className={`absolute -top-2 -right-4 text-sage/60 animate-bounce ${styles['animation-delay-03s']} ${styles['animation-duration-18s']}`}>🌱</div>
+            <div className={`absolute -bottom-3 -left-4 text-sand/60 animate-bounce ${styles['animation-delay-05s']} ${styles['animation-duration-16s']}`}>✨</div>
+            <div className={`absolute -bottom-2 -right-2 text-lavender/60 animate-bounce ${styles['animation-delay-02s']} ${styles['animation-duration-2s']}`}>🍃</div>
           </div>
         )}
         
@@ -456,9 +461,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         {variant === 'register' && phase !== 'logo' && (
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute -top-4 -left-4 w-3 h-3 bg-sage rounded-full animate-ping" />
-            <div className="absolute -top-2 -right-6 w-2 h-2 bg-rose rounded-full animate-ping" style={{ animationDelay: '0.2s' }} />
-            <div className="absolute -bottom-4 -left-6 w-2 h-2 bg-ocean rounded-full animate-ping" style={{ animationDelay: '0.4s' }} />
-            <div className="absolute -bottom-2 -right-4 w-3 h-3 bg-lavender rounded-full animate-ping" style={{ animationDelay: '0.3s' }} />
+            <div className={`absolute -top-2 -right-6 w-2 h-2 bg-rose rounded-full animate-ping ${styles['animation-delay-02s']}`} />
+            <div className={`absolute -bottom-4 -left-6 w-2 h-2 bg-ocean rounded-full animate-ping ${styles['animation-delay-04s']}`} />
+            <div className={`absolute -bottom-2 -right-4 w-3 h-3 bg-lavender rounded-full animate-ping ${styles['animation-delay-03s']}`} />
           </div>
         )}
         
@@ -506,9 +511,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         {variant === 'launch' ? (
           /* Bouncing dots with coin accent */
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-sage/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2.5 h-2.5 bg-amber-400/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 bg-sage/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className={`w-2 h-2 bg-sage/60 rounded-full animate-bounce ${styles['animation-delay-0s']}`} />
+            <div className={`w-2.5 h-2.5 bg-amber-400/70 rounded-full animate-bounce ${styles['animation-delay-02s']}`} />
+            <div className={`w-2 h-2 bg-sage/60 rounded-full animate-bounce ${styles['animation-delay-03s']}`} />
           </div>
         ) : variant === 'login' ? (
           /* Sync animation for login */

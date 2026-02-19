@@ -81,7 +81,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(now.getDate() - i);
-        const dayStr = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+        const dayStr = d.toLocaleDateString('en-GB', { weekday: 'narrow' });
         
         // Sum income for this day
         const sum = transactions
@@ -159,7 +159,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
       <div className="flex flex-col items-center py-8 px-6">
         <p className="text-muted-taupe text-[10px] font-medium uppercase tracking-[0.2em] mb-1">Total Monthly Flow</p>
         <p className="text-muted-taupe text-[9px] font-medium uppercase tracking-[0.2em] mb-2">
-          {effectiveDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+          {effectiveDate.toLocaleDateString('en-GB')}
         </p>
         <div className="flex items-baseline gap-2">
           <h1 className="text-premium-charcoal font-serif text-[44px] leading-tight text-center">{formatAmount(totalFlow)}</h1>

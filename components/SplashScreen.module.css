@@ -1,0 +1,27 @@
+/* SplashScreen.module.css - Styles for SplashScreen component */
+
+/* Animation delay utilities */
+.animation-delay-0s { animation-delay: 0s !important; }
+.animation-delay-02s { animation-delay: 0.2s !important; }
+.animation-delay-03s { animation-delay: 0.3s !important; }
+.animation-delay-04s { animation-delay: 0.4s !important; }
+.animation-delay-05s { animation-delay: 0.5s !important; }
+.animation-delay-08s { animation-delay: 0.8s !important; }
+.animation-delay-1s  { animation-delay: 1s !important; }
+
+/* Animation duration utilities */
+.animation-duration-15s { animation-duration: 1.5s !important; }
+.animation-duration-16s { animation-duration: 1.6s !important; }
+.animation-duration-18s { animation-duration: 1.8s !important; }
+.animation-duration-2s  { animation-duration: 2s !important; }
+.animation-duration-25s { animation-duration: 2.5s !important; }
+
+/* Transform utilities for mirroring/flipping */
+.mirrorX { transform: scaleX(-1); }
+.rotate-180 { transform: rotate(180deg); }
+
+/* Transition for transform */
+.transition-transform-03s {
+	transition: transform 0.3s;
+}
+

@@ -91,7 +91,7 @@ export const EnhancedImportStatement: React.FC = () => {
             accept=".pdf,.xlsx,.xls,.csv"
             onChange={handleFileUpload}
             disabled={importing}
-            style={{ display: 'none' }}
+            className="file-upload-hidden"
           />
           <button 
             className="upload-button"
@@ -142,27 +142,27 @@ export const EnhancedImportStatement: React.FC = () => {
             <div className="summary-grid">
               <div className="summary-item">
                 <label>Account</label>
-                <value>{result.summary.accountNumber}</value>
+                <span className="summary-value">{result.summary.accountNumber}</span>
               </div>
               <div className="summary-item">
                 <label>Period</label>
-                <value>{result.summary.statementPeriod}</value>
+                <span className="summary-value">{result.summary.statementPeriod}</span>
               </div>
               <div className="summary-item">
                 <label>Opening Balance</label>
-                <value className="amount">₹{result.summary.openingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</value>
+                <span className="summary-value amount">₹{result.summary.openingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="summary-item">
                 <label>Total Debit</label>
-                <value className="amount debit">₹{result.summary.totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</value>
+                <span className="summary-value amount debit">₹{result.summary.totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="summary-item">
                 <label>Total Credit</label>
-                <value className="amount credit">₹{result.summary.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</value>
+                <span className="summary-value amount credit">₹{result.summary.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="summary-item">
                 <label>Closing Balance</label>
-                <value className="amount">₹{result.summary.closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</value>
+                <span className="summary-value amount">₹{result.summary.closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
@@ -255,283 +255,7 @@ export const EnhancedImportStatement: React.FC = () => {
         </div>
       )}
 
-      <style jsx>{`
-        .enhanced-import-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 24px;
-        }
-
-        .upload-section {
-          text-align: center;
-          padding: 48px 24px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border-radius: 16px;
-          color: white;
-          margin-bottom: 32px;
-        }
-
-        .upload-section h2 {
-          margin: 0 0 8px;
-          font-size: 28px;
-          font-weight: 700;
-        }
-
-        .subtitle {
-          margin: 0 0 24px;
-          opacity: 0.9;
-        }
-
-        .upload-button {
-          background: white;
-          color: #667eea;
-          border: none;
-          padding: 16px 48px;
-          font-size: 18px;
-          font-weight: 600;
-          border-radius: 12px;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .upload-button:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-        }
-
-        .upload-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .supported-formats {
-          margin-top: 16px;
-          font-size: 14px;
-          opacity: 0.8;
-        }
-
-        .loading-state {
-          text-align: center;
-          padding: 48px;
-        }
-
-        .spinner {
-          width: 48px;
-          height: 48px;
-          border: 4px solid rgba(102, 126, 234, 0.2);
-          border-top-color: #667eea;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .error-banner {
-          background: #fee;
-          border: 2px solid #f66;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-        }
-
-        .error-banner h3 {
-          margin: 0 0 8px;
-          color: #c00;
-        }
-
-        .validation-banner {
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          text-align: center;
-        }
-
-        .validation-banner.success {
-          background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-          color: white;
-        }
-
-        .validation-banner.error {
-          background: #fee;
-          border: 2px solid #f66;
-          color: #c00;
-        }
-
-        .summary-card {
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 16px;
-          margin-top: 16px;
-        }
-
-        .summary-item label {
-          display: block;
-          font-size: 12px;
-          color: #666;
-          margin-bottom: 4px;
-        }
-
-        .summary-item value {
-          display: block;
-          font-size: 18px;
-          font-weight: 600;
-          color: #333;
-        }
-
-        .summary-item .amount {
-          font-family: 'Courier New', monospace;
-        }
-
-        .summary-item .debit {
-          color: #f44;
-        }
-
-        .summary-item .credit {
-          color: #2d7;
-        }
-
-        .category-breakdown {
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .category-list {
-          margin-top: 16px;
-        }
-
-        .category-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px;
-          border-bottom: 1px solid #eee;
-        }
-
-        .category-info {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .category-info .name {
-          font-weight: 500;
-        }
-
-        .category-info .count {
-          font-size: 12px;
-          color: #666;
-        }
-
-        .category-amount {
-          font-family: 'Courier New', monospace;
-          font-weight: 600;
-        }
-
-        .transaction-preview {
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .transaction-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 12px;
-          border-bottom: 1px solid #eee;
-        }
-
-        .txn-left {
-          display: flex;
-          gap: 12px;
-          flex: 1;
-        }
-
-        .txn-icon {
-          font-size: 24px;
-        }
-
-        .txn-description {
-          font-weight: 500;
-          margin-bottom: 4px;
-        }
-
-        .txn-meta {
-          font-size: 12px;
-          color: #666;
-        }
-
-        .txn-amount {
-          font-family: 'Courier New', monospace;
-          font-weight: 600;
-          font-size: 16px;
-        }
-
-        .txn-amount.income {
-          color: #2d7;
-        }
-
-        .txn-amount.expense {
-          color: #f44;
-        }
-
-        .action-buttons {
-          display: flex;
-          gap: 12px;
-          justify-content: center;
-        }
-
-        .btn-primary, .btn-secondary {
-          padding: 14px 32px;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-primary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .btn-secondary {
-          background: white;
-          color: #667eea;
-          border: 2px solid #667eea;
-        }
-
-        .btn-secondary:hover {
-          background: #667eea;
-          color: white;
-        }
-      `}</style>
+      {/* Styles moved to EnhancedImportStatement.module.css */}
     </div>
   );
 };

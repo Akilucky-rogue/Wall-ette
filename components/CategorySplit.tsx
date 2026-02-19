@@ -129,9 +129,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
       startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6);
-      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      return `${startOfWeek.toLocaleDateString('en-GB')} - ${endOfWeek.toLocaleDateString('en-GB')}`;
     } else if (timeRange === 'MONTH') {
-      return selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      return selectedDate.toLocaleDateString('en-GB');
     } else {
       return selectedDate.getFullYear().toString();
     }
@@ -183,7 +183,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
                 <span className="font-serif font-bold text-premium-charcoal text-sm">
                   {timeRange === 'YEAR' 
                     ? selectedDate.getFullYear()
-                    : selectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    : selectedDate.toLocaleDateString('en-GB')
                   }
                 </span>
                 <button onClick={() => handleMonthChange(1)} className="p-1 text-muted-taupe hover:text-sage">
@@ -204,8 +204,8 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
       {/* Pie Chart */}
       <div className="flex flex-col items-center py-8 px-6">
         <div 
-          className="relative w-[200px] h-[200px] rounded-full shadow-lg flex items-center justify-center transition-all duration-500" 
-          style={{ background: gradientString }}
+          className={`relative w-[200px] h-[200px] rounded-full shadow-lg flex items-center justify-center transition-all duration-500 categoryPieBg`}
+          data-gradient={gradientString}
         >
           <div className="w-[140px] h-[140px] bg-zen-bg rounded-full flex flex-col items-center justify-center shadow-inner">
             <span className="text-muted-taupe text-[9px] font-medium uppercase tracking-[0.15em]">Expenses</span>
@@ -243,7 +243,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           <div className="flex flex-wrap justify-center gap-2">
             {categories.slice(0, 5).map((item, i) => (
               <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-full border border-black/5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.colorHex }} />
+                <div className={`w-2_5 h-2_5 rounded-full`} data-bg={item.colorHex} />
                 <span className="text-[10px] text-premium-charcoal font-medium">{item.name}</span>
                 <span className="text-[9px] text-muted-taupe">{item.percent}%</span>
               </div>
@@ -265,8 +265,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             <div key={i} className="bg-white p-4 rounded-3xl border border-black/[0.02] flex items-center justify-between shadow-soft">
               <div className="flex items-center gap-3">
                 <div 
-                  className="p-2.5 rounded-2xl"
-                  style={{ backgroundColor: `${item.colorHex}20`, color: item.colorHex }}
+                  className={`p-2_5 rounded-2xl categoryColorChip`}
+                  data-bg={item.colorHex}
+                  data-fg={item.colorHex}
                 >
                   <span className="material-symbols-outlined text-[20px]">{getIcon(item.name)}</span>
                 </div>

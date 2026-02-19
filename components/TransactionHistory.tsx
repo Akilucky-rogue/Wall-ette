@@ -58,7 +58,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    const filtered = transactions.filter(t => {
       // Type Filter
       if (activeType !== 'ALL' && t.type !== activeType) return false;
       
@@ -89,7 +89,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       return true;
     });
-    
     // Apply sorting
     return filtered.sort((a, b) => {
       switch (sortBy) {
@@ -115,7 +114,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      let key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      let key = date.toLocaleDateString('en-GB');
       if (date.toDateString() === today.toDateString()) key = 'Today';
       if (date.toDateString() === yesterday.toDateString()) key = 'Yesterday';
 
@@ -176,7 +175,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     const csvContent = [
         headers.join(","),
         ...filteredTransactions.map(t => {
-            const date = new Date(t.date).toLocaleDateString();
+            const date = new Date(t.date).toLocaleDateString('en-GB');
             const merchant = `"${(t.merchant || "").replace(/"/g, '""')}"`;
             const category = `"${t.category.replace(/"/g, '""')}"`;
             const amount = t.amount.toFixed(2);
@@ -778,7 +777,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.category}
                             onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
                             className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30 appearance-none cursor-pointer"
-                        >
+                            title="Category"
+                            aria-label="Category"
+                          >
                             {categories.filter(c => c !== 'ALL').map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
@@ -794,7 +795,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.date}
                             onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
                             className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
-                        />
+                            title="Date"
+                            aria-label="Date"
+                          />
                     </div>
 
                     {/* Note */}

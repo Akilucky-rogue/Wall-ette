@@ -22,7 +22,7 @@ interface WalletContextType {
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
   clearAllTransactions: () => Promise<void>;
-  importTransactions: (newTransactions: Transaction[]) => void;
+  importTransactions: (newTransactions: Transaction[], openingBalance?: number) => void;
   toggleIgnoreRule: (id: string) => void;
   getBalance: () => number;
   getMonthlyIncome: () => number;
@@ -245,7 +245,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                if (localMfa !== null) setMfaEnabledState(localMfa);
                
                const localOpeningBalance = loadFromLocal('openingBalance');
-               if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
+               if (localOpeningBalance !== null) {
+                   console.log('💾 Loading opening balance from localStorage:', localOpeningBalance);
+                   setOpeningBalanceState(localOpeningBalance || 0);
+               } else {
+                   console.log('💾 No opening balance in localStorage (first time)');
+               }
           }
           return;
       }
@@ -274,8 +279,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       saveToLocal('mfaEnabled', data.mfaEnabled);
                   }
                   if (data.openingBalance !== undefined) {
+                      console.log('💾 Loaded opening balance from Firestore:', data.openingBalance);
                       setOpeningBalanceState(data.openingBalance || 0);
                       saveToLocal('openingBalance', data.openingBalance || 0);
+                  } else {
+                      console.log('💾 No opening balance in Firestore');
                   }
               } else {
                   if (isOnline) {
@@ -289,6 +297,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                   }
               }
           }, (error) => {
+              console.warn('⚠️ Firestore listener error, falling back to localStorage:', error.message);
               const localCurrency = loadFromLocal('currency');
               if (localCurrency) setCurrencyState(localCurrency);
               
@@ -297,9 +306,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               else setIgnoreRules(DEFAULT_RULES);
               
               const localOpeningBalance = loadFromLocal('openingBalance');
-              if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
+              if (localOpeningBalance !== null) {
+                  console.log('💾 Fallback: Loaded opening balance from localStorage:', localOpeningBalance);
+                  setOpeningBalanceState(localOpeningBalance || 0);
+              }
           });
       } catch (e) {
+           console.warn('⚠️ Settings sync exception, falling back to localStorage:', e);
            const localCurrency = loadFromLocal('currency');
            if (localCurrency) setCurrencyState(localCurrency);
            
@@ -308,7 +321,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
            else setIgnoreRules(DEFAULT_RULES);
            
            const localOpeningBalance = loadFromLocal('openingBalance');
-           if (localOpeningBalance !== null) setOpeningBalanceState(localOpeningBalance || 0);
+           if (localOpeningBalance !== null) {
+               console.log('💾 Exception fallback: Loaded opening balance from localStorage:', localOpeningBalance);
+               setOpeningBalanceState(localOpeningBalance || 0);
+           }
       }
 
       return () => unsubscribe();
@@ -352,13 +368,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const setOpeningBalance = async (balance: number) => {
+      console.log('💰 setOpeningBalance called with:', balance);
       setOpeningBalanceState(balance);
+      console.log('💰 State updated to:', balance);
       saveToLocal('openingBalance', balance);
+      console.log('💰 Saved to localStorage');
       if (user && isOnline && isBackendReady) {
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { openingBalance: balance }, { merge: true });
-          } catch (e) { console.warn("Backend update failed", e); }
+              console.log('💰 Synced to Firestore');
+          } catch (e) { 
+              console.warn("💰 Backend update failed", e); 
+          }
+      } else {
+          console.log('💰 Backend not available for sync. User:', !!user, 'Online:', isOnline, 'Ready:', isBackendReady);
       }
   };
 
@@ -471,25 +495,41 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const importTransactions = async (newTransactions: Transaction[]) => {
-    console.log('importTransactions called with:', newTransactions.length, 'transactions');
-    console.log('Sample import data:', newTransactions.slice(0, 2));
+  const importTransactions = async (newTransactions: Transaction[], openingBalance?: number) => {
+    console.log('📥 importTransactions called with:', newTransactions.length, 'transactions');
+    console.log('📥 Opening balance param:', openingBalance);
+    console.log('📥 Detailed - First transaction:', newTransactions[0]);
+    console.log('📥 Detailed - Last transaction:', newTransactions[newTransactions.length - 1]);
     
     const existingIds = new Set(transactions.map(t => t.id));
     const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
 
-    console.log('Unique new transactions:', uniqueNew.length);
+    console.log('📥 Before import - Existing transactions:', transactions.length);
+    console.log('📥 New unique transactions to add:', uniqueNew.length);
 
     if (uniqueNew.length === 0) {
-        console.warn('No new unique transactions to import');
+        console.warn('⚠️ No new unique transactions to import');
         return;
     }
 
+    // Set opening balance FIRST if provided and no existing transactions
+    if (openingBalance !== undefined && transactions.length === 0) {
+        console.log('💰 Setting opening balance during import:', openingBalance);
+        await setOpeningBalance(openingBalance);
+        console.log('✅ Opening balance set during import');
+    }
+
     const combined = [...uniqueNew, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    console.log('📥 Combined total would be:', combined.length);
+    console.log('📥 Setting state to:', combined.length, 'transactions');
+    console.log('📥 Sample combined[0]:', combined[0]);
+    
     setTransactions(combined);
     saveToLocal('transactions', combined);
     
-    console.log('Transactions updated. Total count:', combined.length);
+    console.log('✅ Transactions state updated. Total count:', combined.length);
+    console.log('✅ localStorage saved with', combined.length, 'transactions');
     
     if (user && isBackendReady) {
         try {
@@ -503,6 +543,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             };
 
             const chunks = chunkArray(uniqueNew, 500);
+            console.log('📥 Firestore - Uploading', uniqueNew.length, 'in', chunks.length, 'chunks');
             
             for (const chunk of chunks) {
                  const batch = writeBatch(db);
@@ -511,13 +552,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     batch.set(ref, tx);
                  });
                  await batch.commit();
+                 console.log('📥 Firestore - Chunk uploaded, waiting...');
             }
-            console.log(`Imported ${uniqueNew.length} transactions via batch write to Firestore.`);
+            console.log('✅ Firestore - Imported', uniqueNew.length, 'transactions via batch write');
         } catch (e) {
-            console.warn("Batch import failed", e);
+            console.warn("⚠️ Firestore import failed", e);
         }
     } else {
-        console.log('Firestore not ready, transactions saved to localStorage only');
+        console.log('📝 Firestore not ready. User:', !!user, 'Backend ready:', isBackendReady);
     }
   };
 

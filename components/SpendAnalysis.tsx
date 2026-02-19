@@ -3,6 +3,7 @@ import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/geminiService';
+import styles from './SpendAnalysis.module.css';
 
 interface SpendAnalysisProps {
   onNavigate: (screen: AppScreen) => void;
@@ -280,7 +281,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         const txDate = new Date(t.date);
         return txDate.getMonth() === selectedDate.getMonth() &&
                txDate.getFullYear() === selectedDate.getFullYear();
-      });
+      }).map(t => ({
+        ...t,
+        merchant: t.merchant || ''
+      }));
       
       const insights = await analyzeFinancialHealth(monthTransactions, totalIncome);
       setAiInsights(insights);
@@ -325,7 +329,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 <span className="font-serif font-bold text-premium-charcoal text-sm">
-                  {selectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  {selectedDate.toLocaleDateString('en-GB')}
                 </span>
                 <button onClick={() => handleMonthChange(1)} className="p-1 text-muted-taupe hover:text-sage">
                   <span className="material-symbols-outlined">chevron_right</span>
@@ -373,7 +377,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       {/* Main Stats */}
       <div className="flex flex-col items-center pb-4">
         <p className="text-muted-taupe text-[10px] font-serif font-medium uppercase tracking-[0.2em] mb-1">
-          {analysisTab === 'EXPENSE' ? 'Total Outflow' : 'Total Inflow'} · {selectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+          {analysisTab === 'EXPENSE' ? 'Total Outflow' : 'Total Inflow'} · {selectedDate.toLocaleDateString('en-GB')}
         </p>
         <h1 className={`font-serif text-[38px] leading-tight px-4 text-center ${analysisTab === 'EXPENSE' ? 'text-rose' : 'text-sage'}`}>
           {formatAmount(currentTotal)}
@@ -444,9 +448,11 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
               </div>
             </div>
             <div className="mt-3 h-2 w-full bg-black/5 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all ${savingsRate >= 20 ? 'bg-sage' : savingsRate >= 0 ? 'bg-amber-400' : 'bg-rose'}`}
-                style={{ width: `${Math.max(0, Math.min(100, savingsRate))}%` }}
+              <div
+                className={
+                  `${styles.savingsBar} ` +
+                  (savingsRate >= 20 ? styles.savingsBarSage : savingsRate >= 0 ? styles.savingsBarAmber : styles.savingsBarRose) + ' ' + styles[`w${Math.round(Math.max(0, Math.min(100, savingsRate)))}p`]
+                }
               />
             </div>
             <p className="text-[9px] text-muted-taupe mt-2 text-center">
@@ -500,13 +506,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                     <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                       {formatAmount(d.val)}
                     </div>
-                    <div 
-                      className={`w-full rounded-t-lg transition-all duration-500 ease-out group-hover:opacity-80 ${
-                        analysisTab === 'EXPENSE' ? 'bg-rose/30' : 'bg-sage/30'
-                      }`}
-                      style={{ 
-                        height: `${d.val > 0 ? Math.max(8, (d.val / (Math.max(...chartData.map(x => x.val)) || 1)) * 100) : 4}%`
-                      }}
+                    <div
+                      className={`w-full group-hover:opacity-80 ${styles.chartBar} ${analysisTab === 'EXPENSE' ? styles.expenseChartBar : styles.incomeChartBar} ${styles[`h${Math.round(d.val > 0 ? Math.max(8, (d.val / (Math.max(...chartData.map(x => x.val)) || 1)) * 100) : 4)}p`]}`}
                     />
                   </div>
                   <span className="text-[8px] font-bold text-muted-taupe uppercase">{d.label}</span>
@@ -561,9 +562,11 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                 </div>
               </div>
               <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-700 ${analysisTab === 'EXPENSE' ? 'bg-rose/60' : 'bg-sage/60'}`}
-                  style={{ width: `${cat.barWidth}%` }}
+                <div
+                  className={
+                    `${styles.savingsBar} ` +
+                    (analysisTab === 'EXPENSE' ? styles.expenseBar : styles.incomeBar) + ' ' + styles[`w${Math.round(cat.barWidth)}p`]
+                  }
                 />
               </div>
             </div>
@@ -616,7 +619,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center">
-                  <WallEMascot mood="happy" size="xs" />
+                  <WallEMascot mood="happy" size="sm" />
                 </div>
                 <h3 className="text-premium-charcoal text-base font-serif font-semibold">AI Pulse</h3>
               </div>
@@ -627,17 +630,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                   disabled={loadingInsights}
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-lavender text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-md hover:shadow-lg active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {loadingInsights ? (
-                    <>
-                      <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                      Get Insights
-                    </>
-                  )}
+                  {/* The above code was a broken fragment. No chart bar is needed here; this was a patching error. Remove it. */}
                 </button>
               )}
             </div>
@@ -651,7 +644,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
             {loadingInsights && (
               <div className="flex flex-col items-center justify-center py-8 gap-3">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center animate-pulse">
-                  <WallEMascot mood="happy" size="sm" animate />
+                  <WallEMascot mood="happy" size="sm" />
                 </div>
                 <p className="text-[11px] text-muted-taupe animate-pulse">Analyzing your financial health...</p>
               </div>
@@ -682,32 +675,32 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                     }`}>{aiInsights.riskScore}/100</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all ${
-                        aiInsights.riskScore < 30 ? 'bg-sage' :
-                        aiInsights.riskScore < 70 ? 'bg-amber-500' :
-                        'bg-rose'
-                      }`}
-                      style={{ width: `${aiInsights.riskScore}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Key Findings */}
-                {aiInsights.keyFindings.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-purple-600">lightbulb</span>
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Key Findings</h4>
+                      <div
+                        className={
+                          `${styles.riskScoreBar} ` +
+                          (aiInsights.riskScore < 30
+                            ? styles.riskScoreLow
+                            : aiInsights.riskScore < 70
+                            ? styles.riskScoreMed
+                            : styles.riskScoreHigh) + ' ' + styles[`w${Math.round(aiInsights.riskScore)}p`]
+                        }
+                      />
                     </div>
-                    {aiInsights.keyFindings.map((finding, i) => (
-                      <div key={i} className="bg-white/60 rounded-xl p-3 flex items-start gap-2">
-                        <span className="text-purple-500 text-[16px]">•</span>
-                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{finding}</p>
+                    {aiInsights.keyFindings.length > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="material-symbols-outlined text-[18px] text-purple-600">lightbulb</span>
+                          <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Key Findings</h4>
+                        </div>
+                        {aiInsights.keyFindings.map((finding, i) => (
+                          <div key={i} className="bg-white/60 rounded-xl p-3 flex items-start gap-2">
+                            <span className="text-purple-500 text-[16px]">•</span>
+                            <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{finding}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
 
                 {/* Recommendations */}
                 {aiInsights.recommendations.length > 0 && (

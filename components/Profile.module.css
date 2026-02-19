@@ -1,0 +1,10 @@
+.clearButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.limitSaved {
+  ring: 2px solid var(--sage, #9BAE93);
+}

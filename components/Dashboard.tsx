@@ -32,8 +32,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   // Debug logging
   useEffect(() => {
-    console.log('Dashboard Debug:', {
+    console.log('📊 Dashboard Debug:', {
       totalTransactions: transactions.length,
+      openingBalance: openingBalance,
       balance,
       monthlyIncome,
       monthlyExpenses,
@@ -41,7 +42,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       totalExpenses,
       showAllTime,
       hasMonthlyData,
-      openingBalance,
       transactionBalance: totalIncome - totalExpenses,
       expectedBalance: openingBalance + totalIncome - totalExpenses,
       sampleTransactions: transactions.slice(0, 3).map(t => ({
@@ -51,7 +51,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         category: t.category
       }))
     });
-  }, [transactions, balance, monthlyIncome, monthlyExpenses, totalIncome, totalExpenses, showAllTime, hasMonthlyData]);
+    console.log('📊 Balance Calculation: opening(' + openingBalance + ') + income(' + totalIncome + ') - expenses(' + totalExpenses + ') = ' + balance);
+  }, [transactions, balance, monthlyIncome, monthlyExpenses, totalIncome, totalExpenses, showAllTime, hasMonthlyData, openingBalance]);
 
   // Close notifications when clicking outside
   useEffect(() => {

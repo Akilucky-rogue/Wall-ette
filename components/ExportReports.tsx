@@ -24,7 +24,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
           const headers = ["ID", "Date", "Merchant", "Amount", "Type", "Category", "Note"];
           const rows = transactions.map(t => [
               t.id,
-              new Date(t.date).toLocaleDateString(),
+              new Date(t.date).toLocaleDateString('en-GB'),
               `"${t.merchant?.replace(/"/g, '""') || ''}"`,
               t.amount,
               t.type,
@@ -112,7 +112,9 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
                 value={format}
                 onChange={(e) => setFormat(e.target.value as any)}
                 className="w-full bg-white border border-sage-border rounded-2xl px-6 py-5 text-zen-charcoal font-serif text-lg shadow-soft focus:ring-1 focus:ring-sage focus:border-sage appearance-none outline-none"
-            >
+                title="Export format"
+                aria-label="Export format"
+              >
               <option value="CSV">CSV Spreadsheet</option>
               <option value="JSON">JSON Archive</option>
               <option value="PDF">PDF Document</option>

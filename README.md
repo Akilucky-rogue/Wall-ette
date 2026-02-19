@@ -1,8 +1,8 @@
-# WALL-E 🌿
+# Wall-ette 🌿
 
 **A mindful, aesthetic wallet tracker built with React, Firebase, and Firestore for seamless real-time sync.**
 
-WALL-E (Wallet & Assets Logic / Living Economy) brings peace of mind to personal finance with Zen design, robust security, and AI-powered automation.
+Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to personal finance with Zen design, robust security, and AI-powered automation.
 
 **🌍 LIVE APP**: https://wall-e-7a113.web.app  
 **STATUS**: ✅ Production Deployed | ✅ Fully Secured | ✅ Real-time Sync
@@ -143,7 +143,7 @@ This project includes comprehensive documentation for both web and Android devel
 
 ## 🤖 AI Implementation Details
 
-WALL-E uses a hybrid model approach for optimal performance and cost:
+Wall-ette uses a hybrid model approach for optimal performance and cost:
 
 1.  **Gemini 3 Flash**: Used for real-time, low-latency tasks like analyzing spending habits strings and simple categorization.
 2.  **Gemini 3 Pro**: Used in `services/geminiService.ts` for heavy-duty document parsing (Bank Statements). It creates structured JSON from unstructured PDF/Image inputs with high accuracy.

@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserSessionPersistence, indexedDBLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 
-// Configuration provided for the WALL-E app
+// Configuration provided for the Wall-ette app
 const firebaseConfig = {
   apiKey: "AIzaSyD-hkH72RsRSKwpltZQSZSfEzynqb8n4Os",
   authDomain: "wall-e-7a113.firebaseapp.com",

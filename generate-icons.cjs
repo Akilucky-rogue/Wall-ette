@@ -201,13 +201,13 @@ function generateIcon(size) {
   ctx.fillStyle = '#FFD700';
   ctx.font = `bold ${size * 0.06}px monospace`;
   ctx.textAlign = 'center';
-  ctx.fillText('WALL-E', centerX, baseY + size * 0.1);
+  ctx.fillText('Wall-ette', centerX, baseY + size * 0.1);
 
   return canvas;
 }
 
 // Generate icons for all densities
-console.log('🎨 Generating WALL-E app icons (ZEN-R style)...\n');
+console.log('🎨 Generating Wall-ette app icons (ZEN-R style)...\n');
 
 Object.entries(sizes).forEach(([density, size]) => {
   const canvas = generateIcon(size);

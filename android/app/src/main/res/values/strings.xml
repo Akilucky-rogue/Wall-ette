@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">WALL-E</string>
-    <string name="title_activity_main">WALL-E</string>
+    <string name="app_name">Wall-ette</string>
+    <string name="title_activity_main">Wall-ette</string>
     <string name="package_name">com.wallet.walle</string>
     <string name="custom_url_scheme">com.wallet.walle</string>
 </resources>

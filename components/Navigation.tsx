@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppScreen } from '../types';
 import { Sprout, LotusFlower } from './SplashScreen';
+import styles from './Navigation.module.css';
 
 interface NavigationProps {
   currentScreen: AppScreen;
@@ -41,7 +42,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
             onClick={() => onNavigate(AppScreen.DASHBOARD)}
             className={`flex flex-col items-center gap-1 ${getIconStyle(AppScreen.DASHBOARD)}`}
         >
-          <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: `'FILL' ${getIconFill(AppScreen.DASHBOARD)}` }}>home</span>
+          <span
+            className={`material-symbols-outlined text-[26px] ${getIconFill(AppScreen.DASHBOARD) === 1 ? styles.iconFill1 : styles.iconFill0}`}
+          >home</span>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${getTextStyle(AppScreen.DASHBOARD)}`}>Home</span>
         </button>
 
@@ -49,7 +52,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
             onClick={() => onNavigate(AppScreen.HISTORY)}
             className={`flex flex-col items-center gap-1 ${getIconStyle(AppScreen.HISTORY)}`}
         >
-          <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: `'FILL' ${getIconFill(AppScreen.HISTORY)}` }}>wallet</span>
+          <span
+            className={`material-symbols-outlined text-[26px] ${getIconFill(AppScreen.HISTORY) === 1 ? styles.iconFill1 : styles.iconFill0}`}
+          >wallet</span>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${getTextStyle(AppScreen.HISTORY)}`}>Vault</span>
         </button>
 
@@ -57,7 +62,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
             onClick={() => onNavigate(AppScreen.ANALYSIS)}
             className={`flex flex-col items-center gap-1 ${getIconStyle(AppScreen.ANALYSIS)}`}
         >
-          <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: `'FILL' ${getIconFill(AppScreen.ANALYSIS)}` }}>query_stats</span>
+          <span
+            className={`material-symbols-outlined text-[26px] ${getIconFill(AppScreen.ANALYSIS) === 1 ? styles.iconFill1 : styles.iconFill0}`}
+          >query_stats</span>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${getTextStyle(AppScreen.ANALYSIS)}`}>Pulse</span>
         </button>
 
@@ -65,7 +72,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
             onClick={() => onNavigate(AppScreen.SELF)}
             className={`flex flex-col items-center gap-1 ${getIconStyle(AppScreen.SELF)}`}
         >
-          <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: `'FILL' ${getIconFill(AppScreen.SELF)}` }}>account_circle</span>
+          <span
+            className={`material-symbols-outlined text-[26px] ${getIconFill(AppScreen.SELF) === 1 ? styles.iconFill1 : styles.iconFill0}`}
+          >account_circle</span>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${getTextStyle(AppScreen.SELF)}`}>Self</span>
         </button>
 

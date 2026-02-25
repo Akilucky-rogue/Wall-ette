@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
+
 import SecurityLock from './components/SecurityLock';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -22,6 +23,7 @@ const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Profile = React.lazy(() => import('./components/Profile'));
 
 function AppContent() {
+  console.error('[WALL-E] AppContent mounted');
   const { user, loading } = useAuth();
   const [isLocked, setIsLocked] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
@@ -33,24 +35,32 @@ function AppContent() {
   // Auto-logout when app goes to background (Mobile Security)
   useEffect(() => {
     if (!user) return;
-    
     // Only enable on native mobile platforms
     if (Capacitor.isNativePlatform()) {
-      const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) {
-          // App went to background - auto logout for security
-          console.log('🔒 App backgrounded - Auto logout triggered');
-          import('./services/firebase').then(({ auth }) => {
-            auth.signOut();
-          });
-        }
-      });
-
+      let listenerHandle: any = null;
+      (async () => {
+        listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+          console.error(`[WALL-E] appStateChange: isActive=${isActive}, currentScreen=${currentScreen}`);
+          if (!isActive) {
+            // Prevent auto-logout on ImportStatement screen
+            if (currentScreen !== AppScreen.IMPORT) {
+              console.error(`[WALL-E] 🔒 App backgrounded - Auto logout triggered (currentScreen=${currentScreen})`);
+              import('./services/firebase').then(({ auth }) => {
+                auth.signOut();
+              });
+            } else {
+              console.error(`[WALL-E] 🛡️ App backgrounded during import/upload - session preserved (currentScreen=${currentScreen})`);
+            }
+          }
+        });
+      })();
       return () => {
-        listener.remove();
+        if (listenerHandle && typeof listenerHandle.remove === 'function') {
+          listenerHandle.remove();
+        }
       };
     }
-  }, [user]);
+  }, [user, currentScreen]);
 
   // Inactivity Lock Timer
   useEffect(() => {

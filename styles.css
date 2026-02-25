@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Zen Theme Global Styles */
+body {
+	@apply bg-zen-bg font-sans text-premium-charcoal antialiased;
+}
+h1, h2, h3, h4, h5, h6, .heading-serif {
+	@apply font-serif;
+}
+
+/* Material Symbols Outlined icon font (thin, minimalist) */
+.material-symbols-outlined {
+	font-family: 'Material Symbols Outlined';
+	font-weight: normal;
+	font-style: normal;
+	font-size: 24px;
+	line-height: 1;
+	letter-spacing: normal;
+	text-transform: none;
+	display: inline-block;
+	white-space: nowrap;
+	direction: ltr;
+	-webkit-font-feature-settings: 'liga';
+	font-feature-settings: 'liga';
+	-webkit-font-smoothing: antialiased;
+	font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+}

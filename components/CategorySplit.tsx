@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, MandalaDots, RangoliCorner, Paisley } from './SplashScreen';
@@ -203,9 +203,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
 
       {/* Pie Chart */}
       <div className="flex flex-col items-center py-8 px-6">
-        <div 
+        <div
+          ref={pieRef}
           className={`relative w-[200px] h-[200px] rounded-full shadow-lg flex items-center justify-center transition-all duration-500 categoryPieBg`}
-          data-gradient={gradientString}
         >
           <div className="w-[140px] h-[140px] bg-zen-bg rounded-full flex flex-col items-center justify-center shadow-inner">
             <span className="text-muted-taupe text-[9px] font-medium uppercase tracking-[0.15em]">Expenses</span>
@@ -213,7 +213,6 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             <span className="text-rose text-[10px] font-semibold mt-0.5">{getTimeRangeLabel()}</span>
           </div>
         </div>
-        
         {/* Transaction count */}
         <p className="text-muted-taupe text-[11px] mt-4">
           {filteredTransactions.length} transactions • {categories.length} categories

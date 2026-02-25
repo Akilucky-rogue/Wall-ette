@@ -8,7 +8,24 @@ interface ExportReportsProps {
 }
 
 const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
-  const { transactions } = useWallet();
+  const { transactions, openingBalance } = useWallet();
+  // Compute dashboard summary for current data
+  const summary = React.useMemo(() => {
+    let totalDebit = 0, totalCredit = 0;
+    transactions.forEach(t => {
+      if (t.type === 'EXPENSE') totalDebit += t.amount;
+      else if (t.type === 'INCOME') totalCredit += t.amount;
+    });
+    const closingBalance = openingBalance + totalCredit - totalDebit;
+    return {
+      openingBalance,
+      totalDebit,
+      totalCredit,
+      closingBalance,
+      transactionCount: transactions.length,
+      period: 'All Time',
+    };
+  }, [transactions, openingBalance]);
   const [format, setFormat] = useState<'PDF' | 'CSV' | 'JSON'>('CSV');
 
   const handleGenerateReport = () => {
@@ -45,6 +62,16 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       } else {
           alert("PDF generation requires a backend service in this demo environment. Please try CSV or JSON.");
       }
+  };
+
+  const handleExportSummary = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(summary, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "dashboard_summary.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
   };
 
   return (
@@ -125,7 +152,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
           </div>
         </section>
 
-        <div className="pt-6 pb-4">
+        <div className="pt-6 pb-4 flex flex-col gap-4">
           <button 
             onClick={handleGenerateReport}
             className="w-full bg-sage text-white py-6 rounded-4xl font-serif text-xl font-medium shadow-soft flex items-center justify-center gap-3 shadow-xl shadow-sage/10 group active:scale-95 transition-all"
@@ -133,7 +160,15 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-[24px] group-hover:rotate-12 transition-transform">auto_awesome</span>
             Generate Report
           </button>
-          <p className="text-center text-zen-taupe text-[10px] mt-6 uppercase tracking-[0.2em] font-medium opacity-60">Preparing your data will take a moment</p>
+          <button
+            onClick={handleExportSummary}
+            className="w-full bg-blue-zen text-white py-4 rounded-4xl font-serif text-lg font-medium shadow-soft flex items-center justify-center gap-2 shadow-xl shadow-blue-zen/10 group active:scale-95 transition-all"
+            title="Export dashboard summary for verification"
+          >
+            <span className="material-symbols-outlined text-[22px] group-hover:rotate-12 transition-transform">fact_check</span>
+            Export Dashboard Summary
+          </button>
+          <p className="text-center text-zen-taupe text-[10px] mt-2 uppercase tracking-[0.2em] font-medium opacity-60">Preparing your data will take a moment</p>
         </div>
       </div>
 

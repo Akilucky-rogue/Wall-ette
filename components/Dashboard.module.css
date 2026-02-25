@@ -1,0 +1,40 @@
+.savingsGauge {
+	transition: stroke-dasharray 1.2s cubic-bezier(.4,1.4,.6,1);
+}
+.trendLine {
+	transition: all 1s cubic-bezier(.4,1.4,.6,1);
+}
+.trendDot {
+	fill: #fff;
+	stroke: #9BAE93;
+	stroke-width: 1;
+}
+.barChartBar {
+	width: 1.75rem;
+	border-radius: 0.75rem;
+	transition-property: height;
+	transition-duration: 700ms;
+	height: 40px;
+}
+/* Use JS to set height via className for now, since attr() for height is not widely supported */
+.barChartBar.height8 { height: 8px; }
+.barChartBar.height16 { height: 16px; }
+.barChartBar.height24 { height: 24px; }
+.barChartBar.height32 { height: 32px; }
+.barChartBar.height40 { height: 40px; }
+.barChartBar.height48 { height: 48px; }
+.barChartBar.height56 { height: 56px; }
+.barChartBar.height64 { height: 64px; }
+.barChartBar.height72 { height: 72px; }
+.barChartBar.height80 { height: 80px; }
+.barSage {
+	background: #9BAE93;
+}
+.barRose {
+	background: #E57373;
+}
+.bg-dashboard-cat1 { background-color: #9BAE93; }
+.bg-dashboard-cat2 { background-color: #E3EAE0; }
+.bg-dashboard-cat3 { background-color: #D4A5A5; }
+.bg-dashboard-cat4 { background-color: #FBBF24; }
+.bg-dashboard-cat5 { background-color: #A8B89E; }

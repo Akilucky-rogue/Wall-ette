@@ -19,15 +19,16 @@ export const auth = getAuth(app);
 // Set session persistence based on platform
 // For mobile: use session persistence (clears on app close)
 // For web: use local persistence (stays logged in)
-const isNativePlatform = 'Capacitor' in window;
+import { Capacitor } from '@capacitor/core';
+const isNativePlatform = Capacitor.isNativePlatform && Capacitor.isNativePlatform();
 if (isNativePlatform) {
-  setPersistence(auth, browserSessionPersistence).catch((error) => {
-    console.warn('Failed to set session persistence:', error);
-  });
-  console.log('🔒 Mobile platform detected - Session persistence enabled (auto-logout on app close)');
-} else {
   setPersistence(auth, indexedDBLocalPersistence).catch((error) => {
     console.warn('Failed to set local persistence:', error);
+  });
+  console.log('Mobile platform detected - Local persistence enabled (session survives background)');
+} else {
+  setPersistence(auth, browserSessionPersistence).catch((error) => {
+    console.warn('Failed to set session persistence:', error);
   });
 }
 

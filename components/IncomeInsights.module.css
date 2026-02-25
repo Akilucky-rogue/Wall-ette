@@ -1,0 +1,10 @@
+.chartAnimated {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.2s cubic-bezier(.4,1.4,.6,1);
+}
+.chartInitial {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  transition: stroke-dashoffset 1.2s cubic-bezier(.4,1.4,.6,1);
+}

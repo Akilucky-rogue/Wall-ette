@@ -572,9 +572,27 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                     {getIconForCategory(t.category)}
                                 </span>
                                 </div>
-                                <div>
-                                <p className="font-serif font-semibold text-[15px] text-premium-charcoal">{t.merchant || "Unknown Merchant"}</p>
-                                <p className="text-[11px] text-muted-taupe uppercase tracking-wider">{t.category}</p>
+                                <div className="max-w-[180px]">
+                                  <p
+                                    className="font-serif font-semibold text-[15px] text-premium-charcoal truncate"
+                                    title={t.merchant || "Unknown Merchant"}
+                                  >
+                                    {t.merchant && t.merchant.trim().length > 0 ? t.merchant : <span className="italic text-muted-taupe">Unknown Merchant</span>}
+                                  </p>
+                                  <p
+                                    className="text-[11px] text-muted-taupe uppercase tracking-wider truncate"
+                                    title={t.category && t.category.trim().length > 0 ? t.category : 'Uncategorized'}
+                                  >
+                                    {t.category && t.category.trim().length > 0 ? t.category : <span className="italic text-muted-taupe">Uncategorized</span>}
+                                  </p>
+                                  {t.note && t.note.trim().length > 0 && (
+                                    <p
+                                      className="text-[10px] text-muted-taupe truncate mt-0.5"
+                                      title={t.note}
+                                    >
+                                      {t.note}
+                                    </p>
+                                  )}
                                 </div>
                             </div>
                             <div className="text-right">

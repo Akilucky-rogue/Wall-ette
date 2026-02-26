@@ -1,3 +1,10 @@
+/* CurrencySelector button sizing */
+.min-w-currency {
+	min-width: 64px;
+}
+.min-h-currency {
+	min-height: 40px;
+}
 .savingsGauge {
 	transition: stroke-dasharray 1.2s cubic-bezier(.4,1.4,.6,1);
 }

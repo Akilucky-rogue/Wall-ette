@@ -258,8 +258,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <WallEMascot mood="happy" size="sm" />
           <span className="text-premium-charcoal font-serif text-xl font-bold tracking-tight select-none">WALL-E</span>
         </div>
-        {/* Right: Notification bell */}
-        <div className="relative flex items-center ml-auto min-w-0">
+        {/* Right: Currency + Notification bell */}
+        <div className="relative flex items-center ml-auto min-w-0 gap-2">
+          <CurrencySelector />
           <div className="relative" ref={notificationRef}>
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
@@ -316,7 +317,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
         <div className="flex items-center gap-3 mb-2">
           <p className="text-muted-taupe text-xs font-medium uppercase tracking-[0.2em]">Portfolio Balance</p>
-          <CurrencySelector />
         </div>
         <div className="flex bg-white/70 border border-sage/10 rounded-full overflow-hidden text-xs font-semibold items-center mb-4">
           <button

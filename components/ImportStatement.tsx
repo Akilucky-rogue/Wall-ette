@@ -407,7 +407,63 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     return;
                 }
                 if (result.transactions.length > 0) {
-                    // ...existing code...
+                    console.log(`✅ IDFCBankParser Excel succeeded: ${result.transactions.length} transactions`);
+                    setParserUsed('🏦 Enhanced IDFC Parser (Excel)');
+
+                    // Store opening balance
+                    if (result.summary.openingBalance !== undefined && existingTransactions.length === 0) {
+                        setParsedOpeningBalance(result.summary.openingBalance);
+                    }
+
+                    // Convert to app format and map to Transaction[]
+                    const mappedTransactions: Transaction[] = result.transactions
+                        .filter((t: any) => {
+                            if (!t.date || !t.amount || !t.type) return false;
+                            if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
+                            if (typeof t.amount !== 'number' || t.amount <= 0) return false;
+                            return true;
+                        })
+                        .map((t: any, index: number) => {
+                            const merchant = (t.description || 'Unknown').substring(0, 100).trim();
+                            const cleanMerchant = merchant.replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
+                            const idString = `${t.date}-${t.amount}-${cleanMerchant}-${t.type}-${index}`;
+                            let hash = 0;
+                            for (let i = 0; i < idString.length; i++) {
+                                const char = idString.charCodeAt(i);
+                                hash = ((hash << 5) - hash) + char;
+                                hash = hash & hash;
+                            }
+                            return {
+                                id: `import-${Math.abs(hash)}`,
+                                date: t.date,
+                                merchant,
+                                amount: Math.abs(t.amount),
+                                type: t.type.toUpperCase() === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE,
+                                category: t.category?.trim() || 'Uncategorized',
+                                note: t.notes || t.description || ''
+                            };
+                        });
+
+                    if (mappedTransactions.length === 0) {
+                        throw new Error("No valid transactions found in the Excel file.");
+                    }
+
+                    // Detect duplicates
+                    const foundDuplicates = new Set<string>();
+                    mappedTransactions.forEach(newTx => {
+                        const isDupe = existingTransactions.some(existingTx =>
+                            isDuplicateTransaction(newTx, existingTx)
+                        );
+                        if (isDupe) foundDuplicates.add(newTx.id);
+                    });
+
+                    console.log(`🔍 Found ${foundDuplicates.size} potential duplicates out of ${mappedTransactions.length}`);
+                    setDuplicateIds(foundDuplicates);
+                    setExtractedData(mappedTransactions);
+                    const nonDuplicateIds = new Set(mappedTransactions.filter(t => !foundDuplicates.has(t.id)).map(t => t.id));
+                    setSelectedIds(nonDuplicateIds);
+                    setShowDuplicateInfo(foundDuplicates.size > 0);
+                    setStage('REVIEW');
                 } else {
                     throw new Error("No transactions found in Excel file.");
                 }

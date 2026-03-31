@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AppScreen, Transaction, TransactionType } from '../types';
+import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
 import { useWallet } from '../context/WalletContext';
 import CurrencySelector from './CurrencySelector';
 import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
@@ -20,6 +20,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Delete Confirmation State
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -58,7 +59,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
     const filtered = transactions.filter(t => {
+      // Search filter
+      if (q) {
+        const inMerchant = (t.merchant || '').toLowerCase().includes(q);
+        const inCategory = t.category.toLowerCase().includes(q);
+        const inNote = (t.note || '').toLowerCase().includes(q);
+        const inAmount = String(t.amount).includes(q);
+        if (!inMerchant && !inCategory && !inNote && !inAmount) return false;
+      }
       // Type Filter
       if (activeType !== 'ALL' && t.type !== activeType) return false;
       
@@ -103,7 +113,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount]);
+  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, debouncedSearch]);
 
   // Group by date (Today, Yesterday, Date String)
   const groupedTransactions = useMemo(() => {
@@ -134,6 +144,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     return count;
   }, [dateFilter, categoryFilter, minAmount, maxAmount, sortBy]);
 
+  // Debounced search to avoid re-renders on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  React.useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(debouncedSearch), 250);
+    return () => clearTimeout(t);
+  }, [debouncedSearch]);
+
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   };
@@ -145,6 +162,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setSortBy('DATE_DESC');
     setMinAmount('');
     setMaxAmount('');
+    setDebouncedSearch('');
+    setSearchQuery('');
     setShowFilters(false);
   }
 
@@ -326,6 +345,26 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
           </button>
         </div>
         
+        {/* Search Bar */}
+        <div className="relative mt-3">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[18px] text-muted-taupe pointer-events-none">search</span>
+          <input
+            type="text"
+            value={debouncedSearch}
+            onChange={e => setDebouncedSearch(e.target.value)}
+            placeholder="Search merchant, category, note..."
+            className="w-full pl-11 pr-10 py-2.5 bg-white border border-black/[0.06] rounded-2xl text-[13px] text-premium-charcoal placeholder:text-muted-taupe/60 focus:outline-none focus:ring-2 focus:ring-sage/30 shadow-sm"
+          />
+          {debouncedSearch && (
+            <button
+              onClick={() => { setDebouncedSearch(''); setSearchQuery(''); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-taupe hover:text-rose transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          )}
+        </div>
+
         {/* Active Filters Summary */}
         {activeFilterCount > 0 && (
           <div className="flex items-center gap-2 pt-2 overflow-x-auto no-scrollbar">
@@ -798,10 +837,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             title="Category"
                             aria-label="Category"
                           >
-                            {categories.filter(c => c !== 'ALL').map(cat => (
+                            {CATEGORIES.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
-                            <option value="Uncategorized">Uncategorized</option>
                         </select>
                     </div>
 

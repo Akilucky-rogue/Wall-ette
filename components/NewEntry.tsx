@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppScreen, TransactionType } from '../types';
+import { AppScreen, TransactionType, CATEGORIES } from '../types';
 import { getSymbol } from '../currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
@@ -12,10 +12,12 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   const { currency, addTransaction, convertToBase } = useWallet();
   const [amount, setAmount] = useState('0.00');
   const [note, setNote] = useState('');
+  const [merchant, setMerchant] = useState('');
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [category, setCategory] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [saveAndAdd, setSaveAndAdd] = useState(false);
 
   const handleKeypad = (val: string) => {
     if (val === 'backspace') {
@@ -31,6 +33,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       } else {
           // Prevent multiple decimals
           if (val === '.' && amount.includes('.')) return;
+          // Limit to 2 decimal places
+          const dotIdx = amount.indexOf('.');
+          if (dotIdx !== -1 && amount.length - dotIdx > 2) return;
           setAmount(prev => prev + val);
       }
     }
@@ -50,11 +55,20 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
         category: category || 'Uncategorized',
         date: selectedDate.toISOString(),
         note: note,
-        merchant: type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'
+        merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source')
     });
 
     if (success) {
-      onNavigate(AppScreen.DASHBOARD);
+      if (saveAndAdd) {
+        // Reset form but stay on screen
+        setAmount('0.00');
+        setNote('');
+        setMerchant('');
+        setCategory('');
+        setSelectedDate(new Date());
+      } else {
+        onNavigate(AppScreen.DASHBOARD);
+      }
     }
   };
 
@@ -107,13 +121,30 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
         </div>
 
         <div className="space-y-4">
+          {/* Merchant / Payee */}
+          <div className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01]">
+            <div className="bg-lavender-light text-lavender p-2.5 rounded-2xl">
+              <span className="material-symbols-outlined text-[20px]">storefront</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Merchant / Payee</p>
+              <input
+                type="text"
+                value={merchant}
+                onChange={e => setMerchant(e.target.value)}
+                placeholder={type === TransactionType.EXPENSE ? 'e.g. Swiggy, Amazon' : 'e.g. Employer, Client'}
+                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none placeholder:text-muted-taupe/50 placeholder:font-sans placeholder:font-normal placeholder:text-sm"
+              />
+            </div>
+          </div>
+
           <div className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01]">
             <div className="bg-sage-light text-sage p-2.5 rounded-2xl">
               <span className="material-symbols-outlined text-[20px]">category</span>
             </div>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Category</p>
-              <select 
+              <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none appearance-none"
@@ -121,15 +152,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 aria-label="Category"
               >
                 <option value="" disabled>Select Category</option>
-                <option value="Groceries">Groceries</option>
-                <option value="Transport">Transport</option>
-                <option value="Housing">Housing</option>
-                <option value="Dining">Dining</option>
-                <option value="Health">Health</option>
-                <option value="Entertainment">Entertainment</option>
-                <option value="Salary">Salary</option>
-                <option value="Freelance">Freelance</option>
-                <option value="Investment">Investment</option>
+                {CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
               </select>
             </div>
             <span className="material-symbols-outlined text-muted-taupe opacity-40">expand_more</span>
@@ -253,11 +278,23 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-[24px]">backspace</span>
           </button>
         </div>
-        <button 
+        {/* Save & Add Another toggle */}
+        <label className="flex items-center justify-center gap-2 mt-4 cursor-pointer select-none">
+          <div
+            onClick={() => setSaveAndAdd(p => !p)}
+            className={`relative w-10 h-5 rounded-full transition-colors ${saveAndAdd ? 'bg-sage' : 'bg-black/10'}`}
+          >
+            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-5' : 'translate-x-0'}`} />
+          </div>
+          <span className="text-[12px] text-muted-taupe font-medium">Save & Add Another</span>
+        </label>
+
+        <button
             onClick={handleSave}
-            className="w-full mt-6 bg-sage text-white py-4 rounded-[24px] font-serif text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors"
+            className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] font-serif text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98]"
         >
-          Save Transaction
+          <span className="material-symbols-outlined text-[22px]">{saveAndAdd ? 'add' : 'check'}</span>
+          {saveAndAdd ? 'Save & Add Another' : 'Save Transaction'}
         </button>
       </div>
     </div>

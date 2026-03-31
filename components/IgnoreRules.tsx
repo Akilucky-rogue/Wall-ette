@@ -10,6 +10,16 @@ interface IgnoreRulesProps {
 const IgnoreRules: React.FC<IgnoreRulesProps> = ({ onNavigate }) => {
   const { ignoreRules, toggleIgnoreRule } = useWallet();
 
+  // Static color map — dynamic Tailwind class strings are purged at build time
+  const COLOR_MAP: Record<string, { bg: string; text: string }> = {
+    sage:  { bg: 'bg-sage-light',     text: 'text-sage' },
+    rose:  { bg: 'bg-rose-light',     text: 'text-rose' },
+    ocean: { bg: 'bg-ocean-light',    text: 'text-ocean' },
+    sand:  { bg: 'bg-sand-light',     text: 'text-sand' },
+    lavender: { bg: 'bg-lavender-light', text: 'text-lavender' },
+    slate: { bg: 'bg-slate-100',      text: 'text-slate-400' },
+  };
+
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco decorative elements */}
@@ -42,7 +52,7 @@ const IgnoreRules: React.FC<IgnoreRulesProps> = ({ onNavigate }) => {
         {ignoreRules.map((rule) => (
           <div key={rule.id} className={`bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft flex items-center justify-between ${!rule.isActive ? 'opacity-70 grayscale-[0.5]' : ''} transition-all`}>
             <div className="flex items-center gap-4">
-              <div className={`${rule.color === 'slate' ? 'bg-slate-100 text-slate-400' : `bg-${rule.color}-light/40 text-${rule.color}`} p-2.5 rounded-2xl`}>
+              <div className={`${(COLOR_MAP[rule.color] || COLOR_MAP.slate).bg} ${(COLOR_MAP[rule.color] || COLOR_MAP.slate).text} p-2.5 rounded-2xl`}>
                 <span className="material-symbols-outlined text-[22px]">{rule.icon}</span>
               </div>
               <div>

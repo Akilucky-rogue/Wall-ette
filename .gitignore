@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets and credentials
+.env
+*.keystore
+*.jks
+
+# Build artifacts
+*.apk
+*.aab
+
+# Bank statements and financial data (personal data — never commit)
+*.pdf
+*.xlsx
+*.xls
+
+# Archives
+*.zip

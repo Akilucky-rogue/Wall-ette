@@ -13,6 +13,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
   const { transactions, formatAmount } = useWallet();
   const [timeRange, setTimeRange] = useState<TimeRange>('MONTH');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const pieRef = useRef<HTMLDivElement>(null);
 
   // Auto-detect the month with most recent transactions
   const latestTxDate = useMemo(() => {
@@ -242,7 +243,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           <div className="flex flex-wrap justify-center gap-2">
             {categories.slice(0, 5).map((item, i) => (
               <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-full border border-black/5">
-                <div className={`w-2_5 h-2_5 rounded-full`} data-bg={item.colorHex} />
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.colorHex }} />
                 <span className="text-[10px] text-premium-charcoal font-medium">{item.name}</span>
                 <span className="text-[9px] text-muted-taupe">{item.percent}%</span>
               </div>
@@ -263,10 +264,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           return (
             <div key={i} className="bg-white p-4 rounded-3xl border border-black/[0.02] flex items-center justify-between shadow-soft">
               <div className="flex items-center gap-3">
-                <div 
-                  className={`p-2_5 rounded-2xl categoryColorChip`}
-                  data-bg={item.colorHex}
-                  data-fg={item.colorHex}
+                <div
+                  className="p-2.5 rounded-2xl"
+                  style={{ backgroundColor: item.colorHex + '33', color: item.colorHex }}
                 >
                   <span className="material-symbols-outlined text-[20px]">{getIcon(item.name)}</span>
                 </div>

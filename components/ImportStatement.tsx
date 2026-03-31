@@ -27,7 +27,7 @@ const normalizeMerchant = (merchant: string): string => {
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 // Removed static import of XLSX to optimize initial load time
 // import * as XLSX from 'xlsx'; 
-import { AppScreen, Transaction, TransactionType } from '../types';
+import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
 import { getSymbol } from '../currencyUtils';
@@ -35,24 +35,6 @@ import { useWallet } from '../context/WalletContext';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
 import styles from './ImportStatement.module.css';
 
-// Comprehensive category list for better classification
-const CATEGORIES = [
-    'Groceries', 'Dining', 'Food Delivery', 'Coffee',
-    'Transport', 'Fuel', 'Parking', 'Taxi', 'Metro', 'Flights',
-    'Shopping', 'Electronics', 'Clothing', 'Furniture',
-    'Entertainment', 'Movies', 'Streaming', 'Games',
-    'Utilities', 'Electricity', 'Water', 'Gas', 'Internet', 'Phone',
-    'Healthcare', 'Pharmacy', 'Doctor', 'Insurance',
-    'Education', 'Books', 'Courses',
-    'Bills', 'Rent', 'EMI', 'Loan', 'Credit Card',
-    'Salary', 'Freelance', 'Bonus', 'Investment', 'Dividend', 'Interest',
-    'Transfer', 'Cash', 'ATM',
-    'Subscriptions', 'Gym', 'Charity',
-    'Travel', 'Hotel', 'Vacation',
-        'Personal Care', 'Beauty',
-        'Pets', 'Gifts',
-        'Other', 'Uncategorized'
-];
 
 // Check if two transactions are likely duplicates
 const isDuplicateTransaction = (

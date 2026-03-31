@@ -630,7 +630,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                   disabled={loadingInsights}
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-lavender text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-md hover:shadow-lg active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {/* The above code was a broken fragment. No chart bar is needed here; this was a patching error. Remove it. */}
+                  {loadingInsights ? 'Analyzing...' : '✦ Analyze with AI'}
                 </button>
               )}
             </div>

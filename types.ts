@@ -52,6 +52,25 @@ export enum AppScreen {
   SELF = 'SELF' // Profile
 }
 
+// Shared category list used across NewEntry, ImportStatement, and TransactionHistory
+export const CATEGORIES = [
+  'Groceries', 'Dining', 'Food Delivery', 'Coffee',
+  'Transport', 'Fuel', 'Parking', 'Taxi', 'Metro', 'Flights',
+  'Shopping', 'Electronics', 'Clothing', 'Furniture',
+  'Entertainment', 'Movies', 'Streaming', 'Games',
+  'Utilities', 'Electricity', 'Water', 'Gas', 'Internet', 'Phone',
+  'Healthcare', 'Pharmacy', 'Doctor', 'Insurance',
+  'Education', 'Books', 'Courses',
+  'Bills', 'Rent', 'EMI', 'Loan', 'Credit Card',
+  'Salary', 'Freelance', 'Bonus', 'Investment', 'Dividend', 'Interest',
+  'Transfer', 'Cash', 'ATM',
+  'Subscriptions', 'Gym', 'Charity',
+  'Travel', 'Hotel', 'Vacation',
+  'Personal Care', 'Beauty',
+  'Pets', 'Gifts',
+  'Other', 'Uncategorized',
+] as const;
+
 export type CurrencyCode = 'INR' | 'USD' | 'EUR' | 'GBP';
 
 export interface CurrencyConfig {

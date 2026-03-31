@@ -10,25 +10,26 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-    // Helper: get today's date string
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    const getDailyIncome = () =>
-      transactions.filter(t => t.type === TransactionType.INCOME && t.date?.slice(0, 10) === todayStr)
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    const getDailyExpense = () =>
-      transactions.filter(t => t.type === TransactionType.EXPENSE && t.date?.slice(0, 10) === todayStr)
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    const getAllTimeIncome = () =>
-      transactions.filter(t => t.type === TransactionType.INCOME)
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    const getAllTimeExpense = () =>
-      transactions.filter(t => t.type === TransactionType.EXPENSE)
-        .reduce((sum, t) => sum + t.amount, 0);
   const { getBalance, getMonthlyIncome, getMonthlyExpense, getTotalIncome, getTotalExpense, transactions, formatAmount, isCloudSyncing, retryCloudConnection, openingBalance } = useWallet();
+
+  // Helper: get today's date string
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const getDailyIncome = () =>
+    transactions.filter(t => t.type === TransactionType.INCOME && t.date?.slice(0, 10) === todayStr)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+  const getDailyExpense = () =>
+    transactions.filter(t => t.type === TransactionType.EXPENSE && t.date?.slice(0, 10) === todayStr)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+  const getAllTimeIncome = () =>
+    transactions.filter(t => t.type === TransactionType.INCOME)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+  const getAllTimeExpense = () =>
+    transactions.filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((sum, t) => sum + t.amount, 0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [periodMode, setPeriodMode] = useState<'MONTH' | 'ALL'>('MONTH'); // 'MONTH' or 'ALL'
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -173,24 +174,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     });
   }, [transactions, periodMode, selectedDate]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('📊 Dashboard Debug:', {
-      totalTransactions: transactions.length,
-      openingBalance: openingBalance,
-      balance,
-      periodMode,
-      selectedDate,
-      showAllTime,
-      hasMonthlyData,
-      sampleTransactions: transactions.slice(0, 3).map(t => ({
-        date: t.date,
-        type: t.type,
-        amount: t.amount,
-        category: t.category
-      }))
-    });
-  }, [transactions, balance, periodMode, selectedDate, showAllTime, hasMonthlyData, openingBalance]);
+  // Recent transactions (latest 5)
+  const recentTransactions = useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [transactions]);
 
   // Close notifications when clicking outside
   useEffect(() => {
@@ -222,17 +211,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   }, [transactions, periodMode, selectedDate]);
 
 
-  // Helper for category color classes
-  function getCategoryColorClass(idx: number) {
-    const colorClasses = [
-      'bg-dashboard-cat1', // #9BAE93
-      'bg-dashboard-cat2', // #E3EAE0
-      'bg-dashboard-cat3', // #D4A5A5
-      'bg-dashboard-cat4', // #FBBF24
-      'bg-dashboard-cat5', // #A8B89E
-    ];
-    return colorClasses[idx % colorClasses.length];
-  }
+  // Category colors (using CSS module classes to avoid Tailwind purge issues)
+  const CAT_COLORS = ['#9BAE93', '#D4A5A5', '#FBBF24', '#A8B89E', '#94BFCA'] as const;
 
   // Icons helper
   const getIconForCategory = (cat: string) => {
@@ -457,7 +437,154 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </button>
         </div>
       </div>
-      {/* End of summary section. All analytics and visualizations are now in Pulse tab. */}
+      {/* Balance Trend Sparkline (12 months) */}
+      {balanceTrend.length > 1 && (
+        <div className="px-6 py-2 mb-2">
+          <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">12-Month Balance Trend</p>
+            <div className="relative h-16">
+              {(() => {
+                const vals = balanceTrend.map(m => m.value);
+                const min = Math.min(...vals);
+                const max = Math.max(...vals);
+                const range = max - min || 1;
+                const w = 100 / (vals.length - 1);
+                const points = vals.map((v, i) => `${i * w},${100 - ((v - min) / range) * 100}`).join(' ');
+                return (
+                  <svg viewBox={`0 0 100 100`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                    <polyline
+                      points={points}
+                      fill="none"
+                      stroke="#9BAE93"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {vals.map((v, i) => (
+                      <circle
+                        key={i}
+                        cx={i * w}
+                        cy={100 - ((v - min) / range) * 100}
+                        r="4"
+                        fill="white"
+                        stroke="#9BAE93"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                  </svg>
+                );
+              })()}
+            </div>
+            <div className="flex justify-between mt-2">
+              {balanceTrend.filter((_, i) => i % 3 === 0 || i === balanceTrend.length - 1).map((m, i) => (
+                <span key={i} className="text-[9px] text-muted-taupe font-medium">{m.label}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Savings Rate + Category Breakdown */}
+      {(income > 0 || categoryBreakdown.length > 0) && (
+        <div className="px-6 py-2 mb-2 grid grid-cols-2 gap-4">
+          {/* Savings Rate */}
+          {income > 0 && (
+            <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">Savings</p>
+              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#E3EAE0" strokeWidth="4" />
+                <circle
+                  cx="18" cy="18" r="14" fill="none" stroke="#9BAE93" strokeWidth="4"
+                  strokeDasharray={`${(savingsRate / 100) * 88} 88`}
+                  strokeLinecap="round"
+                  className={styles.savingsGauge}
+                />
+              </svg>
+              <p className="text-premium-charcoal font-serif text-xl font-bold -mt-2">{savingsRate}%</p>
+              <p className="text-[10px] text-muted-taupe">of income saved</p>
+            </div>
+          )}
+          {/* Top Categories */}
+          {categoryBreakdown.length > 0 && (
+            <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Top Spend</p>
+              <div className="space-y-2">
+                {categoryBreakdown.slice(0, income > 0 ? 3 : 5).map((cat, i) => (
+                  <div key={cat.name} className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }} />
+                    <span className="text-[11px] text-premium-charcoal font-medium flex-1 truncate">{cat.name}</span>
+                    <span className="text-[10px] text-muted-taupe flex-shrink-0">{formatAmount(cat.amount as number).split('.')[0]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recent Transactions */}
+      {recentTransactions.length > 0 && (
+        <div className="px-6 py-2 mb-2">
+          <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recent</p>
+              <button
+                onClick={() => onNavigate(AppScreen.HISTORY)}
+                className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline"
+              >
+                View All
+              </button>
+            </div>
+            <div className="space-y-3">
+              {recentTransactions.map(tx => (
+                <div key={tx.id} className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'bg-sage-light text-sage' : 'bg-rose-light text-rose'}`}>
+                    <span className="material-symbols-outlined text-[15px]">
+                      {tx.type === TransactionType.INCOME ? 'arrow_upward' : 'arrow_downward'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-premium-charcoal truncate">{tx.merchant || tx.category}</p>
+                    <p className="text-[10px] text-muted-taupe">{tx.category} · {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                  </div>
+                  <span className={`text-[13px] font-bold flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'text-sage' : 'text-rose'}`}>
+                    {tx.type === TransactionType.INCOME ? '+' : '-'}{formatAmount(tx.amount).split('.')[0]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state when no transactions */}
+      {transactions.length === 0 && (
+        <div className="px-6 py-8 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-sage-light flex items-center justify-center">
+            <span className="material-symbols-outlined text-sage text-[28px]">account_balance_wallet</span>
+          </div>
+          <div>
+            <p className="text-premium-charcoal font-serif text-lg font-semibold">Start your journey</p>
+            <p className="text-muted-taupe text-sm mt-1">Add a transaction or import a bank statement to begin.</p>
+          </div>
+          <div className="flex gap-3 mt-2">
+            <button
+              onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
+              className="px-5 py-2.5 bg-sage text-white rounded-full text-sm font-semibold shadow-soft active:scale-95 transition-transform"
+            >
+              Add Entry
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.IMPORT)}
+              className="px-5 py-2.5 bg-white border border-sage/30 text-sage rounded-full text-sm font-semibold shadow-soft active:scale-95 transition-transform"
+            >
+              Import
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

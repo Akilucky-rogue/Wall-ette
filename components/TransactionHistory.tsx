@@ -20,6 +20,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Delete Confirmation State
@@ -59,7 +60,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     const filtered = transactions.filter(t => {
       // Search filter
       if (q) {
@@ -113,7 +114,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, debouncedSearch]);
+  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
 
   // Group by date (Today, Yesterday, Date String)
   const groupedTransactions = useMemo(() => {
@@ -144,8 +145,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     return count;
   }, [dateFilter, categoryFilter, minAmount, maxAmount, sortBy]);
 
-  // Debounced search to avoid re-renders on every keystroke
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Debounce: update searchQuery 250ms after debouncedSearch changes
   React.useEffect(() => {
     const t = setTimeout(() => setSearchQuery(debouncedSearch), 250);
     return () => clearTimeout(t);

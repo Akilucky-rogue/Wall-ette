@@ -404,7 +404,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     onClick={handleDropAreaClick}
                     className={`relative w-full aspect-[4/3] rounded-4xl flex flex-col items-center justify-center gap-4 bg-white/30 border-2 border-dashed border-sage/20 hover:border-sage/40 transition-all active:scale-[0.98] cursor-pointer`}
                 >
-                    {/* WALL-E Upload Helper */}
+                    {/* Wall-ette Upload Helper */}
                     <div className="relative">
                       <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg">
                         <WallEEyes size="md" />
@@ -441,13 +441,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'PROCESSING' && (
             <div className="flex flex-col items-center justify-center flex-1 h-[60vh] animate-slide-up">
-                {/* WALL-E Processing Animation */}
+                {/* Wall-ette Processing Animation */}
                 <div className="relative mb-8">
                     {/* Outer spinning ring */}
                     <div className="absolute inset-0 w-28 h-28 border-4 border-sage-light rounded-full"></div>
                     <div className="absolute inset-0 w-28 h-28 border-4 border-sage rounded-full border-t-transparent animate-spin"></div>
                     
-                    {/* WALL-E face in center */}
+                    {/* Wall-ette face in center */}
                     <div className="w-28 h-28 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-xl">
                       <WallEEyes size="lg" animate={true} />
                     </div>
@@ -457,7 +457,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <div className="absolute -bottom-1 -left-3 text-sm animate-pulse animation-delay-03s">✨</div>
                 </div>
                 <h3 className="text-xl font-serif font-semibold text-premium-charcoal mb-2">{loadingMessage}</h3>
-                <p className="text-muted-taupe text-xs animate-pulse">WALL-E is analyzing your document</p>
+                <p className="text-muted-taupe text-xs animate-pulse">Wall-ette is analyzing your document</p>
                 <p className="text-[10px] text-muted-taupe/50 mt-3 italic">"Processing... beep boop!"</p>
             </div>
         )}

@@ -104,7 +104,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <div className="flex justify-center mb-3">
           <LotusFlower size="sm" color="#E8A5A5" />
         </div>
-        {/* WALL-E Robot Logo with Wealth Context */}
+        {/* Wall-ette Robot Logo with Wealth Context */}
         <div className="relative inline-flex items-center justify-center mb-6">
           {/* Outer glow */}
           <div className="absolute inset-0 -m-2 rounded-full bg-sage/20 blur-lg animate-pulse" />
@@ -114,7 +114,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             {/* Inner highlight */}
             <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
             
-            {/* Robot eyes - WALL-E inspired */}
+            {/* Robot eyes - Wall-ette inspired */}
             <div className="flex items-center gap-1">
               <div className="w-6 h-7 bg-premium-charcoal/90 rounded-md flex items-center justify-center shadow-inner relative overflow-hidden">
                 <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-white/40 rounded-full" />
@@ -138,7 +138,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         </div>
         
         <h1 className="text-premium-charcoal font-serif text-3xl font-semibold mb-2">
-          WALL<span className="text-sage">·</span>E
+          Wall<span className="text-sage">·</span>ette
         </h1>
         <p className="text-muted-taupe text-[15px]">Mindful Wealth Management</p>
       </div>

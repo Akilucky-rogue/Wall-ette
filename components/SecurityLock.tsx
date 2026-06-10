@@ -122,7 +122,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       <Diya className="absolute bottom-24 left-12 opacity-40" />
       
       <div className="relative text-center mb-8">
-        {/* WALL-E Guard Mode */}
+        {/* Wall-ette Guard Mode */}
         <div className="relative inline-flex items-center justify-center mb-6">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg animate-pulse">
             <WallEEyes size="md" expression={isMfaStep ? 'neutral' : 'sleepy'} />
@@ -242,7 +242,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       
       <div className="absolute bottom-8 left-0 right-0 text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe/60 font-medium">
-          WALL-E Secured
+          Wall-ette Secured
         </p>
       </div>
     </div>

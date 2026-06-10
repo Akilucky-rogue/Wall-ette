@@ -155,7 +155,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
           <WallEMascot mood="thinking" size="md" />
           <p className="text-premium-charcoal font-serif text-lg font-semibold mt-4">No income recorded yet</p>
           <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">
-            Add income entries or import a bank statement, and WALL-E will map your income streams, stability, and where the money flows.
+            Add income entries or import a bank statement, and Wall-ette will map your income streams, stability, and where the money flows.
           </p>
           <button
             onClick={() => onNavigate(AppScreen.IMPORT)}

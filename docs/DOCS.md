@@ -38,7 +38,7 @@
 |----------|---------|
 | [CODE_VERIFICATION_COMPLETE.md](CODE_VERIFICATION_COMPLETE.md) | Feature analysis |
 | [LIVE_TESTING_LOG.md](LIVE_TESTING_LOG.md) | Test scenarios |
-| [WALL-E_DOCUMENTATION.md](WALL-E_DOCUMENTATION.md) | Legacy docs (consolidated) |
+| [Wall-ette_DOCUMENTATION.md](Wall-ette_DOCUMENTATION.md) | Legacy docs (consolidated) |
 
 ---
 

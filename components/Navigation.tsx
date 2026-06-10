@@ -10,10 +10,8 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) => {
   const getIconStyle = (screen: AppScreen) => {
-    const isActive = currentScreen === screen || 
-                     (screen === AppScreen.HISTORY && currentScreen === AppScreen.HISTORY) || // Grouping
-                     (screen === AppScreen.ANALYSIS && (currentScreen === AppScreen.ANALYSIS || currentScreen === AppScreen.CATEGORY_SPLIT)) ||
-                     (screen === AppScreen.DASHBOARD && (currentScreen === AppScreen.DASHBOARD || currentScreen === AppScreen.INCOME_INSIGHTS));
+    const isActive = currentScreen === screen ||
+                     (screen === AppScreen.ANALYSIS && currentScreen === AppScreen.CATEGORY_SPLIT);
 
     return isActive ? 'text-sage' : 'text-muted-taupe opacity-60 hover:text-sage hover:opacity-100 transition-colors';
   };

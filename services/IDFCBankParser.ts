@@ -10,6 +10,7 @@
  */
 
 import * as XLSX from 'xlsx';
+import { log } from '../utils/log';
 
 interface Transaction {
   id: string;
@@ -55,23 +56,15 @@ export class IDFCBankParser {
    */
   static async parseExcel(file: File): Promise<ParseResult> {
     try {
-      console.log('📊 parseExcel called with file:', file.name, 'size:', file.size, 'type:', file.type);
-      
       const buffer = await file.arrayBuffer();
-      console.log('📊 File buffer size:', buffer.byteLength);
-      
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-      
-      console.log('📊 Excel sheets found:', workbook.SheetNames);
-      
+
       // Get the main statement sheet
-      const sheetName = workbook.SheetNames.find(name => 
-        name.toLowerCase().includes('account') || 
+      const sheetName = workbook.SheetNames.find(name =>
+        name.toLowerCase().includes('account') ||
         name.toLowerCase().includes('statement')
       ) || workbook.SheetNames[0];
-      
-      console.log('📊 Using sheet:', sheetName);
-      
+
       const worksheet = workbook.Sheets[sheetName];
       const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { 
         header: 1, 
@@ -88,11 +81,6 @@ export class IDFCBankParser {
           cell && cell.toString().toLowerCase().includes('transaction date')
         )
       );
-
-      console.log('📊 Header row index:', headerRowIndex);
-      if (headerRowIndex > -1) {
-        console.log('📊 Headers:', data[headerRowIndex].slice(0, 7).join(' | '));
-      }
 
       if (headerRowIndex === -1) {
         throw new Error('Could not find transaction header row. Expected "Transaction Date" column in Excel.');
@@ -121,10 +109,10 @@ export class IDFCBankParser {
       // Validation
       const validation = this.validateTransactions(transactions, summary);
 
-      console.log(`✅ Parsed ${transactions.length} transactions from Excel`);
-      console.log('🔍 Validation result:', validation);
-      console.log('   Errors:', validation.errors);
-      console.log('   Warnings:', validation.warnings);
+      log.debug(`IDFC Excel: parsed ${transactions.length} transactions (valid: ${validation.isValid})`);
+      if (!validation.isValid) {
+        log.warn(`IDFC Excel: validation reported ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)`);
+      }
 
       return {
         transactions,
@@ -132,51 +120,15 @@ export class IDFCBankParser {
         validation
       };
     } catch (error: any) {
-      console.error('❌ Excel parsing error:', error);
+      log.warn('IDFC Excel parsing failed:', error?.message);
       throw new Error(`Excel parsing failed: ${error.message} | Please ensure the file is a valid IDFC statement with "Transaction Date" column.`);
     }
   }
 
-  /**
-   * Parse IDFC Bank statement from PDF text
-   */
-  static parsePDF(pdfText: string): ParseResult {
-    const lines = pdfText.split('\n');
-    const summary = this.extractSummaryFromText(lines);
-    const transactions: Transaction[] = [];
-
-    // Find transaction section
-    let inTransactionSection = false;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      if (line.includes('Transaction') && line.includes('Date') && line.includes('Particulars')) {
-        inTransactionSection = true;
-        continue;
-      }
-      
-      if (line.includes('REGISTERED OFFICE') || line.includes('End of statement')) {
-        inTransactionSection = false;
-        break;
-      }
-
-      if (!inTransactionSection) continue;
-
-      const txn = this.parseTransactionFromPDFLine(line, lines, i);
-      if (txn) transactions.push(txn);
-    }
-
-    const validation = this.validateTransactions(transactions, summary);
-
-    console.log(`✅ Parsed ${transactions.length} transactions from PDF`);
-
-    return {
-      transactions,
-      summary,
-      validation
-    };
-  }
+  // NOTE (audit Phase 5.2): the unused parsePDF / extractSummaryFromText /
+  // parseTransactionFromPDFLine trio was removed — PDF statements are handled
+  // by services/idfcParser.ts (parseIDFCStatement), which was the only path
+  // ever exercised.
 
   /**
    * Extract summary from Excel data
@@ -208,20 +160,15 @@ export class IDFCBankParser {
       }
     }
 
-    console.log('📊 Summary rows found - Labels:', summaryLabelRow, 'Values:', summaryValueRow);
-
     // Extract values from summary
     if (summaryValueRow > -1 && data[summaryValueRow]) {
       const valueRow = data[summaryValueRow];
-      console.log('📊 Summary values row:', valueRow.slice(0, 4));
-      
+
       // Parse values based on column position
       if (valueRow[0]) openingBalance = this.parseAmount(valueRow[0]);
       if (valueRow[1]) totalDebit = this.parseAmount(valueRow[1]);
       if (valueRow[2]) totalCredit = this.parseAmount(valueRow[2]);
       if (valueRow[3]) closingBalance = this.parseAmount(valueRow[3]);
-      
-      console.log('📊 Parsed - Opening:', openingBalance, 'Debit:', totalDebit, 'Credit:', totalCredit, 'Closing:', closingBalance);
     }
 
     // Extract other metadata from earlier rows
@@ -241,65 +188,6 @@ export class IDFCBankParser {
       
       if (rowText.includes('statement period') && row[1]) {
         statementPeriod = row[1].toString();
-      }
-    }
-
-    return {
-      openingBalance,
-      totalDebit,
-      totalCredit,
-      closingBalance,
-      accountNumber,
-      statementPeriod,
-      customerName
-    };
-  }
-
-  /**
-   * Extract summary from PDF text
-   */
-  private static extractSummaryFromText(lines: string[]): StatementSummary {
-    let openingBalance = 0;
-    let totalDebit = 0;
-    let totalCredit = 0;
-    let closingBalance = 0;
-    let accountNumber = '';
-    let statementPeriod = '';
-    let customerName = '';
-
-    for (const line of lines) {
-      const lowerLine = line.toLowerCase();
-
-      if (lowerLine.includes('account') && /\d{10,}/.test(line)) {
-        accountNumber = line.match(/(\d{10,})/)?.[1] || '';
-      }
-
-      if (lowerLine.includes('customer name')) {
-        customerName = line.split(':')[1]?.trim() || '';
-      }
-
-      if (lowerLine.includes('opening balance')) {
-        const match = line.match(/([\d,]+\.[\d]{2})/);
-        if (match) openingBalance = this.parseAmount(match[1]);
-      }
-
-      if (lowerLine.includes('total') && lowerLine.includes('debit')) {
-        const match = line.match(/([\d,]+\.[\d]{2})/);
-        if (match) totalDebit = this.parseAmount(match[1]);
-      }
-
-      if (lowerLine.includes('total') && lowerLine.includes('credit')) {
-        const match = line.match(/([\d,]+\.[\d]{2})/);
-        if (match) totalCredit = this.parseAmount(match[1]);
-      }
-
-      if (lowerLine.includes('closing balance')) {
-        const match = line.match(/([\d,]+\.[\d]{2})/);
-        if (match) closingBalance = this.parseAmount(match[1]);
-      }
-
-      if (lowerLine.includes('statement period')) {
-        statementPeriod = line.split(':')[1]?.trim() || '';
       }
     }
 
@@ -373,49 +261,6 @@ export class IDFCBankParser {
         credit: creditAmount
       }
     };
-  }
-
-  /**
-   * Parse transaction from PDF line
-   */
-  private static parseTransactionFromPDFLine(
-    line: string,
-    allLines: string[],
-    currentIndex: number
-  ): Transaction | null {
-    const parts = line.split(/\s+/);
-    if (parts.length < 5) return null;
-
-    // Try to parse date
-    const dateMatch = line.match(/(\d{2}-[A-Za-z]{3}-\d{4})/);
-    if (!dateMatch) return null;
-
-    const date = this.parseDate(dateMatch[1]);
-    if (!date) return null;
-
-    // Extract amounts from end of line
-    const amounts = line.match(/([\d,]+\.[\d]{2})/g);
-    if (!amounts || amounts.length < 2) return null;
-
-    const balance = amounts[amounts.length - 1];
-    const transactionAmount = amounts[amounts.length - 2];
-
-    // Extract particulars (middle section)
-    const particularsMatch = line.match(/\d{4}\s+(.+?)\s+([\d,]+\.[\d]{2})/);
-    const particulars = particularsMatch ? particularsMatch[1] : '';
-
-    // Determine if debit or credit
-    const isDebit = particulars.includes('/DR/') || !particulars.includes('/CR/');
-    
-    return this.parseTransaction(
-      dateMatch[1],
-      dateMatch[1],
-      particulars,
-      null,
-      isDebit ? transactionAmount : null,
-      !isDebit ? transactionAmount : null,
-      balance
-    );
   }
 
   /**

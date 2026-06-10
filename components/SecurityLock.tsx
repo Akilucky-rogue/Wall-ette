@@ -182,7 +182,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                     className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-base font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                     <span className="material-symbols-outlined text-[20px] text-sage">fingerprint</span>
-                    Use Face ID / Passcode
+                    Use Face ID / Passcode (demo)
                 </button>
                 
                 <div className="mt-4 text-center">
@@ -209,7 +209,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                         maxLength={6}
                         autoFocus
                     />
-                    <p className="text-center text-[10px] text-muted-taupe mt-2">Enter verification code</p>
+                    <p className="text-center text-[10px] text-muted-taupe mt-2">Enter verification code (demo — no SMS is sent)</p>
                 </div>
 
                 <button 

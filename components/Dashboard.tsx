@@ -548,10 +548,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Top Spend</p>
               <div className="space-y-2">
                 {categoryBreakdown.slice(0, income > 0 ? 3 : 5).map((cat, i) => (
-                  <div key={cat.name} className="flex items-center gap-2">
+                  <div key={cat.name} className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }} />
-                    <span className="text-[11px] text-premium-charcoal font-medium flex-1 truncate">{cat.name}</span>
-                    <span className="text-[10px] text-muted-taupe flex-shrink-0">{formatAmount(cat.amount as number).split('.')[0]}</span>
+                    <span className="text-[11px] text-premium-charcoal font-medium flex-1 truncate" title={cat.name}>{cat.name}</span>
+                    <span className="text-[10px] text-muted-taupe flex-shrink-0 tabular-nums">{formatAmountCompact(cat.amount as number)}</span>
                   </div>
                 ))}
               </div>

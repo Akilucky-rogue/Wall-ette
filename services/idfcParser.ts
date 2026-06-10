@@ -527,6 +527,130 @@ function validateBalances(header: StatementHeader, transactions: RawTransaction[
 }
 
 // ═══════════════════════════════════════════════════════════════
+// GENERIC BANK PDF FALLBACK
+// Not every bank exports the IDFC table layout. This pass works for
+// most Indian bank PDFs by reading each line as
+//   <date> <description> [amount] [running balance]
+// and inferring INCOME/EXPENSE from the running-balance delta —
+// the most reliable signal across banks. Explicit Cr/Dr markers
+// take priority when present.
+// ═══════════════════════════════════════════════════════════════
+
+// Amounts in statements carry 2 decimals; reference numbers don't —
+// requiring the decimals keeps txn ids/refs out of the amount list.
+const GENERIC_AMOUNT = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;
+const GENERIC_DATE = /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})|(\d{1,2}[\s\-\/][A-Za-z]{3,9}[\s\-\/,]+\d{2,4})/;
+
+function parseDateFlexible(str: string): string | null {
+    // DD MMM YYYY (existing helper handles it)
+    const named = parseDate(str);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(named)) return named;
+
+    // Numeric DD/MM/YYYY or DD-MM-YY (Indian banks are day-first)
+    const m = str.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (m) {
+        const day = m[1].padStart(2, '0');
+        const month = m[2].padStart(2, '0');
+        let year = m[3];
+        if (year.length === 2) year = parseInt(year) > 50 ? '19' + year : '20' + year;
+        if (parseInt(month) >= 1 && parseInt(month) <= 12 && parseInt(day) >= 1 && parseInt(day) <= 31) {
+            return `${year}-${month}-${day}`;
+        }
+    }
+    return null;
+}
+
+function parseGenericTransactionLines(text: string, openingBalance: number): RawTransaction[] {
+    interface Row { date: string; desc: string; amounts: number[]; crdr: 'CR' | 'DR' | null; }
+    const rows: Row[] = [];
+
+    for (const rawLine of text.split('\n')) {
+        const line = rawLine.trim();
+        if (!line || line.length < 12) continue;
+        if (/^(date|txn|transaction|particulars|narration|description|chq|debit|credit|withdrawal|deposit|balance|opening|closing|total|page \d)/i.test(line)) continue;
+
+        const dateMatch = line.match(GENERIC_DATE);
+        if (!dateMatch || line.indexOf(dateMatch[0]) > 20) continue; // date should lead the row
+        const date = parseDateFlexible(dateMatch[0]);
+        if (!date) continue;
+
+        const amountMatches = [...line.matchAll(GENERIC_AMOUNT)].map(m => m[0]);
+        if (amountMatches.length === 0) continue;
+        const amounts = amountMatches.map(parseAmount).filter(a => a > 0);
+        if (amounts.length === 0) continue;
+
+        // Explicit Cr/Dr marker (e.g., "1,234.00 Cr")
+        const crdrMatch = line.match(/\d\s*\(?(cr|dr)\b\.?\)?/i);
+        const crdr = crdrMatch ? (crdrMatch[1].toUpperCase() as 'CR' | 'DR') : null;
+
+        // Description = the line minus date, amounts, and markers
+        let desc = line.replace(dateMatch[0], '');
+        for (const a of amountMatches) desc = desc.replace(a, '');
+        desc = desc.replace(/\b(cr|dr)\b\.?/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+        rows.push({ date, desc: desc.substring(0, 100) || 'Unknown', amounts, crdr });
+    }
+
+    if (rows.length === 0) return [];
+
+    // Decide whether the LAST amount per row is a running balance:
+    // in balance mode, |balance[i] − balance[i−1]| equals the txn amount.
+    let prev = openingBalance > 0 ? openingBalance : null;
+    let matches = 0, comparable = 0;
+    for (const r of rows) {
+        if (r.amounts.length < 2 || prev === null) { prev = r.amounts[r.amounts.length - 1]; continue; }
+        const bal = r.amounts[r.amounts.length - 1];
+        const amt = r.amounts[r.amounts.length - 2];
+        comparable++;
+        if (Math.abs(Math.abs(bal - prev) - amt) <= 0.02) matches++;
+        prev = bal;
+    }
+    const balanceMode = comparable >= 3 && matches / comparable > 0.6;
+
+    const transactions: RawTransaction[] = [];
+    let prevBal = openingBalance > 0 ? openingBalance : null;
+
+    for (const r of rows) {
+        let amount: number;
+        let balance: number | undefined;
+        let isCredit: boolean | null = r.crdr ? r.crdr === 'CR' : null;
+
+        if (balanceMode && r.amounts.length >= 2) {
+            balance = r.amounts[r.amounts.length - 1];
+            amount = r.amounts[r.amounts.length - 2];
+            if (isCredit === null && prevBal !== null) {
+                isCredit = balance > prevBal;
+            }
+            prevBal = balance;
+        } else {
+            amount = r.amounts[0];
+        }
+
+        if (isCredit === null) {
+            // Last resort: keyword heuristic
+            isCredit = /credit|deposit|refund|reversal|salary|interest|cashback|received/i.test(r.desc);
+        }
+
+        const classification = classifyTransaction(r.desc, isCredit);
+        transactions.push({
+            date: r.date,
+            merchant: classification.merchant,
+            amount,
+            // Balance-delta / Cr-Dr signal outranks keyword classification
+            type: isCredit ? 'INCOME' : 'EXPENSE',
+            nature: classification.nature,
+            category: classification.category,
+            incomeSource: classification.incomeSource,
+            balance,
+            note: r.desc
+        });
+    }
+
+    log.debug(`Generic PDF: ${transactions.length} rows, balanceMode=${balanceMode}`);
+    return transactions;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN PARSER FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
@@ -540,8 +664,13 @@ export async function parseIDFCStatement(base64Data: string): Promise<ParsedStat
         // Extract header info
         const header = extractHeader(text);
 
-        // Parse transactions
-        const transactions = parseTransactionLines(text);
+        // Parse transactions — IDFC table layout first, generic fallback
+        // for other banks' PDF formats.
+        let transactions = parseTransactionLines(text);
+        if (transactions.length === 0) {
+            transactions = parseGenericTransactionLines(text, header.openingBalance);
+            if (transactions.length > 0) header.bankName = 'Generic (auto-detected)';
+        }
 
         // Validate mathematical accuracy
         const validation = validateBalances(header, transactions);

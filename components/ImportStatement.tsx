@@ -128,6 +128,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Bridge a detected coverage gap with a single adjustment entry
+  const [bridgeGap, setBridgeGap] = useState(false);
   
   // Parser tracking
   const [parserUsed, setParserUsed] = useState<string>('');
@@ -197,10 +200,28 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       if (applies) openingDelta = parsedOpeningBalance - openingBalance;
     }
 
-    const projected = getBalance() + selectedNet + openingDelta;
     // Sorted desc in context — [0] is the latest existing transaction.
     const latestExisting = existingTransactions.length > 0 ? existingTransactions[0].date : null;
     const isNewest = !latestExisting || reviewSummary.maxDate >= latestExisting;
+
+    // Coverage-gap detection: importing a strictly LATER period means the
+    // bank's opening balance for this statement should equal the wallet's
+    // current balance. A difference = transactions in between that were
+    // never imported (e.g., a missing statement window).
+    let gap: { amount: number; from: string; to: string } | null = null;
+    if (
+      parsedOpeningBalance !== undefined &&
+      latestExisting &&
+      reviewSummary.minDate > latestExisting.slice(0, 10)
+    ) {
+      const gapAmount = parsedOpeningBalance - getBalance();
+      if (Math.abs(gapAmount) > 1) {
+        gap = { amount: gapAmount, from: latestExisting.slice(0, 10), to: reviewSummary.minDate };
+      }
+    }
+
+    const bridge = bridgeGap && gap ? gap.amount : 0;
+    const projected = getBalance() + selectedNet + openingDelta + bridge;
     const diff = projected - parsedClosingBalance;
 
     return {
@@ -209,9 +230,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       diff,
       matched: Math.abs(diff) <= 1,
       isNewest,
+      gap,
     };
-  }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData,
-      selectedIds, existingTransactions, openingBalanceAsOf, openingBalance, getBalance]);
+  }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds,
+      existingTransactions, openingBalanceAsOf, openingBalance, getBalance, bridgeGap]);
 
   // Helper to update loading messages
   const updateProgress = (msg: string) => setLoadingMessage(msg);
@@ -296,7 +318,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
             : `Found ${result.transactions.length} transactions`);
 
-        stageForReview(result.transactions, 'Rule-based PDF parser');
+        stageForReview(result.transactions,
+            result.header.bankName === 'Generic (auto-detected)'
+                ? 'Generic PDF parser (verify amounts)'
+                : 'Rule-based PDF parser');
     } catch (err: any) {
         log.warn('PDF import failed:', err?.message);
         setError(err.message || "Could not parse the statement. Please ensure it's a valid bank statement.");
@@ -407,6 +432,21 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       const toImport = extractedData.filter(t => selectedIds.has(t.id));
       if (toImport.length === 0) return;
 
+      // One adjustment entry that stands in for a missing statement window,
+      // so the running balance matches the bank to the rupee.
+      if (bridgeGap && tally?.gap && reviewSummary) {
+          const g = tally.gap;
+          toImport.unshift({
+              id: `adjust-${g.from}-${g.to}-${Math.round(Math.abs(g.amount) * 100)}`,
+              date: reviewSummary.minDate,
+              merchant: 'Balance adjustment — missing statement period',
+              amount: Math.abs(g.amount),
+              type: g.amount >= 0 ? TransactionType.INCOME : TransactionType.EXPENSE,
+              category: 'Adjustment',
+              note: `Bridges un-imported period ${g.from} → ${g.to}`
+          });
+      }
+
       log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions`);
       // Opening balance + statement start let the context anchor the balance
       // to the earliest statement, so multi-statement imports always tally.
@@ -419,6 +459,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       setSelectedIds(new Set());
       setParsedOpeningBalance(undefined);
       setParsedClosingBalance(undefined);
+      setBridgeGap(false);
       setStage('IDLE');
   }
 
@@ -607,8 +648,23 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 ? 'Older statement — your wallet already has newer entries, so the final balance will reflect those too.'
                                 : tally.matched
                                 ? '✓ Tallies with the statement. Your balance will be accurate after import.'
+                                : tally.gap
+                                ? `The bank says this period started at ${formatAmount(parsedOpeningBalance!)}, but your wallet stands at ${formatAmount(getBalance())}. ${formatAmount(Math.abs(tally.gap.amount))} of activity between ${tally.gap.from} and ${tally.gap.to} hasn't been imported. Best fix: download that period's statement from your bank and import it.`
                                 : `Off by ${formatAmount(Math.abs(tally.diff))}. Check deselected rows or use Flip Types if income/expense look swapped.`}
                         </p>
+                        {tally.gap && tally.isNewest && (
+                            <label className="mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-white/70 border border-amber-200 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={bridgeGap}
+                                    onChange={e => setBridgeGap(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 accent-[#9BAE93] shrink-0"
+                                />
+                                <span className="text-[10px] leading-relaxed text-premium-charcoal">
+                                    <b>Can't get that statement?</b> Add a single {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} to bridge the gap so your balance matches the bank.
+                                </span>
+                            </label>
+                        )}
                     </div>
                 )}
 
@@ -623,9 +679,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         </p>
                         {reviewSummary && (
                             <div className="text-[10px] text-muted-taupe mt-2 space-y-0.5">
-                                <p>💰 Income: {reviewSummary.incomeSum.toFixed(2)}</p>
-                                <p>💸 Expense: {reviewSummary.expenseSum.toFixed(2)}</p>
-                                <p>📅 Dates: {reviewSummary.minDate} to {reviewSummary.maxDate}</p>
+                                <p>💰 Income: {formatAmount(reviewSummary.incomeSum)}</p>
+                                <p>💸 Expense: {formatAmount(reviewSummary.expenseSum)}</p>
+                                <p>📅 Covers: {reviewSummary.minDate} to {reviewSummary.maxDate}</p>
+                                {parsedOpeningBalance !== undefined && (
+                                    <p>🏦 Opens {formatAmount(parsedOpeningBalance)}{parsedClosingBalance !== undefined ? ` → closes ${formatAmount(parsedClosingBalance)}` : ''}</p>
+                                )}
                                 {duplicateIds.size > 0 && (
                                     <p className="text-blue-500">🔄 Duplicates: {duplicateIds.size} (auto-skipped)</p>
                                 )}

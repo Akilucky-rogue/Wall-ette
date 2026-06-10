@@ -9,25 +9,26 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![React](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg?logo=typescript)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6.svg?logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC.svg?logo=tailwind-css)
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%26%20Auth-FFCA28.svg?logo=firebase)
-![Gemini](https://img.shields.io/badge/AI-Gemini%203%20Pro-8E75B2.svg?logo=google-gemini)
+![Capacitor](https://img.shields.io/badge/Capacitor-8-119EFF.svg?logo=capacitor)
 
 ## ✨ Key Features
 
-### 🛡️ Security & Privacy (Locked Features)
-*   **Session Security**: Automatic application lock after 15 minutes of inactivity.
+### 🛡️ Security & Privacy
+*   **Session Security**: Automatic application lock after 15 minutes of inactivity (and on backgrounding, on Android).
 *   **Authentication**: Secure Firebase Email/Password login.
-*   **2FA Simulation**: Toggleable Multi-Factor Authentication (MFA) in settings.
+*   **2FA & Biometrics (demo)**: The MFA and Face ID unlock flows are simulated placeholders — they are labeled "(demo)" in the UI and are not yet real second factors.
 *   **Daily Limits**: Set daily spending limits with real-time blocking and alerts.
 *   **Security Logs**: Tracks login attempts and unlocking methods (Password/Bio/MFA).
 
-### 🧠 AI-Powered Automation
-*   **Smart Import**: Upload PDF, Excel, or Image bank statements.
-    *   Uses **Gemini 3 Pro** for high-precision table parsing and data extraction.
-    *   Uses **Gemini 3 Flash** for instant transaction categorization.
-*   **Mindful Insights**: AI analysis of spending habits providing calming, actionable feedback.
+### 📄 Statement Import (rule-based, no AI, no network)
+*   **Smart Import**: Upload IDFC FIRST Bank statements as PDF or Excel.
+    *   Deterministic rule-based parsers (`services/idfcParser.ts`, `services/IDFCBankParser.ts`) with balance validation against statement totals.
+    *   Automatic merchant categorization via comprehensive Indian merchant/UPI patterns.
+    *   Duplicate detection against existing transactions at review time.
+*   **Mindful Insights**: Fully local analysis (`services/insightsService.ts`) — savings rate, anomalies, budget suggestions. No API keys, nothing leaves the device.
 
 ### 📊 Financial Analytics
 *   **Spend Analysis**: Visual breakdown of expenses by category (Groceries, Transport, etc.).
@@ -47,9 +48,9 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 *   **Frontend**: React 19, Vite
 *   **Language**: TypeScript
 *   **Styling**: Tailwind CSS (Custom Configuration)
-*   **Backend**: Firebase (Authentication, Firestore)
-*   **AI Integration**: Google GenAI SDK (`@google/genai`)
-*   **Data Handling**: `xlsx` for spreadsheet parsing.
+*   **Backend**: Firebase (Authentication, Firestore with offline persistent cache)
+*   **Mobile**: Capacitor 8 (Android)
+*   **Data Handling**: `xlsx` for spreadsheet parsing, `pdfjs-dist` for PDF text extraction (worker bundled locally).
 
 ---
 
@@ -57,8 +58,7 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 
 ### Prerequisites
 *   Node.js (v18 or higher)
-*   A Google Cloud Project with the **Gemini API** enabled.
-*   A Firebase Project.
+*   A Firebase Project (Authentication + Firestore). No AI/API keys are needed.
 
 ### Installation
 
@@ -74,14 +74,11 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
     ```
 
 3.  **Environment Configuration**
-    Create a `.env` file in the root directory (if not using the hardcoded values for demo purposes).
-    
-    ```env
-    # Required for AI Features
-    API_KEY=your_google_gemini_api_key
-    ```
+    No environment variables are required — the app makes no external AI calls.
+    Remember that any `VITE_*` variable is inlined into the client bundle and
+    visible to every user; never put secrets in `.env` files here.
 
-    *Note: The current build includes a pre-configured Firebase setup in `services/firebase.ts`. For production, replace these credentials with your own.*
+    *Note: The current build includes a pre-configured Firebase setup in `services/firebase.ts` (Firebase web config values are public identifiers, secured by Firestore Rules). For production, replace them with your own project's config.*
 
 4.  **Run the Application**
     ```bash
@@ -98,7 +95,7 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 ├── components/          # UI Components
 │   ├── Dashboard.tsx    # Main Hub
 │   ├── SecurityLock.tsx # Inactivity/Auth Lock Screen
-│   ├── ImportStatement.tsx # AI Import Logic
+│   ├── ImportStatement.tsx # Statement import & review flow
 │   ├── Profile.tsx      # User Settings & Limits
 │   └── ...
 ├── context/
@@ -106,9 +103,14 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 │   └── WalletContext.tsx# Transaction Logic & Firestore Sync
 ├── services/
 │   ├── firebase.ts      # DB Configuration
-│   └── geminiService.ts # AI Model Interaction (Flash/Pro)
+│   ├── idfcParser.ts    # Rule-based PDF statement parser (pdf.js)
+│   ├── IDFCBankParser.ts# Rule-based Excel statement parser (xlsx)
+│   └── insightsService.ts # Local financial insights (no AI/API)
+├── utils/
+│   └── log.ts           # Logger (debug/info/warn are no-ops in production)
+├── docs/                # Project documentation
 ├── types.ts             # TypeScript Interfaces
-├── currencyUtils.ts     # Currency conversion logic
+├── currencyUtils.ts     # Currency conversion + cached formatters
 └── index.html           # Entry point
 ```
 
@@ -116,37 +118,33 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 
 ## 🎯 Quick Start
 
-1. **Right Now (5 min)**: See [QUICK_START.md](QUICK_START.md) to deploy security rules
+1. **Right Now (5 min)**: See [docs/QUICK_START.md](docs/QUICK_START.md) to deploy security rules
 2. **This Week (10 hrs)**: Implement edit, search, and validation features
 3. **Next Week (6 hrs)**: Mobile optimization and final testing
 4. **Week 3-4 (6 hrs)**: Android prep and launch
 
-**Full timeline?** → See [VISUAL_ROADMAP.md](VISUAL_ROADMAP.md)
+**Full timeline?** → See [docs/VISUAL_ROADMAP.md](docs/VISUAL_ROADMAP.md)
 
 ---
 
 ## 📋 Documentation
 
-This project includes comprehensive documentation for both web and Android development:
+Project documentation lives in [`docs/`](docs/). Key entry points:
 
-| Document | Purpose | Time to Read |
-|----------|---------|--------------|
-| [QUICK_START.md](QUICK_START.md) | What to do RIGHT NOW | 5 min |
-| [VISUAL_ROADMAP.md](VISUAL_ROADMAP.md) | 4-week implementation timeline | 10 min |
-| [PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md) | Launch strategy & timeline | 15 min |
-| [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) | Code examples for features | 20 min |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design & data flow | 15 min |
-| [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) | Pre-launch verification | 10 min |
-| [SETUP_COMPLETE_SUMMARY.md](SETUP_COMPLETE_SUMMARY.md) | What's built & next steps | 10 min |
+| Document | Purpose |
+|----------|---------|
+| [AUDIT_REPORT.md](AUDIT_REPORT.md) | Full code audit findings (2026-06) |
+| [FIX_CHECKLIST.md](FIX_CHECKLIST.md) | Executed fix plan with phase status |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design & data flow |
+| [docs/QUICK_START.md](docs/QUICK_START.md) | Getting started |
+| [docs/PRODUCTION_ROADMAP.md](docs/PRODUCTION_ROADMAP.md) | Launch strategy |
+| [docs/LAUNCH_CHECKLIST.md](docs/LAUNCH_CHECKLIST.md) | Pre-launch verification |
 
 ---
 
-## 🤖 AI Implementation Details
+## 🧮 Insights Implementation
 
-Wall-ette uses a hybrid model approach for optimal performance and cost:
-
-1.  **Gemini 3 Flash**: Used for real-time, low-latency tasks like analyzing spending habits strings and simple categorization.
-2.  **Gemini 3 Pro**: Used in `services/geminiService.ts` for heavy-duty document parsing (Bank Statements). It creates structured JSON from unstructured PDF/Image inputs with high accuracy.
+Insights are computed entirely on-device in `services/insightsService.ts` — savings rate, category concentration, anomaly detection (3× median), and a 50/30/20 budget heuristic. The previous Gemini-based pipeline was removed after it required shipping an API key in the client bundle.
 
 ---
 

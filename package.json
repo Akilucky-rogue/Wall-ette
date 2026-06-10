@@ -18,6 +18,8 @@
     "@capacitor/app": "^8.0.1",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "firebase": "^11.10.0",
     "pdfjs-dist": "^5.4.624",
     "react": "^19.2.4",

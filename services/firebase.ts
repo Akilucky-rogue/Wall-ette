@@ -16,19 +16,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Set session persistence based on platform
-// For mobile: use session persistence (clears on app close)
-// For web: use local persistence (stays logged in)
+// Set session persistence based on platform:
+// - native (Capacitor): local persistence, session survives backgrounding
+// - web: session persistence, cleared when the tab closes
 import { Capacitor } from '@capacitor/core';
+import { log } from '../utils/log';
 const isNativePlatform = Capacitor.isNativePlatform && Capacitor.isNativePlatform();
 if (isNativePlatform) {
-  setPersistence(auth, indexedDBLocalPersistence).catch((error) => {
-    console.warn('Failed to set local persistence:', error);
+  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
+    log.warn('Failed to set local persistence');
   });
-  console.log('Mobile platform detected - Local persistence enabled (session survives background)');
 } else {
-  setPersistence(auth, browserSessionPersistence).catch((error) => {
-    console.warn('Failed to set session persistence:', error);
+  setPersistence(auth, browserSessionPersistence).catch(() => {
+    log.warn('Failed to set session persistence');
   });
 }
 

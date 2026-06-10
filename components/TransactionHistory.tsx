@@ -100,34 +100,33 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       return true;
     });
-    // Apply sorting
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'DATE_ASC':
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
-        case 'AMOUNT_DESC':
-          return b.amount - a.amount;
-        case 'AMOUNT_ASC':
-          return a.amount - b.amount;
-        case 'DATE_DESC':
-        default:
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-      }
-    });
+    // Apply sorting. For date sorts, parse each date once (decorate-sort-undecorate)
+    // instead of re-parsing inside the comparator (audit Phase 2.4).
+    if (sortBy === 'AMOUNT_DESC') return filtered.sort((a, b) => b.amount - a.amount);
+    if (sortBy === 'AMOUNT_ASC') return filtered.sort((a, b) => a.amount - b.amount);
+
+    const decorated = filtered.map(t => ({ t, ts: new Date(t.date).getTime() }));
+    decorated.sort((a, b) => sortBy === 'DATE_ASC' ? a.ts - b.ts : b.ts - a.ts);
+    return decorated.map(d => d.t);
   }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
 
-  // Group by date (Today, Yesterday, Date String)
+  // Group by date (Today, Yesterday, Date String).
+  // Today/Yesterday computed once, not per transaction (audit Phase 2.4).
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, Transaction[]> = {};
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayKey = today.toDateString();
+    const yesterdayKey = yesterday.toDateString();
+
     filteredTransactions.forEach(t => {
       const date = new Date(t.date);
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      const dateKey = date.toDateString();
 
       let key = date.toLocaleDateString('en-GB');
-      if (date.toDateString() === today.toDateString()) key = 'Today';
-      if (date.toDateString() === yesterday.toDateString()) key = 'Yesterday';
+      if (dateKey === todayKey) key = 'Today';
+      else if (dateKey === yesterdayKey) key = 'Yesterday';
 
       if (!groups[key]) groups[key] = [];
       groups[key].push(t);

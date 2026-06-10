@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
-import { analyzeFinancialHealth, FinancialInsight } from '../services/geminiService';
+import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
 import styles from './SpendAnalysis.module.css';
 
 interface SpendAnalysisProps {
@@ -21,10 +21,15 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const [showAiInsights, setShowAiInsights] = useState(false);
 
   // Auto-detect the month with most recent transactions
+  // (single O(n) max scan instead of copy + sort — audit Phase 2.6)
   const latestTxDate = useMemo(() => {
     if (transactions.length === 0) return new Date();
-    const sorted = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return new Date(sorted[0].date);
+    let maxTs = -Infinity;
+    for (const t of transactions) {
+      const ts = new Date(t.date).getTime();
+      if (ts > maxTs) maxTs = ts;
+    }
+    return new Date(maxTs);
   }, [transactions]);
 
   const [selectedDate, setSelectedDate] = useState(latestTxDate);
@@ -37,50 +42,50 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   // Helper: Get days in month
   const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 
-  // Filter transactions by selected month
-  const filteredExpenses = useMemo(() => {
-    return transactions.filter(t => 
-      t.type === TransactionType.EXPENSE && 
-      new Date(t.date).getMonth() === selectedDate.getMonth() &&
-      new Date(t.date).getFullYear() === selectedDate.getFullYear()
-    );
-  }, [transactions, selectedDate]);
+  // Filter transactions by selected month + previous-month comparison in ONE
+  // pass; each date is parsed exactly once (audit Phase 2 — was 4 scans with
+  // up to 8 Date parses per transaction).
+  const { filteredExpenses, filteredIncome, totalExpense, totalIncome, prevMonthData } = useMemo(() => {
+    const month = selectedDate.getMonth();
+    const year = selectedDate.getFullYear();
+    const prevDate = new Date(year, month - 1, 1);
+    const prevMonth = prevDate.getMonth();
+    const prevYear = prevDate.getFullYear();
 
-  const filteredIncome = useMemo(() => {
-    return transactions.filter(t => 
-      t.type === TransactionType.INCOME && 
-      new Date(t.date).getMonth() === selectedDate.getMonth() &&
-      new Date(t.date).getFullYear() === selectedDate.getFullYear()
-    );
-  }, [transactions, selectedDate]);
+    const expensesArr: typeof transactions = [];
+    const incomeArr: typeof transactions = [];
+    let expSum = 0, incSum = 0, prevExpSum = 0, prevIncSum = 0;
 
-  const totalExpense = filteredExpenses.reduce((acc, t) => acc + t.amount, 0);
-  const totalIncome = filteredIncome.reduce((acc, t) => acc + t.amount, 0);
-  const netFlow = totalIncome - totalExpense;
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+    for (const t of transactions) {
+      const d = new Date(t.date);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const isExpense = t.type === TransactionType.EXPENSE;
 
-  // Previous month comparison
-  const prevMonthData = useMemo(() => {
-    const prevDate = new Date(selectedDate);
-    prevDate.setMonth(prevDate.getMonth() - 1);
-    
-    const prevExpenses = transactions.filter(t => 
-      t.type === TransactionType.EXPENSE && 
-      new Date(t.date).getMonth() === prevDate.getMonth() &&
-      new Date(t.date).getFullYear() === prevDate.getFullYear()
-    );
-    const prevIncome = transactions.filter(t => 
-      t.type === TransactionType.INCOME && 
-      new Date(t.date).getMonth() === prevDate.getMonth() &&
-      new Date(t.date).getFullYear() === prevDate.getFullYear()
-    );
-    
+      if (m === month && y === year) {
+        if (isExpense) { expensesArr.push(t); expSum += t.amount; }
+        else { incomeArr.push(t); incSum += t.amount; }
+      } else if (m === prevMonth && y === prevYear) {
+        if (isExpense) prevExpSum += t.amount;
+        else prevIncSum += t.amount;
+      }
+    }
+
     return {
-      expense: prevExpenses.reduce((acc, t) => acc + t.amount, 0),
-      income: prevIncome.reduce((acc, t) => acc + t.amount, 0),
-      monthName: prevDate.toLocaleDateString('en-US', { month: 'short' })
+      filteredExpenses: expensesArr,
+      filteredIncome: incomeArr,
+      totalExpense: expSum,
+      totalIncome: incSum,
+      prevMonthData: {
+        expense: prevExpSum,
+        income: prevIncSum,
+        monthName: prevDate.toLocaleDateString('en-US', { month: 'short' })
+      }
     };
   }, [transactions, selectedDate]);
+
+  const netFlow = totalIncome - totalExpense;
+  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
 
   // Calculate percentage changes
   const expenseChange = prevMonthData.expense > 0 

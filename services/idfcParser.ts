@@ -3,6 +3,8 @@
 // Fast, accurate, deterministic parsing with balance validation
 // ═══════════════════════════════════════════════════════════════
 
+import { log } from '../utils/log';
+
 type TransactionNature = 
     | 'CONSUMPTION'
     | 'TRANSFER'
@@ -63,9 +65,14 @@ interface ParsedStatement {
 // ═══════════════════════════════════════════════════════════════
 
 async function extractTextFromPDF(base64Data: string): Promise<string> {
-    const pdfjsLib = await import('pdfjs-dist');
-    // Use unpkg CDN for reliable worker loading
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+    // Worker is bundled by Vite (?url emits it as a local asset) instead of
+    // being fetched from unpkg at runtime — works offline and on native
+    // Android, and removes the CDN supply-chain dependency (audit Phase 3.4).
+    const [pdfjsLib, worker] = await Promise.all([
+        import('pdfjs-dist'),
+        import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+    ]);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
     
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
@@ -300,46 +307,36 @@ function parseTransactionLines(text: string): RawTransaction[] {
     let debitColIndex = -1;
     let creditColIndex = -1;
     
-    console.log('🔍 Searching for transaction table header...');
-    
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
+
         // Look for header row with column names
         if (/debit|withdrawal/i.test(line) && /credit|deposit/i.test(line)) {
-            console.log('✅ Found header at line', i, ':', line);
-            
             // Split by multiple spaces to identify columns
             const headerParts = line.split(/\s{2,}|\t+/);
-            console.log('   Header columns:', headerParts);
-            
+
             // Find column indices
             for (let j = 0; j < headerParts.length; j++) {
                 const col = headerParts[j].toLowerCase();
                 if (/debit|withdrawal/i.test(col)) {
                     debitColIndex = j;
-                    console.log('   Debit column at index:', j);
                 }
                 if (/credit|deposit/i.test(col)) {
                     creditColIndex = j;
-                    console.log('   Credit column at index:', j);
                 }
             }
-            
+
             headerFound = true;
             break;
         }
     }
-    
+
     if (!headerFound) {
-        console.warn('⚠️ Could not find header, using default column positions');
+        log.warn('IDFC PDF: no table header found, using default column positions');
         debitColIndex = -3;  // 3rd from end
         creditColIndex = -2; // 2nd from end
     }
-    
-    console.log(`📊 Parsing transactions with debit=${debitColIndex}, credit=${creditColIndex}...`);
-    let transactionCount = 0;
-    
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
@@ -382,13 +379,7 @@ function parseTransactionLines(text: string): RawTransaction[] {
             if (amount === 0) continue;
             
             const classification = classifyTransaction(description, isCredit);
-            
-            transactionCount++;
-            if (transactionCount <= 3) {
-                // Log first 3 transactions for debugging
-                console.log(`   Txn ${transactionCount}: ${date} | ${description.substring(0, 30)} | Dr:${withdrawal} Cr:${deposit} Bal:${balance} | Type:${classification.type}`);
-            }
-            
+
             transactions.push({
                 date,
                 merchant: classification.merchant,
@@ -401,15 +392,11 @@ function parseTransactionLines(text: string): RawTransaction[] {
                 note: description
             });
         } catch (error) {
-            console.warn('Failed to parse line:', line, error);
+            // Do not log line content — statement lines contain PII.
+            log.warn('IDFC PDF: failed to parse a statement line');
         }
     }
-    
-    console.log(`✅ Parsed ${transactions.length} transactions total`);
-    const incomeCount = transactions.filter(t => t.type === 'INCOME').length;
-    const expenseCount = transactions.filter(t => t.type === 'EXPENSE').length;
-    console.log(`   ${incomeCount} income, ${expenseCount} expense`);
-    
+
     return transactions;
 }
 
@@ -425,15 +412,12 @@ function extractHeader(text: string): StatementHeader {
         totalCredit: 0
     };
     
-    console.log('📋 Extracting statement header...');
-    
-    // Extract account number
+    // Extract account number (never logged — PII)
     const accMatch = text.match(PATTERNS.accountNum);
     if (accMatch) {
         header.accountNumber = accMatch[1];
-        console.log('   Account:', header.accountNumber);
     }
-    
+
     // Extract period
     const periodMatch = text.match(PATTERNS.period);
     if (periodMatch) {
@@ -441,35 +425,30 @@ function extractHeader(text: string): StatementHeader {
             from: parseDate(periodMatch[1]),
             to: parseDate(periodMatch[2])
         };
-        console.log('   Period:', header.statementPeriod.from, 'to', header.statementPeriod.to);
     }
-    
+
     // Extract balances
     const openingMatch = text.match(PATTERNS.openingBalance);
     if (openingMatch) {
         header.openingBalance = parseAmount(openingMatch[1]);
-        console.log('   Opening Balance:', header.openingBalance);
     }
-    
+
     const closingMatch = text.match(PATTERNS.closingBalance);
     if (closingMatch) {
         header.closingBalance = parseAmount(closingMatch[1]);
-        console.log('   Closing Balance:', header.closingBalance);
     }
-    
+
     // Extract totals
     const debitMatch = text.match(PATTERNS.totalDebit);
     if (debitMatch) {
         header.totalDebit = parseAmount(debitMatch[1]);
-        console.log('   Total Debit:', header.totalDebit);
     }
-    
+
     const creditMatch = text.match(PATTERNS.totalCredit);
     if (creditMatch) {
         header.totalCredit = parseAmount(creditMatch[1]);
-        console.log('   Total Credit:', header.totalCredit);
     }
-    
+
     header.bankName = 'IDFC FIRST Bank';
     
     return header;
@@ -552,38 +531,35 @@ function validateBalances(header: StatementHeader, transactions: RawTransaction[
 // ═══════════════════════════════════════════════════════════════
 
 export async function parseIDFCStatement(base64Data: string): Promise<ParsedStatement> {
-    console.log('🏦 Parsing IDFC statement (rule-based, no AI)...');
     const startTime = Date.now();
-    
+
     try {
         // Extract text from PDF
         const text = await extractTextFromPDF(base64Data);
-        
+
         // Extract header info
         const header = extractHeader(text);
-        
+
         // Parse transactions
         const transactions = parseTransactionLines(text);
-        
+
         // Validate mathematical accuracy
         const validation = validateBalances(header, transactions);
-        
-        const parseTime = Date.now() - startTime;
-        console.log(`✅ Parsed ${transactions.length} transactions in ${parseTime}ms`);
-        
+
+        log.debug(`IDFC PDF: parsed ${transactions.length} transactions in ${Date.now() - startTime}ms`);
         if (!validation.passed) {
-            console.warn('⚠️ Validation warnings:', validation.errors);
+            log.warn(`IDFC PDF: balance validation reported ${validation.errors.length} issue(s)`);
         }
-        
+
         return {
             header,
             transactions,
             validationPassed: validation.passed,
             errors: validation.errors
         };
-        
+
     } catch (error) {
-        console.error('❌ IDFC parser error:', error);
+        log.error('IDFC parser error'); // no payload — may contain statement content
         throw error;
     }
 }

@@ -27,9 +27,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return unsubscribe;
   }, []);
 
+  // Children render unconditionally — App.tsx already gates on `loading`,
+  // so the old `!loading &&` double-gate only caused an extra mount cycle
+  // (audit Phase 5.6).
   return (
     <AuthContext.Provider value={{ user, loading }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

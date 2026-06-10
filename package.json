@@ -14,12 +14,10 @@
     "postandroid": "powershell -ExecutionPolicy Bypass -File patch-capacitor-gradle.ps1"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.28.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.1",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
-    "@google/genai": "^1.39.0",
     "firebase": "^11.10.0",
     "pdfjs-dist": "^5.4.624",
     "react": "^19.2.4",

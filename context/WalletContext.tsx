@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, IgnoreRule } from '../types';
 import { db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { CURRENCIES } from '../currencyUtils';
+import { CURRENCIES, getCurrencyFormatter } from '../currencyUtils';
+import { log } from '../utils/log';
 
 interface WalletContextType {
   transactions: Transaction[];
@@ -27,6 +28,8 @@ interface WalletContextType {
   getBalance: () => number;
   getMonthlyIncome: () => number;
   getMonthlyExpense: () => number;
+  getDailyIncome: () => number;
+  getDailyExpense: () => number;
   getTotalIncome: () => number;
   getTotalExpense: () => number;
   formatAmount: (amountInBase: number) => string;
@@ -52,6 +55,38 @@ const DEFAULT_RULES: IgnoreRule[] = [
   { id: '4', name: "Network Fees", description: "Gas & Overhead", icon: "token", color: "sand", isActive: true }
 ];
 
+// Only these currencies are selectable in the UI; don't keep ~160 rates in state.
+const SUPPORTED_CODES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP'];
+const FX_CACHE_KEY = 'fxRates_v1';
+const FX_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+const FALLBACK_RATES: Record<string, number> = {
+  INR: 1,
+  USD: 0.012,
+  EUR: 0.011,
+  GBP: 0.0095,
+};
+
+const readFxCache = (): { rates: Record<string, number>; fetchedAt: number } | null => {
+  try {
+    const raw = localStorage.getItem(FX_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.fetchedAt === 'number' && parsed.rates) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+  const results: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    results.push(arr.slice(i, i + size));
+  }
+  return results;
+};
+
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -61,18 +96,22 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
   const [lastLoginTime, setLastLoginTime] = useState<Date | null>(null);
   const [openingBalance, setOpeningBalanceState] = useState<number>(0);
-  
+
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   // Backend ready state to handle cases where DB doesn't exist
-  const [isBackendReady, setIsBackendReady] = useState(true); 
-  
-  // Exchange Rates State (Base: INR)
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ 
-      INR: 1, 
-      USD: 0.012, 
-      EUR: 0.011, 
-      GBP: 0.0095 
+  const [isBackendReady, setIsBackendReady] = useState(true);
+
+  // Exchange Rates State (Base: INR). Hydrate from the local cache when fresh.
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(() => {
+    const cached = readFxCache();
+    return cached ? { ...FALLBACK_RATES, ...cached.rates } : FALLBACK_RATES;
   });
+
+  // Refs that let long-lived listeners read current values without re-subscribing.
+  const isOnlineRef = useRef(isOnline);
+  isOnlineRef.current = isOnline;
+  const isBackendReadyRef = useRef(isBackendReady);
+  isBackendReadyRef.current = isBackendReady;
 
   // Monitor Online Status
   useEffect(() => {
@@ -86,98 +125,120 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
   }, []);
 
-  // Fetch Live Rates
+  // Fetch Live Rates — only when the cache is stale (audit Phase 3.2)
   useEffect(() => {
-    const fetchRates = async () => {
-        if (!isOnline) return;
+    const fetchRates = async (force = false) => {
+        if (!isOnlineRef.current) return;
+        if (!force) {
+            const cached = readFxCache();
+            if (cached && Date.now() - cached.fetchedAt < FX_TTL_MS) return; // still fresh
+        }
         try {
             const res = await fetch('https://api.exchangerate-api.com/v4/latest/INR');
             if (res.ok) {
                 const data = await res.json();
-                setExchangeRates(prev => ({ ...prev, ...data.rates }));
+                // Keep only the currencies the app supports.
+                const rates: Record<string, number> = {};
+                for (const code of SUPPORTED_CODES) {
+                    if (typeof data?.rates?.[code] === 'number') rates[code] = data.rates[code];
+                }
+                if (Object.keys(rates).length > 0) {
+                    setExchangeRates(prev => ({ ...prev, ...rates }));
+                    try {
+                        localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ rates, fetchedAt: Date.now() }));
+                    } catch { /* storage full — non-fatal */ }
+                }
             }
-        } catch (e) { 
-            console.warn("Rate fetch failed, using fallbacks", e); 
+        } catch (e) {
+            log.warn('FX rate fetch failed, using cached/fallback rates');
         }
     };
 
     fetchRates();
-    const interval = setInterval(fetchRates, 3600000); // Update every hour
+    const interval = setInterval(() => fetchRates(), FX_TTL_MS);
     return () => clearInterval(interval);
   }, [isOnline]);
 
-  // Helper: Format Amount based on active currency and live rate
-  const formatAmount = (amountInBase: number): string => {
+  // Helper: Format Amount based on active currency and live rate.
+  // Uses a cached Intl.NumberFormat (audit Phase 2.2).
+  const formatAmount = useCallback((amountInBase: number): string => {
       const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
-      const converted = amountInBase * rate;
-      const config = CURRENCIES[currency];
-      
-      return new Intl.NumberFormat(config.locale, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(converted);
-  };
+      return getCurrencyFormatter(currency).format(amountInBase * rate);
+  }, [currency, exchangeRates]);
 
   // Helper: Convert display currency amount back to base (INR) for storage
-  const convertToBase = (amount: number): number => {
+  const convertToBase = useCallback((amount: number): number => {
       const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
       return amount / rate;
-  }
+  }, [currency, exchangeRates]);
 
-  // Local Storage Fallback Helper
-  const saveToLocal = (key: string, data: any) => {
+  // Local Storage Fallback Helpers
+  const saveToLocal = useCallback((key: string, data: any) => {
       if (!user) return;
       try {
         localStorage.setItem(`${key}_${user.uid}`, JSON.stringify(data));
-      } catch (e) { console.error("Local storage save error", e); }
-  };
+      } catch (e) { log.error('Local storage save error'); }
+  }, [user]);
 
-  const loadFromLocal = (key: string) => {
+  const loadFromLocal = useCallback((key: string) => {
       if (!user) return null;
       try {
         const data = localStorage.getItem(`${key}_${user.uid}`);
         return data ? JSON.parse(data) : null;
       } catch (e) { return null; }
-  };
+  }, [user]);
 
-  // Initialize User Profile in Firestore & Fetch Last Login
+  // Debounced transaction mirror (audit Phase 3.1).
+  // Firestore's persistent cache already covers offline reads; this mirror only
+  // exists as a fallback for backend-unavailable (rules/missing DB) mode, so a
+  // trailing 1s write is plenty — and avoids serializing the whole list on
+  // every change.
+  const mirrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleMirror = useCallback((txs: Transaction[]) => {
+      if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
+      mirrorTimer.current = setTimeout(() => saveToLocal('transactions', txs), 1000);
+  }, [saveToLocal]);
+  useEffect(() => () => { if (mirrorTimer.current) clearTimeout(mirrorTimer.current); }, []);
+
+  // Persist transactions: immediate when running local-only, debounced otherwise.
+  const persistTransactions = useCallback((txs: Transaction[]) => {
+      if (isBackendReadyRef.current) scheduleMirror(txs);
+      else saveToLocal('transactions', txs);
+  }, [scheduleMirror, saveToLocal]);
+
+  // Initialize User Profile in Firestore & Fetch Last Login (audit Phase 3.3:
+  // single merged write, fire-and-forget; read kept only for the
+  // "previous login" display).
   useEffect(() => {
     const initUserProfile = async () => {
-      if (user && isOnline && isBackendReady) {
-        try {
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (!userSnap.exists()) {
-            await setDoc(userRef, {
-              email: user.email,
-              createdAt: serverTimestamp(),
-              lastLogin: serverTimestamp(),
-              platform: navigator.platform
-            }, { merge: true });
-            setLastLoginTime(new Date());
-          } else {
-             const data = userSnap.data();
-             if (data.lastLogin) {
-                 setLastLoginTime(data.lastLogin.toDate());
-             }
-             // Update last login
-             await updateDoc(userRef, {
-                 lastLogin: serverTimestamp()
-             });
-          }
-        } catch (e: any) {
-          console.error("Failed to initialize user profile on backend:", e);
-          if (e.code === 'permission-denied') {
-             console.warn("Permission denied. Check Firestore Security Rules.");
-          }
+      if (!user || !isBackendReady) return;
+      const userRef = doc(db, 'users', user.uid);
+      let isNewUser = false;
+      try {
+        const userSnap = await getDoc(userRef);
+        isNewUser = !userSnap.exists();
+        if (!isNewUser && userSnap.data()?.lastLogin) {
+          setLastLoginTime(userSnap.data()!.lastLogin.toDate());
+        } else {
+          setLastLoginTime(new Date());
         }
+      } catch {
+        // Offline at startup — Firestore cache may not have the doc yet; non-fatal.
       }
+      setDoc(userRef, {
+        email: user.email,
+        lastLogin: serverTimestamp(),
+        platform: navigator.platform,
+        ...(isNewUser ? { createdAt: serverTimestamp() } : {})
+      }, { merge: true }).catch((e: any) => {
+        log.warn('Failed to update user profile:', e?.code || 'unknown');
+        if (e?.code === 'permission-denied') {
+          log.warn('Permission denied. Check Firestore Security Rules.');
+        }
+      });
     };
     initUserProfile();
-  }, [user, isOnline, isBackendReady]);
+  }, [user, isBackendReady]);
 
   // Sync Transactions
   useEffect(() => {
@@ -195,33 +256,37 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     let unsubscribe = () => {};
 
     try {
-        // Optimized Query: Sort by date descending in database
+        // Sorted by date descending in the database
         const q = query(collection(db, `users/${user.uid}/transactions`), orderBy('date', 'desc'));
         unsubscribe = onSnapshot(q, (snapshot) => {
             const txData: Transaction[] = [];
-            snapshot.forEach((doc) => {
-                txData.push(doc.data() as Transaction);
+            snapshot.forEach((d) => {
+                txData.push(d.data() as Transaction);
             });
-            // Sorting is now handled by the database
             setTransactions(txData);
-            saveToLocal('transactions', txData);
+            scheduleMirror(txData);
         }, (error) => {
-            console.warn("Firestore access failed (possibly missing DB), switching to local-only mode:", error.message);
+            log.warn('Firestore access failed, switching to local-only mode:', error.message);
             setIsBackendReady(false);
-            const localData = loadFromLocal('transactions');
-            if (localData) setTransactions(localData);
+            // Keep whatever is already in memory (freshest); only fall back to
+            // the mirror when we have nothing.
+            setTransactions(prev => {
+                if (prev.length > 0) return prev;
+                const localData = loadFromLocal('transactions');
+                return localData ?? prev;
+            });
         });
     } catch (e) {
-        console.warn("Firestore setup error:", e);
+        log.warn('Firestore setup error:', e);
         setIsBackendReady(false);
         const localData = loadFromLocal('transactions');
         if (localData) setTransactions(localData);
     }
 
     return () => unsubscribe();
-  }, [user, isBackendReady]);
+  }, [user, isBackendReady, loadFromLocal, scheduleMirror]);
 
-  // Sync Settings (Currency, Rules, Limits, MFA)
+  // Sync Settings (Currency, Rules, Limits, MFA, Opening Balance)
   useEffect(() => {
       if (!user || !isBackendReady) {
           if (!user) {
@@ -233,23 +298,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           } else {
                const localCurrency = loadFromLocal('currency');
                if (localCurrency) setCurrencyState(localCurrency);
-               
+
                const localRules = loadFromLocal('ignoreRules');
                if (localRules) setIgnoreRules(localRules);
                else setIgnoreRules(DEFAULT_RULES);
 
                const localLimit = loadFromLocal('dailyLimit');
                if (localLimit) setDailyLimitState(localLimit);
-               
+
                const localMfa = loadFromLocal('mfaEnabled');
                if (localMfa !== null) setMfaEnabledState(localMfa);
-               
+
                const localOpeningBalance = loadFromLocal('openingBalance');
                if (localOpeningBalance !== null) {
-                   console.log('💾 Loading opening balance from localStorage:', localOpeningBalance);
                    setOpeningBalanceState(localOpeningBalance || 0);
-               } else {
-                   console.log('💾 No opening balance in localStorage (first time)');
                }
           }
           return;
@@ -279,121 +341,157 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       saveToLocal('mfaEnabled', data.mfaEnabled);
                   }
                   if (data.openingBalance !== undefined) {
-                      console.log('💾 Loaded opening balance from Firestore:', data.openingBalance);
                       setOpeningBalanceState(data.openingBalance || 0);
                       saveToLocal('openingBalance', data.openingBalance || 0);
-                  } else {
-                      console.log('💾 No opening balance in Firestore');
                   }
-              } else {
-                  if (isOnline) {
-                    setDoc(settingsRef, { 
-                        currency: 'INR', 
-                        ignoreRules: DEFAULT_RULES,
-                        dailyLimit: 0,
-                        mfaEnabled: false
-                    }, { merge: true })
-                    .catch(err => console.warn("Failed to init settings on backend", err));
-                  }
+              } else if (isOnlineRef.current) {
+                  setDoc(settingsRef, {
+                      currency: 'INR',
+                      ignoreRules: DEFAULT_RULES,
+                      dailyLimit: 0,
+                      mfaEnabled: false
+                  }, { merge: true })
+                  .catch(() => log.warn('Failed to init settings on backend'));
               }
           }, (error) => {
-              console.warn('⚠️ Firestore listener error, falling back to localStorage:', error.message);
+              log.warn('Settings listener error, falling back to localStorage:', error.message);
               const localCurrency = loadFromLocal('currency');
               if (localCurrency) setCurrencyState(localCurrency);
-              
+
               const localRules = loadFromLocal('ignoreRules');
               if (localRules) setIgnoreRules(localRules);
               else setIgnoreRules(DEFAULT_RULES);
-              
+
               const localOpeningBalance = loadFromLocal('openingBalance');
               if (localOpeningBalance !== null) {
-                  console.log('💾 Fallback: Loaded opening balance from localStorage:', localOpeningBalance);
                   setOpeningBalanceState(localOpeningBalance || 0);
               }
           });
       } catch (e) {
-           console.warn('⚠️ Settings sync exception, falling back to localStorage:', e);
+           log.warn('Settings sync exception, falling back to localStorage');
            const localCurrency = loadFromLocal('currency');
            if (localCurrency) setCurrencyState(localCurrency);
-           
+
            const localRules = loadFromLocal('ignoreRules');
            if (localRules) setIgnoreRules(localRules);
            else setIgnoreRules(DEFAULT_RULES);
-           
+
            const localOpeningBalance = loadFromLocal('openingBalance');
            if (localOpeningBalance !== null) {
-               console.log('💾 Exception fallback: Loaded opening balance from localStorage:', localOpeningBalance);
                setOpeningBalanceState(localOpeningBalance || 0);
            }
       }
 
       return () => unsubscribe();
-  }, [user, isBackendReady]);
+  }, [user, isBackendReady, loadFromLocal, saveToLocal]);
 
-  const retryCloudConnection = () => {
+  const retryCloudConnection = useCallback(() => {
       setIsBackendReady(true);
-  };
+  }, []);
 
-  const setCurrency = async (code: CurrencyCode) => {
+  const setCurrency = useCallback(async (code: CurrencyCode) => {
     setCurrencyState(code);
     saveToLocal('currency', code);
     if (user && isOnline && isBackendReady) {
         try {
             const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
             await setDoc(settingsRef, { currency: code }, { merge: true });
-        } catch (e) { console.warn("Backend update failed, using local state"); }
+        } catch (e) { log.warn('Backend update failed, using local state'); }
     }
-  };
+  }, [user, isOnline, isBackendReady, saveToLocal]);
 
-  const setDailyLimit = async (limit: number) => {
+  const setDailyLimit = useCallback(async (limit: number) => {
       setDailyLimitState(limit);
       saveToLocal('dailyLimit', limit);
       if (user && isOnline && isBackendReady) {
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { dailyLimit: limit }, { merge: true });
-          } catch (e) { console.warn("Backend update failed", e); }
+          } catch (e) { log.warn('Backend update failed'); }
       }
-  };
+  }, [user, isOnline, isBackendReady, saveToLocal]);
 
-  const setMfaEnabled = async (enabled: boolean) => {
+  const setMfaEnabled = useCallback(async (enabled: boolean) => {
       setMfaEnabledState(enabled);
       saveToLocal('mfaEnabled', enabled);
       if (user && isOnline && isBackendReady) {
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { mfaEnabled: enabled }, { merge: true });
-          } catch (e) { console.warn("Backend update failed", e); }
+          } catch (e) { log.warn('Backend update failed'); }
       }
-  };
+  }, [user, isOnline, isBackendReady, saveToLocal]);
 
-  const setOpeningBalance = async (balance: number) => {
-      console.log('💰 setOpeningBalance called with:', balance);
+  const setOpeningBalance = useCallback(async (balance: number) => {
       setOpeningBalanceState(balance);
-      console.log('💰 State updated to:', balance);
       saveToLocal('openingBalance', balance);
-      console.log('💰 Saved to localStorage');
       if (user && isOnline && isBackendReady) {
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { openingBalance: balance }, { merge: true });
-              console.log('💰 Synced to Firestore');
-          } catch (e) { 
-              console.warn("💰 Backend update failed", e); 
+          } catch (e) {
+              log.warn('Backend update failed for opening balance');
           }
-      } else {
-          console.log('💰 Backend not available for sync. User:', !!user, 'Online:', isOnline, 'Ready:', isBackendReady);
       }
-  };
+  }, [user, isOnline, isBackendReady, saveToLocal]);
 
-  const addTransaction = async (transaction: Transaction): Promise<boolean> => {
-    // Check Daily Limit
+  // ── Aggregates ────────────────────────────────────────────────────────────
+  // Single pass over transactions, recomputed only when data changes
+  // (audit Phase 2.3). Each transaction's date is parsed exactly once here.
+  const aggregates = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const dayKey = now.toDateString();
+
+    let totalIncome = 0, totalExpense = 0;
+    let monthlyIncome = 0, monthlyExpense = 0;
+    let todayIncome = 0, todayExpense = 0;
+
+    for (const t of transactions) {
+      const isIncome = t.type === TransactionType.INCOME;
+      if (isIncome) totalIncome += t.amount; else totalExpense += t.amount;
+
+      const d = new Date(t.date);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        if (isIncome) monthlyIncome += t.amount; else monthlyExpense += t.amount;
+      }
+      if (d.toDateString() === dayKey) {
+        if (isIncome) todayIncome += t.amount; else todayExpense += t.amount;
+      }
+    }
+
+    return {
+      dayKey,
+      totalIncome,
+      totalExpense,
+      monthlyIncome,
+      monthlyExpense,
+      todayIncome,
+      todayExpense,
+      balance: openingBalance + totalIncome - totalExpense,
+    };
+  }, [transactions, openingBalance]);
+
+  const getBalance = useCallback(() => aggregates.balance, [aggregates]);
+  const getMonthlyIncome = useCallback(() => aggregates.monthlyIncome, [aggregates]);
+  const getMonthlyExpense = useCallback(() => aggregates.monthlyExpense, [aggregates]);
+  const getDailyIncome = useCallback(() => aggregates.todayIncome, [aggregates]);
+  const getDailyExpense = useCallback(() => aggregates.todayExpense, [aggregates]);
+  const getTotalIncome = useCallback(() => aggregates.totalIncome, [aggregates]);
+  const getTotalExpense = useCallback(() => aggregates.totalExpense, [aggregates]);
+
+  const addTransaction = useCallback(async (transaction: Transaction): Promise<boolean> => {
+    // Check Daily Limit (audit Phase 2.8: reuse the aggregate when it is for
+    // today; recompute only across a midnight boundary).
     if (transaction.type === TransactionType.EXPENSE && dailyLimit > 0) {
         const today = new Date().toDateString();
-        const todaySpend = transactions
-            .filter(t => t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === today)
-            .reduce((acc, t) => acc + t.amount, 0);
-        
+        const todaySpend = aggregates.dayKey === today
+            ? aggregates.todayExpense
+            : transactions
+                .filter(t => t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === today)
+                .reduce((acc, t) => acc + t.amount, 0);
+
         if (todaySpend + transaction.amount > dailyLimit) {
             alert(`Transaction declined. Exceeds daily limit of ${formatAmount(dailyLimit)}.`);
             return false;
@@ -402,63 +500,62 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const newTxs = [transaction, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setTransactions(newTxs);
-    saveToLocal('transactions', newTxs);
-    
+    persistTransactions(newTxs);
+
     if (user && isBackendReady) {
         const txRef = doc(db, `users/${user.uid}/transactions/${transaction.id}`);
         setDoc(txRef, transaction)
-            .then(() => console.log("Transaction saved to Firestore"))
             .catch(e => {
-                console.warn("Backend update queued/failed", e);
-                if (e.message.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
+                log.warn('Backend write queued/failed:', e?.code || e?.message);
+                if (e.message?.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
             });
     }
     return true;
-  };
+  }, [transactions, dailyLimit, aggregates, formatAmount, persistTransactions, user, isBackendReady]);
 
-  const editTransaction = async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
+  const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
     try {
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) {
-        console.error('Transaction not found');
+        log.error('Edit failed: transaction not found');
         return false;
       }
 
       const updatedTx = { ...transaction, ...updates, id: transaction.id };
       const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
       setTransactions(newTxs);
-      saveToLocal('transactions', newTxs);
+      persistTransactions(newTxs);
 
       if (user && isBackendReady) {
         const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
         await updateDoc(txRef, updates)
           .catch(e => {
-            console.warn('Backend update queued/failed', e);
-            if (e.message.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
+            log.warn('Backend update queued/failed:', e?.code || e?.message);
+            if (e.message?.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
           });
       }
       return true;
     } catch (error) {
-      console.error('Edit transaction error:', error);
+      log.error('Edit transaction error');
       return false;
     }
-  };
+  }, [transactions, persistTransactions, user, isBackendReady]);
 
-  const deleteTransaction = async (id: string) => {
+  const deleteTransaction = useCallback(async (id: string) => {
     try {
       const newTxs = transactions.filter(t => t.id !== id);
       setTransactions(newTxs);
-      saveToLocal('transactions', newTxs);
-      
+      persistTransactions(newTxs);
+
       if (user && isBackendReady) {
-        deleteDoc(doc(db, `users/${user.uid}/transactions/${id}`)).catch(e => console.warn('Backend delete queued/failed', e));
+        deleteDoc(doc(db, `users/${user.uid}/transactions/${id}`)).catch(e => log.warn('Backend delete queued/failed:', e?.code));
       }
     } catch (error) {
-      console.error('Delete transaction error:', error);
+      log.error('Delete transaction error');
     }
-  };
+  }, [transactions, persistTransactions, user, isBackendReady]);
 
-  const clearAllTransactions = async () => {
+  const clearAllTransactions = useCallback(async () => {
     setTransactions([]);
     saveToLocal('transactions', []);
     setOpeningBalanceState(0);
@@ -466,85 +563,51 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (user && isBackendReady) {
         try {
+            // Also reset the cloud opening balance, otherwise the settings
+            // snapshot restores the old value after a clear (audit Phase 1.2).
+            const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+            setDoc(settingsRef, { openingBalance: 0 }, { merge: true })
+                .catch(() => log.warn('Failed to reset opening balance on backend'));
+
             const q = query(collection(db, `users/${user.uid}/transactions`));
             const snapshot = await getDocs(q);
-            const docs = snapshot.docs;
-            
-            // Process in chunks of 500 (Firestore Batch Limit)
-            const chunkArray = (arr: any[], size: number) => {
-                const results = [];
-                for (let i = 0; i < arr.length; i += size) {
-                    results.push(arr.slice(i, i + size));
-                }
-                return results;
-            };
-
-            const chunks = chunkArray(docs, 500);
+            const chunks = chunkArray(snapshot.docs, 500); // Firestore batch limit
 
             for (const chunk of chunks) {
                 const batch = writeBatch(db);
-                chunk.forEach(doc => {
-                    batch.delete(doc.ref);
+                chunk.forEach(d => {
+                    batch.delete(d.ref);
                 });
                 await batch.commit();
             }
-            console.log("All transactions cleared from backend");
         } catch (e) {
-            console.warn("Failed to clear backend transactions", e);
+            log.warn('Failed to clear backend transactions');
         }
     }
-  };
+  }, [user, isBackendReady, saveToLocal]);
 
-  const importTransactions = async (newTransactions: Transaction[], openingBalance?: number) => {
-    console.log('📥 importTransactions called with:', newTransactions.length, 'transactions');
-    console.log('📥 Opening balance param:', openingBalance);
-    console.log('📥 Detailed - First transaction:', newTransactions[0]);
-    console.log('📥 Detailed - Last transaction:', newTransactions[newTransactions.length - 1]);
-    
+  const importTransactions = useCallback(async (newTransactions: Transaction[], importedOpeningBalance?: number) => {
     const existingIds = new Set(transactions.map(t => t.id));
     const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
 
-    console.log('📥 Before import - Existing transactions:', transactions.length);
-    console.log('📥 New unique transactions to add:', uniqueNew.length);
-
     if (uniqueNew.length === 0) {
-        console.warn('⚠️ No new unique transactions to import');
+        log.warn('No new unique transactions to import');
         return;
     }
 
     // Set opening balance FIRST if provided and no existing transactions
-    if (openingBalance !== undefined && transactions.length === 0) {
-        console.log('💰 Setting opening balance during import:', openingBalance);
-        await setOpeningBalance(openingBalance);
-        console.log('✅ Opening balance set during import');
+    if (importedOpeningBalance !== undefined && transactions.length === 0) {
+        await setOpeningBalance(importedOpeningBalance);
     }
 
     const combined = [...uniqueNew, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    console.log('📥 Combined total would be:', combined.length);
-    console.log('📥 Setting state to:', combined.length, 'transactions');
-    console.log('📥 Sample combined[0]:', combined[0]);
-    
+
     setTransactions(combined);
-    saveToLocal('transactions', combined);
-    
-    console.log('✅ Transactions state updated. Total count:', combined.length);
-    console.log('✅ localStorage saved with', combined.length, 'transactions');
-    
+    persistTransactions(combined);
+
     if (user && isBackendReady) {
         try {
-            // Chunk imports
-             const chunkArray = (arr: any[], size: number) => {
-                const results = [];
-                for (let i = 0; i < arr.length; i += size) {
-                    results.push(arr.slice(i, i + size));
-                }
-                return results;
-            };
-
             const chunks = chunkArray(uniqueNew, 500);
-            console.log('📥 Firestore - Uploading', uniqueNew.length, 'in', chunks.length, 'chunks');
-            
             for (const chunk of chunks) {
                  const batch = writeBatch(db);
                  chunk.forEach(tx => {
@@ -552,85 +615,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     batch.set(ref, tx);
                  });
                  await batch.commit();
-                 console.log('📥 Firestore - Chunk uploaded, waiting...');
             }
-            console.log('✅ Firestore - Imported', uniqueNew.length, 'transactions via batch write');
+            log.debug(`Imported ${uniqueNew.length} transactions via batch write`);
         } catch (e) {
-            console.warn("⚠️ Firestore import failed", e);
+            log.warn('Firestore import failed');
         }
-    } else {
-        console.log('📝 Firestore not ready. User:', !!user, 'Backend ready:', isBackendReady);
     }
-  };
+  }, [transactions, setOpeningBalance, persistTransactions, user, isBackendReady]);
 
-  const toggleIgnoreRule = async (id: string) => {
-    const newRules = ignoreRules.map(rule => 
+  const toggleIgnoreRule = useCallback(async (id: string) => {
+    const newRules = ignoreRules.map(rule =>
       rule.id === id ? { ...rule, isActive: !rule.isActive } : rule
     );
     setIgnoreRules(newRules);
     saveToLocal('ignoreRules', newRules);
-    
+
     if (user && isOnline && isBackendReady) {
         try {
             const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
             await updateDoc(settingsRef, { ignoreRules: newRules });
-        } catch (e) { console.warn("Backend update failed, using local state"); }
+        } catch (e) { log.warn('Backend update failed, using local state'); }
     }
-  };
+  }, [ignoreRules, user, isOnline, isBackendReady, saveToLocal]);
 
-  const getBalance = () => {
-    const transactionBalance = transactions.reduce((acc, curr) => {
-      return curr.type === TransactionType.INCOME ? acc + curr.amount : acc - curr.amount;
-    }, 0);
-    return openingBalance + transactionBalance;
-  };
-
-  const getMonthlyIncome = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const monthlyIncome = transactions
-      .filter(t => {
-        if (t.type !== TransactionType.INCOME) return false;
-        const txDate = new Date(t.date);
-        return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
-      })
-      .reduce((acc, curr) => acc + curr.amount, 0);
-    
-    return monthlyIncome;
-  };
-
-  const getMonthlyExpense = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const monthlyExpense = transactions
-      .filter(t => {
-        if (t.type !== TransactionType.EXPENSE) return false;
-        const txDate = new Date(t.date);
-        return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
-      })
-      .reduce((acc, curr) => acc + curr.amount, 0);
-    
-    return monthlyExpense;
-  };
-
-  const getTotalIncome = () => {
-    return transactions
-      .filter(t => t.type === TransactionType.INCOME)
-      .reduce((acc, curr) => acc + curr.amount, 0);
-  };
-
-  const getTotalExpense = () => {
-    return transactions
-      .filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((acc, curr) => acc + curr.amount, 0);
-  };
-
-  return (
-    <WalletContext.Provider value={{
+  // Memoized provider value (audit Phase 2.1) — consumers no longer re-render
+  // from identity churn alone.
+  const value = useMemo<WalletContextType>(() => ({
       transactions,
       currency,
       ignoreRules,
@@ -652,13 +662,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       getBalance,
       getMonthlyIncome,
       getMonthlyExpense,
+      getDailyIncome,
+      getDailyExpense,
       getTotalIncome,
       getTotalExpense,
       formatAmount,
       convertToBase,
       retryCloudConnection,
       lastLoginTime
-    }}>
+  }), [
+      transactions, currency, ignoreRules, dailyLimit, mfaEnabled, isOnline,
+      isBackendReady, openingBalance, setCurrency, setDailyLimit, setMfaEnabled,
+      setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
+      clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
+      getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
+      getTotalIncome, getTotalExpense, formatAmount, convertToBase,
+      retryCloudConnection, lastLoginTime
+  ]);
+
+  return (
+    <WalletContext.Provider value={value}>
       {children}
     </WalletContext.Provider>
   );

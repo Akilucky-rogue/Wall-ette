@@ -24,20 +24,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       convertToBase
   } = useWallet();
 
-  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? (dailyLimit * 1).toString() : '');
+  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? dailyLimit.toString() : '');
   const [limitSaved, setLimitSaved] = useState(false);
-  // Daily Limit is stored in base currency (INR). We should display it in selected currency, but for simplicity let's assume input is in Base or handle conversion.
-  // Actually, keeping it simple: Input amount in Base Currency (INR) for now, or assume the input is in current currency and convert before save.
-  // Let's do: Input in Current Currency.
-  
-  // Wait, formatAmount converts Base -> Display.
-  // convertToBase converts Display -> Base.
-  
-  // We need to display the limit in current currency.
-  // dailyLimit is in Base.
-  const [displayLimit, setDisplayLimit] = useState('');
-  
-  // Init state on load
+  // Note: the daily limit is stored and entered in base currency (INR).
+
+  // Keep the input in sync when the limit loads from Firestore
   React.useEffect(() => {
     setLimitInput(dailyLimit > 0 ? dailyLimit.toString() : '');
   }, [dailyLimit]);
@@ -124,8 +115,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                               <span className="material-symbols-outlined text-[20px]">lock</span>
                           </div>
                           <div>
-                              <p className="text-premium-charcoal font-serif font-medium text-[15px]">Multi-Factor Auth</p>
-                              <p className="text-muted-taupe text-[10px]">Require 2FA code on unlock</p>
+                              <p className="text-premium-charcoal font-serif font-medium text-[15px]">Multi-Factor Auth <span className="text-muted-taupe text-[10px] font-sans">(demo)</span></p>
+                              <p className="text-muted-taupe text-[10px]">Simulated 2FA prompt on unlock — not yet a real second factor</p>
                           </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- WALL-E favicon: sage circle with robot eyes (matches app logo) -->
+  <circle cx="32" cy="32" r="30" fill="#9BAE93"/>
+  <circle cx="32" cy="32" r="30" fill="url(#g)" fill-opacity="0.25"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="22" width="16" height="20" rx="5" fill="#333333" fill-opacity="0.9"/>
+  <rect x="34" y="22" width="16" height="20" rx="5" fill="#333333" fill-opacity="0.9"/>
+  <circle cx="22" cy="32" r="5" fill="#E3EAE0"/>
+  <circle cx="42" cy="32" r="5" fill="#E3EAE0"/>
+  <circle cx="22" cy="32" r="2.2" fill="#9BAE93"/>
+  <circle cx="42" cy="32" r="2.2" fill="#9BAE93"/>
+</svg>

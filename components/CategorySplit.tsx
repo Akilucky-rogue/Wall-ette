@@ -16,10 +16,15 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
   const pieRef = useRef<HTMLDivElement>(null);
 
   // Auto-detect the month with most recent transactions
+  // (single O(n) max scan instead of copy + sort — audit Phase 2.6)
   const latestTxDate = useMemo(() => {
     if (transactions.length === 0) return new Date();
-    const sorted = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return new Date(sorted[0].date);
+    let maxTs = -Infinity;
+    for (const t of transactions) {
+      const ts = new Date(t.date).getTime();
+      if (ts > maxTs) maxTs = ts;
+    }
+    return new Date(maxTs);
   }, [transactions]);
 
   const [selectedDate, setSelectedDate] = useState(latestTxDate);

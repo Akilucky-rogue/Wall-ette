@@ -37,5 +37,12 @@ dist-ssr
 *.xlsx
 *.xls
 
+# Personal files kept locally but never in git
+private/
+*.idsig
+
+# Firebase deploy cache
+.firebase/
+
 # Archives
 *.zip

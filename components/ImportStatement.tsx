@@ -105,7 +105,10 @@ const mapRawToTransactions = (rawTransactions: any[]): Transaction[] => {
 };
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
-  const { currency, importTransactions, transactions: existingTransactions } = useWallet();
+  const {
+      currency, importTransactions, transactions: existingTransactions,
+      getBalance, openingBalance, openingBalanceAsOf, formatAmount
+  } = useWallet();
 
   // Stages: IDLE (Upload), PROCESSING (AI Loading), REVIEW (Selection)
   const [stage, setStage] = useState<'IDLE' | 'PROCESSING' | 'REVIEW'>('IDLE');
@@ -117,6 +120,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const [showDuplicateInfo, setShowDuplicateInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedOpeningBalance, setParsedOpeningBalance] = useState<number | undefined>(undefined);
+  const [parsedClosingBalance, setParsedClosingBalance] = useState<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Edit modal state
@@ -163,6 +167,51 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   useEffect(() => {
     setCurrentPage(1);
   }, [extractedData]);
+
+  // ── Balance tally (issue: imported data must reconcile) ──────────────────
+  // Projects the wallet balance after this import and compares it with the
+  // statement's own closing balance. Only meaningful when this statement is
+  // the newest data in the wallet — older back-fills show an info note instead.
+  const tally = useMemo(() => {
+    if (parsedClosingBalance === undefined || !reviewSummary) return null;
+
+    let selectedNet = 0;
+    for (const t of extractedData) {
+      if (!selectedIds.has(t.id)) continue;
+      selectedNet += t.type === TransactionType.INCOME ? t.amount : -t.amount;
+    }
+
+    // Mirror the context's opening-balance anchoring to predict the new opening.
+    let openingDelta = 0;
+    if (parsedOpeningBalance !== undefined) {
+      let applies = false;
+      if (existingTransactions.length === 0) {
+        applies = true;
+      } else if (openingBalanceAsOf) {
+        applies = reviewSummary.minDate < openingBalanceAsOf;
+      } else {
+        const earliest = existingTransactions.reduce(
+          (m, t) => (t.date < m ? t.date : m), existingTransactions[0].date);
+        applies = reviewSummary.minDate <= earliest;
+      }
+      if (applies) openingDelta = parsedOpeningBalance - openingBalance;
+    }
+
+    const projected = getBalance() + selectedNet + openingDelta;
+    // Sorted desc in context — [0] is the latest existing transaction.
+    const latestExisting = existingTransactions.length > 0 ? existingTransactions[0].date : null;
+    const isNewest = !latestExisting || reviewSummary.maxDate >= latestExisting;
+    const diff = projected - parsedClosingBalance;
+
+    return {
+      projected,
+      closing: parsedClosingBalance,
+      diff,
+      matched: Math.abs(diff) <= 1,
+      isNewest,
+    };
+  }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData,
+      selectedIds, existingTransactions, openingBalanceAsOf, openingBalance, getBalance]);
 
   // Helper to update loading messages
   const updateProgress = (msg: string) => setLoadingMessage(msg);
@@ -220,12 +269,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       setStage('REVIEW');
   };
 
-  // Remember the statement's opening balance for confirmImport — only when the
-  // wallet is still empty, so an existing balance is never overwritten.
-  const maybeStoreOpeningBalance = (openingBalance: number | undefined) => {
-      if (openingBalance !== undefined && existingTransactions.length === 0) {
-          setParsedOpeningBalance(openingBalance);
-      }
+  // Remember the statement's opening/closing balances for the tally card and
+  // for confirmImport. The context decides whether the opening actually
+  // applies (it anchors to the earliest statement ever imported).
+  const storeStatementMeta = (opening: number | undefined, closing: number | undefined) => {
+      setParsedOpeningBalance(opening);
+      setParsedClosingBalance(closing);
   };
 
   // PDF path: rule-based IDFC parser only (audit Phase 1.5 — previously the
@@ -239,7 +288,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             throw new Error('Could not parse this statement. Try uploading a clear PDF or Excel file from your IDFC bank statement.');
         }
 
-        maybeStoreOpeningBalance(result.header.openingBalance || undefined);
+        storeStatementMeta(
+            result.header.openingBalance || undefined,
+            result.header.closingBalance || undefined
+        );
         updateProgress(result.validationPassed
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
             : `Found ${result.transactions.length} transactions`);
@@ -263,7 +315,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             throw new Error('No transactions found in Excel file.');
         }
 
-        maybeStoreOpeningBalance(result.summary.openingBalance);
+        storeStatementMeta(result.summary.openingBalance, result.summary.closingBalance || undefined);
 
         // Convert parser output to the shared raw shape
         const raw = result.transactions.map((t: any) => ({
@@ -356,14 +408,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       if (toImport.length === 0) return;
 
       log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions`);
-      // Pass opening balance to import function - it will set it before transactions
-      importTransactions(toImport, parsedOpeningBalance);
+      // Opening balance + statement start let the context anchor the balance
+      // to the earliest statement, so multi-statement imports always tally.
+      importTransactions(toImport, parsedOpeningBalance, reviewSummary?.minDate);
       onNavigate(AppScreen.DASHBOARD);
   }
 
   const handleDiscard = () => {
       setExtractedData([]);
       setSelectedIds(new Set());
+      setParsedOpeningBalance(undefined);
+      setParsedClosingBalance(undefined);
       setStage('IDLE');
   }
 
@@ -517,6 +572,46 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
                 
+                {/* Balance tally — statement closing vs wallet after import */}
+                {tally && (
+                    <div className={`mb-4 p-4 rounded-2xl border animate-slide-up ${
+                        !tally.isNewest ? 'bg-white border-black/5'
+                        : tally.matched ? 'bg-sage-light/30 border-sage/20'
+                        : 'bg-amber-50 border-amber-200'
+                    }`}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className={`material-symbols-outlined text-[18px] ${
+                                !tally.isNewest ? 'text-muted-taupe' : tally.matched ? 'text-sage' : 'text-amber-600'
+                            }`}>
+                                {!tally.isNewest ? 'history' : tally.matched ? 'task_alt' : 'error'}
+                            </span>
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-taupe">Balance Check</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">Statement closing</p>
+                                <p className="text-[15px] font-serif font-bold text-premium-charcoal">{formatAmount(tally.closing)}</p>
+                            </div>
+                            <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
+                            <div className="text-right">
+                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">Wallet after import</p>
+                                <p className={`text-[15px] font-serif font-bold ${
+                                    !tally.isNewest ? 'text-premium-charcoal' : tally.matched ? 'text-sage' : 'text-amber-600'
+                                }`}>{formatAmount(tally.projected)}</p>
+                            </div>
+                        </div>
+                        <p className={`text-[10px] mt-3 leading-relaxed ${
+                            !tally.isNewest ? 'text-muted-taupe' : tally.matched ? 'text-sage' : 'text-amber-700'
+                        }`}>
+                            {!tally.isNewest
+                                ? 'Older statement — your wallet already has newer entries, so the final balance will reflect those too.'
+                                : tally.matched
+                                ? '✓ Tallies with the statement. Your balance will be accurate after import.'
+                                : `Off by ${formatAmount(Math.abs(tally.diff))}. Check deselected rows or use Flip Types if income/expense look swapped.`}
+                        </p>
+                    </div>
+                )}
+
                 <div className="flex justify-between items-end mb-6 px-2">
                     <div>
                         <h3 className="text-premium-charcoal text-lg font-serif font-semibold">Review Transactions</h3>

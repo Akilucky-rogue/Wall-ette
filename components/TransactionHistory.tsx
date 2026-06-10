@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
 import { useWallet } from '../context/WalletContext';
-import CurrencySelector from './CurrencySelector';
 import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
 
 interface TransactionHistoryProps {
@@ -9,7 +8,7 @@ interface TransactionHistoryProps {
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, deleteTransaction, editTransaction, clearAllTransactions, formatAmount } = useWallet();
+  const { transactions, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -132,6 +131,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       groups[key].push(t);
     });
     return groups;
+  }, [filteredTransactions]);
+
+  // Totals for whatever is currently visible — the "do these filters tally?"
+  // strip (single pass, only recomputed when the filtered list changes).
+  const filteredTotals = useMemo(() => {
+    let inc = 0, exp = 0;
+    for (const t of filteredTransactions) {
+      if (t.type === TransactionType.INCOME) inc += t.amount;
+      else exp += t.amount;
+    }
+    return { inc, exp, net: inc - exp };
   }, [filteredTransactions]);
 
   // Count active filters
@@ -280,30 +290,29 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       <Paisley className="absolute bottom-36 right-4 opacity-20" />
       
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-12 pb-4 border-b border-sage-border/20">
-        <div className="flex items-center justify-between mb-6">
-          <button 
+      <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
+        <div className="flex items-center justify-between mb-5">
+          <button
             onClick={() => onNavigate(AppScreen.DASHBOARD)}
             className="w-10 h-10 flex items-center justify-start text-premium-charcoal hover:text-sage transition-colors"
           >
             <span className="material-symbols-outlined text-[28px]">chevron_left</span>
           </button>
           <h1 className="font-serif text-xl font-semibold tracking-tight">History</h1>
-          <div className="flex items-center gap-1">
-             <button 
+          <div className="flex items-center gap-0.5">
+             <button
                 onClick={() => setShowClearConfirm(true)}
                 className="w-10 h-10 flex items-center justify-center text-rose hover:bg-rose-light/20 rounded-full transition-colors"
                 title="Clear All History"
              >
-                <span className="material-symbols-outlined text-[24px]">delete_sweep</span>
+                <span className="material-symbols-outlined text-[22px]">delete_sweep</span>
              </button>
-             <CurrencySelector />
-             <button 
+             <button
                 onClick={handleExportCSV}
                 className="w-10 h-10 flex items-center justify-center text-muted-taupe hover:text-sage transition-colors"
                 title="Export CSV"
              >
-                <span className="material-symbols-outlined text-[24px]">download</span>
+                <span className="material-symbols-outlined text-[22px]">download</span>
              </button>
              <button 
                 onClick={() => setShowFilters(true)}
@@ -576,6 +585,29 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* List */}
       <main className="px-6 space-y-6 mt-4">
+        {/* Results summary — visible totals for the current filters */}
+        {filteredTransactions.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-soft border border-black/[0.02] px-4 py-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted-taupe uppercase tracking-widest font-bold">
+                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'entry' : 'entries'}
+              </p>
+              <p className={`text-[13px] font-serif font-bold whitespace-nowrap ${filteredTotals.net >= 0 ? 'text-sage' : 'text-rose'}`}>
+                Net {filteredTotals.net >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(filteredTotals.net))}
+              </p>
+            </div>
+            <div className="flex items-center gap-4 shrink-0 text-right">
+              <div>
+                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">In</p>
+                <p className="text-[12px] font-semibold text-sage whitespace-nowrap tabular-nums">+{formatAmountCompact(filteredTotals.inc)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Out</p>
+                <p className="text-[12px] font-semibold text-rose whitespace-nowrap tabular-nums">−{formatAmountCompact(filteredTotals.exp)}</p>
+              </div>
+            </div>
+          </div>
+        )}
         {Object.entries(groupedTransactions).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
                 <WallEMascot 
@@ -603,14 +635,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         className={`bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden transition-all duration-300 ${expandedId === t.id ? 'ring-1 ring-sage/30' : 'active:scale-[0.98]'}`}
                     >
                         {/* Main Row */}
-                        <div className="p-4 flex items-center justify-between cursor-pointer">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${t.type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
+                        <div className="p-4 flex items-center justify-between gap-3 cursor-pointer">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center ${t.type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
                                 <span className="material-symbols-outlined text-[22px]">
                                     {getIconForCategory(t.category)}
                                 </span>
                                 </div>
-                                <div className="max-w-[180px]">
+                                <div className="min-w-0">
                                   <p
                                     className="font-serif font-semibold text-[15px] text-premium-charcoal truncate"
                                     title={t.merchant || "Unknown Merchant"}
@@ -633,9 +665,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                   )}
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className={`font-serif font-bold ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
-                                {t.type === TransactionType.EXPENSE ? '-' : '+'}{formatAmount(t.amount)}
+                            <div className="text-right shrink-0">
+                                <p className={`font-serif font-bold text-[15px] whitespace-nowrap tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
+                                {t.type === TransactionType.EXPENSE ? '-' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : formatAmount(t.amount)}
                                 </p>
                             </div>
                         </div>

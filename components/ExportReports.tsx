@@ -97,7 +97,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
       <div className="px-8 pt-8 pb-10">
         <div className="flex items-start gap-4">
-          {/* Mini WALL-E helper */}
+          {/* Mini Wall-ette helper */}
           <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-md flex-shrink-0">
             <WallEEyes size="sm" />
           </div>

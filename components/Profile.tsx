@@ -70,7 +70,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
 
       <div className="flex flex-col items-center py-8 px-6">
-        {/* WALL-E Avatar with lotus wreath */}
+        {/* Wall-ette Avatar with lotus wreath */}
         <div className="relative">
           {/* Lotus wreath decoration */}
           <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -217,7 +217,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
       
       <div className="mt-12 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">WALL-E Version 1.0.0</p>
+        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.1.0</p>
       </div>
     </div>
   );

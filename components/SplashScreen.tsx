@@ -171,7 +171,7 @@ export const VineDecoration: React.FC<{ className?: string; direction?: 'left' |
   </svg>
 );
 
-// Reusable WALL-E Eyes Component
+// Reusable Wall-ette Eyes Component
 export const WallEEyes: React.FC<{ 
   size?: 'sm' | 'md' | 'lg';
   eyeColor?: string;
@@ -216,7 +216,7 @@ export const WallEEyes: React.FC<{
   );
 };
 
-// Mini WALL-E mascot for various situations
+// Mini Wall-ette mascot for various situations
 export const WallEMascot: React.FC<{
   mood?: 'happy' | 'thinking' | 'sad' | 'excited' | 'sleeping';
   message?: string;
@@ -329,7 +329,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         };
       default:
         return {
-          greeting: 'WALL·E',
+          greeting: 'Wall·ette',
           subtitle: 'Wallet Analyzer for Lavish Living',
           tagline: '"Your mindful money companion"',
           bgGradient: 'from-sage/10 via-zen-bg to-sage-light/20',
@@ -404,7 +404,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
           variant === 'register' ? 'bg-lavender/30' : variant === 'login' ? 'bg-ocean/20' : 'bg-sage/20'
         }`} />
         
-        {/* Main logo circle - WALL-E eyes for ALL variants */}
+        {/* Main logo circle - Wall-ette eyes for ALL variants */}
         <div className={`relative w-28 h-28 rounded-full shadow-xl flex items-center justify-center ${
           variant === 'register' 
             ? 'bg-gradient-to-br from-lavender to-lavender/80' 
@@ -417,7 +417,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
           {/* Inner highlight */}
           <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
           
-          {/* WALL-E Robot Eyes - consistent across all variants with color variations */}
+          {/* Wall-ette Robot Eyes - consistent across all variants with color variations */}
           <WallEEyes 
             size="lg" 
             eyeColor={content.eyeColor}
@@ -504,7 +504,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         </p>
       </div>
 
-      {/* Loading indicator - WALL-E themed */}
+      {/* Loading indicator - Wall-ette themed */}
       <div className={`mt-10 flex items-center gap-2 transition-opacity duration-500 ${
         phase === 'fade' ? 'opacity-0' : 'opacity-100'
       }`}>

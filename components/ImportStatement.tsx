@@ -396,6 +396,23 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         
         {stage === 'IDLE' && (
             <>
+                {/* Import / Export slider (matches Data Studio) */}
+                <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5 mb-6">
+                    <button
+                        className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-sage/10 text-sage shadow-sm"
+                    >
+                        <span className="material-symbols-outlined text-[16px]">download</span>
+                        Import
+                    </button>
+                    <button
+                        onClick={() => onNavigate(AppScreen.EXPORT)}
+                        className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 text-muted-taupe hover:text-premium-charcoal"
+                    >
+                        <span className="material-symbols-outlined text-[16px]">upload</span>
+                        Export
+                    </button>
+                </div>
+
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
                 Upload your IDFC bank statement (PDF or Excel). Fast, rule-based parsing without AI.
                 </p>

@@ -481,7 +481,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
       }`}>
         {variant === 'launch' ? (
           <h1 className="text-4xl font-serif font-bold tracking-tight text-premium-charcoal">
-            WALL<span className="text-sage">·</span>E
+            Wall<span className="text-sage">·</span>ette
           </h1>
         ) : (
           <h1 className={`text-3xl font-serif font-bold tracking-tight ${
@@ -540,7 +540,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
           phase === 'logo' ? 'opacity-0' : 'opacity-60'
         }`}>
           <p className="text-[10px] text-muted-taupe tracking-widest uppercase">
-            Version 2.0
+            v1.1.0
           </p>
         </div>
       )}

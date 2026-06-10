@@ -13,10 +13,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
     getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
     getTotalIncome, getTotalExpense, transactions, formatAmount,
-    isCloudSyncing, retryCloudConnection, openingBalance
+    formatAmountCompact, isCloudSyncing, refresh, openingBalance
   } = useWallet();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    refresh();
+    setTimeout(() => setRefreshing(false), 900);
+  };
   const [periodMode, setPeriodMode] = useState<'MONTH' | 'ALL'>('MONTH'); // 'MONTH' or 'ALL'
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
@@ -339,16 +346,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <h1 className="text-premium-charcoal font-serif text-[40px] leading-tight px-4 text-center">
             {formatAmount(balance)}
         </h1>
-        <button 
-            onClick={!isCloudSyncing ? retryCloudConnection : undefined}
-            className={`mt-4 flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isCloudSyncing ? 'bg-sage-light/50 border-sage/10 cursor-default' : 'bg-rose-light/50 border-rose/10 cursor-pointer hover:bg-rose-light'}`}
-            title={!isCloudSyncing ? "Tap to retry connection" : "Connected"}
+        <button
+            onClick={handleRefresh}
+            className={`mt-4 flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all cursor-pointer active:scale-95 ${isCloudSyncing ? 'bg-sage-light/50 border-sage/10 hover:bg-sage-light' : 'bg-rose-light/50 border-rose/10 hover:bg-rose-light'}`}
+            title="Tap to refresh data"
         >
-          <span className={`material-symbols-outlined text-sm font-bold ${isCloudSyncing ? 'text-sage' : 'text-rose'}`}>
-            {isCloudSyncing ? 'cloud_sync' : 'cloud_off'}
+          <span className={`material-symbols-outlined text-sm font-bold ${refreshing ? 'animate-spin' : ''} ${isCloudSyncing ? 'text-sage' : 'text-rose'}`}>
+            {refreshing ? 'progress_activity' : isCloudSyncing ? 'cloud_sync' : 'cloud_off'}
           </span>
           <span className={`${isCloudSyncing ? 'text-sage' : 'text-rose'} text-[13px] font-semibold`}>
-            {isCloudSyncing ? 'Live Updates' : 'Local Mode (Tap to Retry)'}
+            {refreshing ? 'Refreshing…' : isCloudSyncing ? 'Live Updates · Tap to Refresh' : 'Local Mode · Tap to Retry'}
           </span>
         </button>
       </div>
@@ -364,17 +371,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-[20px]">add</span>
           </div>
           <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>Daily</span>
-              <span>+{formatAmount(getDailyIncome())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">Daily</span>
+              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getDailyIncome())}</span>
             </div>
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>Monthly</span>
-              <span>+{formatAmount(getMonthlyIncome())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">Monthly</span>
+              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getMonthlyIncome())}</span>
             </div>
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>All Time</span>
-              <span>+{formatAmount(getTotalIncome())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">All Time</span>
+              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getTotalIncome())}</span>
             </div>
           </div>
         </div>
@@ -384,17 +391,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-[20px]">remove</span>
           </div>
           <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>Daily</span>
-              <span>-{formatAmount(getDailyExpense())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">Daily</span>
+              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getDailyExpense())}</span>
             </div>
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>Monthly</span>
-              <span>-{formatAmount(getMonthlyExpense())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">Monthly</span>
+              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getMonthlyExpense())}</span>
             </div>
-            <div className="flex justify-between text-xs text-muted-taupe font-semibold">
-              <span>All Time</span>
-              <span>-{formatAmount(getTotalExpense())}</span>
+            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
+              <span className="shrink-0">All Time</span>
+              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getTotalExpense())}</span>
             </div>
           </div>
         </div>

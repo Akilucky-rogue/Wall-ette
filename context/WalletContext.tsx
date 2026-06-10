@@ -15,15 +15,17 @@ interface WalletContextType {
   isOnline: boolean;
   isCloudSyncing: boolean;
   openingBalance: number;
+  /** ISO date the opening balance is anchored to (start of the earliest imported statement). */
+  openingBalanceAsOf: string | null;
   setCurrency: (code: CurrencyCode) => void;
   setDailyLimit: (limit: number) => void;
   setMfaEnabled: (enabled: boolean) => void;
-  setOpeningBalance: (balance: number) => void;
+  setOpeningBalance: (balance: number, asOf?: string | null) => void;
   addTransaction: (transaction: Transaction) => Promise<boolean>;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
   clearAllTransactions: () => Promise<void>;
-  importTransactions: (newTransactions: Transaction[], openingBalance?: number) => void;
+  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string) => void;
   toggleIgnoreRule: (id: string) => void;
   getBalance: () => number;
   getMonthlyIncome: () => number;
@@ -36,6 +38,8 @@ interface WalletContextType {
   formatAmountCompact: (amountInBase: number) => string;
   convertToBase: (amount: number) => number;
   retryCloudConnection: () => void;
+  /** Force re-subscribe of cloud listeners — the manual "pull to refresh". */
+  refresh: () => void;
   lastLoginTime: Date | null;
 }
 
@@ -97,10 +101,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
   const [lastLoginTime, setLastLoginTime] = useState<Date | null>(null);
   const [openingBalance, setOpeningBalanceState] = useState<number>(0);
+  const [openingBalanceAsOf, setOpeningBalanceAsOfState] = useState<string | null>(null);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   // Backend ready state to handle cases where DB doesn't exist
   const [isBackendReady, setIsBackendReady] = useState(true);
+  // Bumped by refresh() — re-runs the listener effects for a fresh server pull.
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  // While a Clear All is running, snapshot echoes of the soon-to-be-deleted
+  // docs must not repopulate state (issue: cleared data "flickering back").
+  const clearingRef = useRef(false);
 
   // Exchange Rates State (Base: INR). Hydrate from the local cache when fresh.
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(() => {
@@ -266,6 +276,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // Sorted by date descending in the database
         const q = query(collection(db, `users/${user.uid}/transactions`), orderBy('date', 'desc'));
         unsubscribe = onSnapshot(q, (snapshot) => {
+            // Ignore echoes while Clear All is deleting in batches — otherwise
+            // half-deleted snapshots repopulate the UI mid-clear.
+            if (clearingRef.current) return;
             const txData: Transaction[] = [];
             snapshot.forEach((d) => {
                 txData.push(d.data() as Transaction);
@@ -291,7 +304,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
 
     return () => unsubscribe();
-  }, [user, isBackendReady, loadFromLocal, scheduleMirror]);
+  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror]);
 
   // Sync Settings (Currency, Rules, Limits, MFA, Opening Balance)
   useEffect(() => {
@@ -351,6 +364,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       setOpeningBalanceState(data.openingBalance || 0);
                       saveToLocal('openingBalance', data.openingBalance || 0);
                   }
+                  if (data.openingBalanceAsOf !== undefined) {
+                      setOpeningBalanceAsOfState(data.openingBalanceAsOf || null);
+                      saveToLocal('openingBalanceAsOf', data.openingBalanceAsOf || null);
+                  }
               } else if (isOnlineRef.current) {
                   setDoc(settingsRef, {
                       currency: 'INR',
@@ -390,10 +407,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       return () => unsubscribe();
-  }, [user, isBackendReady, loadFromLocal, saveToLocal]);
+  }, [user, isBackendReady, refreshNonce, loadFromLocal, saveToLocal]);
 
   const retryCloudConnection = useCallback(() => {
       setIsBackendReady(true);
+  }, []);
+
+  // Manual refresh: re-arm backend mode and force both listeners to
+  // re-subscribe (fresh server snapshot). Safe to spam.
+  const refresh = useCallback(() => {
+      setIsBackendReady(true);
+      setRefreshNonce(n => n + 1);
   }, []);
 
   const setCurrency = useCallback(async (code: CurrencyCode) => {
@@ -429,13 +453,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
   }, [user, isOnline, isBackendReady, saveToLocal]);
 
-  const setOpeningBalance = useCallback(async (balance: number) => {
+  const setOpeningBalance = useCallback(async (balance: number, asOf: string | null = null) => {
       setOpeningBalanceState(balance);
+      setOpeningBalanceAsOfState(asOf);
       saveToLocal('openingBalance', balance);
+      saveToLocal('openingBalanceAsOf', asOf);
       if (user && isOnline && isBackendReady) {
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { openingBalance: balance }, { merge: true });
+              await setDoc(settingsRef, { openingBalance: balance, openingBalanceAsOf: asOf }, { merge: true });
           } catch (e) {
               log.warn('Backend update failed for opening balance');
           }
@@ -563,17 +589,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [transactions, persistTransactions, user, isBackendReady]);
 
   const clearAllTransactions = useCallback(async () => {
+    clearingRef.current = true;
     setTransactions([]);
     saveToLocal('transactions', []);
     setOpeningBalanceState(0);
+    setOpeningBalanceAsOfState(null);
     saveToLocal('openingBalance', 0);
+    saveToLocal('openingBalanceAsOf', null);
 
-    if (user && isBackendReady) {
-        try {
+    try {
+        if (user && isBackendReady) {
             // Also reset the cloud opening balance, otherwise the settings
             // snapshot restores the old value after a clear (audit Phase 1.2).
             const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-            setDoc(settingsRef, { openingBalance: 0 }, { merge: true })
+            setDoc(settingsRef, { openingBalance: 0, openingBalanceAsOf: null }, { merge: true })
                 .catch(() => log.warn('Failed to reset opening balance on backend'));
 
             const q = query(collection(db, `users/${user.uid}/transactions`));
@@ -587,13 +616,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 });
                 await batch.commit();
             }
-        } catch (e) {
-            log.warn('Failed to clear backend transactions');
         }
+    } catch (e) {
+        log.warn('Failed to clear backend transactions');
+    } finally {
+        // Snapshot listener resumes only after every batch is committed.
+        clearingRef.current = false;
     }
   }, [user, isBackendReady, saveToLocal]);
 
-  const importTransactions = useCallback(async (newTransactions: Transaction[], importedOpeningBalance?: number) => {
+  const importTransactions = useCallback(async (newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string) => {
     const existingIds = new Set(transactions.map(t => t.id));
     const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
 
@@ -602,9 +634,25 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return;
     }
 
-    // Set opening balance FIRST if provided and no existing transactions
-    if (importedOpeningBalance !== undefined && transactions.length === 0) {
-        await setOpeningBalance(importedOpeningBalance);
+    // Anchor the opening balance to the EARLIEST statement we've ever seen,
+    // so Balance = opening + Σ(all txns) always tallies even when statements
+    // are imported out of order (issue: imported balance not matching).
+    if (importedOpeningBalance !== undefined) {
+        let shouldApply = false;
+        if (transactions.length === 0) {
+            shouldApply = true;
+        } else if (openingBalanceAsOf) {
+            // Older statement than the current anchor → its opening wins.
+            shouldApply = !!statementStart && statementStart < openingBalanceAsOf;
+        } else if (statementStart) {
+            // Legacy data without an anchor: apply only if this statement
+            // starts at/before everything already in the wallet.
+            const earliest = transactions.reduce((m, t) => (t.date < m ? t.date : m), transactions[0].date);
+            shouldApply = statementStart <= earliest;
+        }
+        if (shouldApply) {
+            await setOpeningBalance(importedOpeningBalance, statementStart ?? null);
+        }
     }
 
     const combined = [...uniqueNew, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -628,7 +676,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             log.warn('Firestore import failed');
         }
     }
-  }, [transactions, setOpeningBalance, persistTransactions, user, isBackendReady]);
+  }, [transactions, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, isBackendReady]);
 
   const toggleIgnoreRule = useCallback(async (id: string) => {
     const newRules = ignoreRules.map(rule =>
@@ -666,6 +714,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       importTransactions,
       toggleIgnoreRule,
       openingBalance,
+      openingBalanceAsOf,
       getBalance,
       getMonthlyIncome,
       getMonthlyExpense,
@@ -677,15 +726,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       formatAmountCompact,
       convertToBase,
       retryCloudConnection,
+      refresh,
       lastLoginTime
   }), [
       transactions, currency, ignoreRules, dailyLimit, mfaEnabled, isOnline,
-      isBackendReady, openingBalance, setCurrency, setDailyLimit, setMfaEnabled,
+      isBackendReady, openingBalance, openingBalanceAsOf, setCurrency, setDailyLimit, setMfaEnabled,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatAmountCompact,
-      convertToBase, retryCloudConnection, lastLoginTime
+      convertToBase, retryCloudConnection, refresh, lastLoginTime
   ]);
 
   return (

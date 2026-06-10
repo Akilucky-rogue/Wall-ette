@@ -10,8 +10,6 @@ interface SecurityLockProps {
 
 const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
-  const [isMfaStep, setIsMfaStep] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,25 +47,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         setError("Incorrect password.");
         setPassword('');
     } finally {
-        if (!isMfaStep) setLoading(false);
+        setLoading(false);
     }
-  };
-
-  const handleMfaUnlock = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setLoading(true);
-      setError('');
-
-      // Simulated MFA Verification for demo purposes (as backend SMS isn't connected)
-      // Check if code is 6 digits
-      if (mfaCode.length === 6 && /^\d+$/.test(mfaCode)) {
-          await logAttempt(true, 'MFA');
-          onUnlock();
-      } else {
-          await logAttempt(false, 'MFA');
-          setError("Invalid code format.");
-          setLoading(false);
-      }
   };
 
   const handleForgotPassword = async () => {
@@ -79,31 +60,6 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       } catch (err) {
           setError("Failed to send recovery email.");
       }
-  };
-
-  const handleBiometricUnlock = async () => {
-    // Check if platform authenticator is available
-    if (window.PublicKeyCredential) {
-        try {
-            const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-            if (available) {
-                // In a real implementation, we would call navigator.credentials.get({ publicKey: ... })
-                // Since we don't have a backend to issue a challenge, we will simulate the success 
-                // assuming the device would handle the prompt.
-                setLoading(true);
-                setTimeout(async () => {
-                    await logAttempt(true, 'BIOMETRIC');
-                    onUnlock();
-                }, 1000);
-            } else {
-                setError("Biometrics not set up on this device.");
-            }
-        } catch (e) {
-            setError("Biometric authentication failed.");
-        }
-    } else {
-        setError("Biometrics not supported.");
-    }
   };
 
   return (
@@ -125,110 +81,50 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         {/* Wall-ette Guard Mode */}
         <div className="relative inline-flex items-center justify-center mb-6">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg animate-pulse">
-            <WallEEyes size="md" expression={isMfaStep ? 'neutral' : 'sleepy'} />
+            <WallEEyes size="md" expression="sleepy" />
           </div>
           {/* Lock badge */}
           <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
-            <span className="material-symbols-outlined text-sage text-[16px]">{isMfaStep ? 'lock_clock' : 'lock'}</span>
+            <span className="material-symbols-outlined text-sage text-[16px]">lock</span>
           </div>
         </div>
-        <h1 className="text-premium-charcoal font-serif text-2xl font-semibold mb-2">{isMfaStep ? 'Two-Factor Auth' : 'Session Locked'}</h1>
+        <h1 className="text-premium-charcoal font-serif text-2xl font-semibold mb-2">Session Locked</h1>
         <p className="text-muted-taupe text-[14px] leading-relaxed max-w-[280px] mx-auto">
-          {isMfaStep ? 'Please enter the verification code.' : 'For your security, please verify your identity to continue.'}
+          For your security, please verify your identity to continue.
         </p>
         <p className="text-[10px] text-muted-taupe/50 mt-2 italic">"I'm guarding your finances!"</p>
       </div>
 
       <div className="w-full bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02]">
-        {!isMfaStep ? (
-            <form onSubmit={handlePasswordUnlock}>
-                {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
-                {info && <div className="mb-4 text-center text-sage text-xs font-medium">{info}</div>}
-                
-                <div className="mb-4">
-                    <input 
-                        type="password" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-lg tracking-widest outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base"
-                        placeholder="Enter Password"
-                        autoFocus
-                    />
-                </div>
+        <form onSubmit={handlePasswordUnlock}>
+            {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
+            {info && <div className="mb-4 text-center text-sage text-xs font-medium">{info}</div>}
 
-                <div className="flex justify-end mb-6">
-                    <button type="button" onClick={handleForgotPassword} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide">
-                        Forgot Password?
-                    </button>
-                </div>
+            <div className="mb-4">
+                <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-lg tracking-widest outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base"
+                    placeholder="Enter Password"
+                    autoFocus
+                />
+            </div>
 
-                <button 
-                    type="submit"
-                    disabled={loading || password.length === 0}
-                    className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
-                >
-                    {loading ? 'Verifying...' : 'Unlock Wallet'}
+            <div className="flex justify-end mb-6">
+                <button type="button" onClick={handleForgotPassword} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide">
+                    Forgot Password?
                 </button>
+            </div>
 
-                <div className="relative flex items-center gap-2 py-4">
-                    <div className="h-px bg-black/5 flex-1"></div>
-                    <span className="text-[10px] text-muted-taupe uppercase tracking-widest">Or</span>
-                    <div className="h-px bg-black/5 flex-1"></div>
-                </div>
-
-                <button 
-                    type="button"
-                    onClick={handleBiometricUnlock}
-                    className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-base font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                    <span className="material-symbols-outlined text-[20px] text-sage">fingerprint</span>
-                    Use Face ID / Passcode (demo)
-                </button>
-                
-                <div className="mt-4 text-center">
-                    <button 
-                        type="button" 
-                        onClick={() => setIsMfaStep(true)}
-                        className="text-[10px] text-muted-taupe uppercase tracking-widest hover:text-premium-charcoal"
-                    >
-                        Use 2FA Code
-                    </button>
-                </div>
-            </form>
-        ) : (
-            <form onSubmit={handleMfaUnlock}>
-                {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
-                
-                <div className="mb-6">
-                    <input 
-                        type="text" 
-                        value={mfaCode}
-                        onChange={(e) => setMfaCode(e.target.value)}
-                        className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-xl tracking-[0.5em] font-mono outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-sans"
-                        placeholder="000000"
-                        maxLength={6}
-                        autoFocus
-                    />
-                    <p className="text-center text-[10px] text-muted-taupe mt-2">Enter verification code (demo — no SMS is sent)</p>
-                </div>
-
-                <button 
-                    type="submit"
-                    disabled={loading || mfaCode.length < 6}
-                    className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
-                >
-                    {loading ? 'Verifying...' : 'Verify Code'}
-                </button>
-
-                <button 
-                    type="button"
-                    onClick={() => { setIsMfaStep(false); setError(''); }}
-                    className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
-                >
-                    Back to Password
-                </button>
-            </form>
-        )}
+            <button
+                type="submit"
+                disabled={loading || password.length === 0}
+                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {loading ? 'Verifying...' : 'Unlock Wallet'}
+            </button>
+        </form>
 
         <div className="mt-6 text-center border-t border-black/5 pt-4">
             <button 

@@ -111,27 +111,6 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
               <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
                   <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                          <div className="bg-blue-zen-light text-blue-zen p-2 rounded-xl">
-                              <span className="material-symbols-outlined text-[20px]">lock</span>
-                          </div>
-                          <div>
-                              <p className="text-premium-charcoal font-serif font-medium text-[15px]">Multi-Factor Auth <span className="text-muted-taupe text-[10px] font-sans">(demo)</span></p>
-                              <p className="text-muted-taupe text-[10px]">Simulated 2FA prompt on unlock — not yet a real second factor</p>
-                          </div>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={mfaEnabled} 
-                            onChange={() => setMfaEnabled(!mfaEnabled)}
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sage"></div>
-                      </label>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
                           <div className="bg-rose-light text-rose p-2 rounded-xl">
                               <span className="material-symbols-outlined text-[20px]">remove_circle</span>
                           </div>

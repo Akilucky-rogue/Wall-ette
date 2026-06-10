@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Wall-ette</title>
+  <style>
+    body{font-family:Georgia,'Times New Roman',serif;background:#FAF9F6;color:#333;margin:0;padding:32px 16px;line-height:1.7}
+    .page{max-width:720px;margin:0 auto;background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+    h1{font-size:26px;margin:0 0 4px}.dot{color:#9BAE93}
+    .sub{color:#8E8D8A;font-size:13px;margin-bottom:28px}
+    h2{font-size:15px;text-transform:uppercase;letter-spacing:.12em;color:#7d937a;margin:28px 0 8px}
+    p,li{font-size:15px;color:#444}
+    ul{padding-left:20px}
+    a{color:#7d937a}
+    .foot{margin-top:36px;text-align:center;color:#b9b7b2;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>Wall<span class="dot">·</span>ette — Privacy Policy</h1>
+  <p class="sub">Effective date: 10 June 2026 · Applies to the Wall-ette Android app and wall-e-7a113.web.app</p>
+
+  <p>Wall-ette is a personal finance tracker operated by an individual developer ("we", "us").
+  This policy explains what data the app handles and how. The short version: your financial
+  data belongs to you, is stored in your own private account space, and is never sold,
+  shared for advertising, or used for any purpose other than showing you your own finances.</p>
+
+  <h2>Data we collect</h2>
+  <ul>
+    <li><b>Account data:</b> your email address and a password, used solely to create and
+      authenticate your account (via Google Firebase Authentication).</li>
+    <li><b>Financial data you provide:</b> transactions you enter manually and transactions
+      extracted from bank statements you choose to import (amounts, dates, merchant names,
+      categories, notes, account opening balance).</li>
+    <li><b>App settings:</b> preferred currency, daily spend limit, and similar preferences.</li>
+    <li><b>Security log:</b> timestamps and method (password/biometric) of app unlock attempts,
+      stored in your own account space so you can review access to your wallet.</li>
+  </ul>
+  <p>We do <b>not</b> collect contacts, location, advertising identifiers, or analytics profiles,
+  and the app contains no advertising.</p>
+
+  <h2>How bank statement imports work</h2>
+  <p>Statement files (PDF/Excel) are parsed <b>entirely on your device</b>. The file itself is
+  never uploaded to any server. Only the resulting transaction records (date, amount, merchant,
+  category) are saved to your private database space so they sync across your devices.</p>
+
+  <h2>Where data is stored</h2>
+  <ul>
+    <li><b>Google Firebase (Firestore &amp; Authentication)</b> stores your account and
+      transaction data, encrypted in transit and at rest. Access is restricted by security
+      rules so only your authenticated account can read or write your data.
+      See <a href="https://firebase.google.com/support/privacy">Firebase Privacy &amp; Security</a>.</li>
+    <li><b>Your device</b> keeps an offline copy (cache) so the app works without a connection.
+      Uninstalling the app removes this local copy.</li>
+  </ul>
+
+  <h2>Third-party services</h2>
+  <ul>
+    <li><b>Google Firebase</b> — authentication and database hosting (data processor).</li>
+    <li><b>exchangerate-api.com</b> — the app fetches public currency exchange rates. This
+      request contains no personal data or financial information.</li>
+    <li><b>Google Fonts</b> — the web version loads fonts from Google's CDN; standard
+      web-request metadata (IP address) applies.</li>
+  </ul>
+  <p>No data is sold or shared with advertisers, brokers, or any other third party.</p>
+
+  <h2>Insights are computed locally</h2>
+  <p>All analytics — spending insights, recurring-charge detection, income analysis — are
+  computed on your device from your own data. Nothing is sent to any AI service or
+  external analytics platform.</p>
+
+  <h2>Data retention &amp; deletion</h2>
+  <p>Your data is kept for as long as your account exists. You can delete all transactions
+  from within the app (History → Clear All). To delete your account and all associated data
+  permanently, email <a href="mailto:akshatbvora@gmail.com">akshatbvora@gmail.com</a> from
+  your registered address and we will remove it within 30 days.</p>
+
+  <h2>Your rights</h2>
+  <p>You may export a full copy of your data at any time from the app's Data Studio
+  (Export → Full Backup), and you may request access, correction, or deletion by email.</p>
+
+  <h2>Children</h2>
+  <p>Wall-ette is not directed at children under 13 (or the equivalent minimum age in your
+  jurisdiction) and we do not knowingly collect data from them.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the updated version will be posted at this address with a new
+  effective date.</p>
+
+  <h2>Contact</h2>
+  <p>Akshat Vora · <a href="mailto:akshatbvora@gmail.com">akshatbvora@gmail.com</a> · Mumbai, India</p>
+
+  <div class="foot">Wall·ette · your mindful money companion</div>
+</div>
+</body>
+</html>

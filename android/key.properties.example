@@ -1,0 +1,11 @@
+# Copy this file to android/key.properties and fill in the real values.
+# key.properties is gitignored — NEVER commit it.
+#
+# Find your key alias with:
+#   keytool -list -keystore my-release-key.keystore
+# (run from the project root; it prompts for the store password)
+
+storeFile=../../my-release-key.keystore
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD

@@ -16,6 +16,7 @@ import { Capacitor } from '@capacitor/core';
 const TransactionHistory = React.lazy(() => import('./components/TransactionHistory'));
 const NewEntry = React.lazy(() => import('./components/NewEntry'));
 const SpendAnalysis = React.lazy(() => import('./components/SpendAnalysis'));
+const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const IgnoreRules = React.lazy(() => import('./components/IgnoreRules'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
@@ -162,6 +163,8 @@ function AppContent() {
         return <NewEntry onNavigate={handleNavigate} />;
       case AppScreen.ANALYSIS:
         return <SpendAnalysis onNavigate={handleNavigate} />;
+      case AppScreen.INCOME_INSIGHTS:
+        return <IncomeInsights onNavigate={handleNavigate} />;
       case AppScreen.CATEGORY_SPLIT:
         return <CategorySplit onNavigate={handleNavigate} />;
       case AppScreen.IGNORE_RULES:
@@ -186,6 +189,7 @@ function AppContent() {
         {(currentScreen === AppScreen.DASHBOARD ||
           currentScreen === AppScreen.HISTORY ||
           currentScreen === AppScreen.ANALYSIS ||
+          currentScreen === AppScreen.INCOME_INSIGHTS ||
           currentScreen === AppScreen.CATEGORY_SPLIT ||
           currentScreen === AppScreen.SELF ||
           currentScreen === AppScreen.EXPORT ||

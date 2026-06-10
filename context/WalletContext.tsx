@@ -3,7 +3,7 @@ import { Transaction, TransactionType, CurrencyCode, IgnoreRule } from '../types
 import { db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { CURRENCIES, getCurrencyFormatter } from '../currencyUtils';
+import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../currencyUtils';
 import { log } from '../utils/log';
 
 interface WalletContextType {
@@ -33,6 +33,7 @@ interface WalletContextType {
   getTotalIncome: () => number;
   getTotalExpense: () => number;
   formatAmount: (amountInBase: number) => string;
+  formatAmountCompact: (amountInBase: number) => string;
   convertToBase: (amount: number) => number;
   retryCloudConnection: () => void;
   lastLoginTime: Date | null;
@@ -164,6 +165,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const formatAmount = useCallback((amountInBase: number): string => {
       const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
       return getCurrencyFormatter(currency).format(amountInBase * rate);
+  }, [currency, exchangeRates]);
+
+  // Short form for chart axes: ₹85.7K instead of ₹85,707.00
+  const formatAmountCompact = useCallback((amountInBase: number): string => {
+      const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
+      return getCompactCurrencyFormatter(currency).format(amountInBase * rate);
   }, [currency, exchangeRates]);
 
   // Helper: Convert display currency amount back to base (INR) for storage
@@ -667,6 +674,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       getTotalIncome,
       getTotalExpense,
       formatAmount,
+      formatAmountCompact,
       convertToBase,
       retryCloudConnection,
       lastLoginTime
@@ -676,8 +684,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
-      getTotalIncome, getTotalExpense, formatAmount, convertToBase,
-      retryCloudConnection, lastLoginTime
+      getTotalIncome, getTotalExpense, formatAmount, formatAmountCompact,
+      convertToBase, retryCloudConnection, lastLoginTime
   ]);
 
   return (

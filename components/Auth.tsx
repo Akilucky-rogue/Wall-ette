@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 
 export type AuthType = 'login' | 'register';
@@ -16,6 +17,26 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  // TOTP second factor at sign-in (accounts with 2FA enrolled)
+  const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!totpResolver) return;
+    setLoading(true);
+    setError('');
+    try {
+      await resolveTotpSignIn(totpResolver, totpCode);
+      onAuthSuccess?.('login');
+    } catch (err: any) {
+      setError(mfaErrorMessage(err));
+      setTotpCode('');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getErrorMessage = (code: string, message: string) => {
       switch (code) {
@@ -59,6 +80,11 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         onAuthSuccess?.('register');
       }
     } catch (err: any) {
+      if (isMfaRequiredError(err)) {
+          // Credentials correct — account has 2FA, ask for the authenticator code
+          setTotpResolver(mfaResolverFromError(err));
+          setError('');
+      } else
       // UX Fix: Auto-switch to login if email exists
       if (err.code === 'auth/email-already-in-use') {
           // Do not log this as an error since it's a handled flow
@@ -151,9 +177,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <RangoliCorner className="absolute -bottom-1 -right-1 opacity-20 rotate-180" color="#C4A98E" />
         
         <h2 className="relative text-xl font-serif font-semibold text-premium-charcoal mb-6 text-center">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {totpResolver ? 'Two-Factor Verification' : isLogin ? 'Welcome Back' : 'Create Account'}
         </h2>
-        
+
         {error && (
             <div className="mb-4 p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-rose text-xs font-medium leading-relaxed">
                 {error}
@@ -166,6 +192,36 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             </div>
         )}
 
+        {totpResolver ? (
+        <form onSubmit={handleTotpSubmit} className="space-y-4">
+          <p className="text-center text-[12px] text-muted-taupe">Enter the 6-digit code from your authenticator app</p>
+          <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-xl tracking-[0.5em] font-mono outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-sans"
+              placeholder="000000"
+              maxLength={6}
+              autoFocus
+          />
+          <button
+            type="submit"
+            disabled={loading || totpCode.length < 6}
+            className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Verify & Sign In'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); }}
+            className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
+          >
+            Back
+          </button>
+        </form>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
@@ -190,7 +246,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             />
           </div>
           
-          <button 
+          <button
             type="submit"
             disabled={loading}
             className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
@@ -198,7 +254,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
           </button>
         </form>
+        )}
 
+        {!totpResolver && (
         <div className="mt-6 flex flex-col items-center gap-4">
             {isLogin && (
                 <button onClick={handleResetPassword} className="text-[12px] text-muted-taupe hover:text-sage transition-colors">
@@ -216,6 +274,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 </button>
             </div>
         </div>
+        )}
       </div>
     </div>
   );

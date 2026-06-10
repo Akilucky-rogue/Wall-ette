@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
+import React, { useState, useEffect, useRef } from 'react';
+import { reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric } from '../utils/biometric';
+import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
 
 interface SecurityLockProps {
@@ -13,6 +15,41 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Real TOTP second factor: set when reauth reports the account has 2FA
+  const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+
+  // Device biometric unlock (native only, user-enabled in Self → Security)
+  const [bioReady, setBioReady] = useState(false);
+  const bioAutoTried = useRef(false);
+
+  const tryBiometric = async () => {
+    setError('');
+    const ok = await authenticateBiometric('Unlock your wallet');
+    if (ok) {
+      await logAttempt(true, 'BIOMETRIC');
+      onUnlock();
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid || !isBiometricEnabled(uid)) return;
+      const available = await isBiometricAvailable();
+      if (cancelled || !available) return;
+      setBioReady(true);
+      // Prompt automatically once on lock — the natural "glance to unlock" flow
+      if (!bioAutoTried.current) {
+        bioAutoTried.current = true;
+        tryBiometric();
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const logAttempt = async (success: boolean, method: 'PASSWORD' | 'MFA' | 'BIOMETRIC') => {
       if (!auth.currentUser) return;
@@ -39,13 +76,37 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     try {
         const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
         await reauthenticateWithCredential(auth.currentUser, credential);
-        
+
         await logAttempt(true, 'PASSWORD');
         onUnlock();
     } catch (err: any) {
-        await logAttempt(false, 'PASSWORD');
-        setError("Incorrect password.");
-        setPassword('');
+        if (isMfaRequiredError(err)) {
+            // Password was correct — account has 2FA, ask for the TOTP code
+            setTotpResolver(mfaResolverFromError(err));
+            setError('');
+        } else {
+            await logAttempt(false, 'PASSWORD');
+            setError("Incorrect password.");
+            setPassword('');
+        }
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleTotpVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!totpResolver) return;
+    setLoading(true);
+    setError('');
+    try {
+        await resolveTotpSignIn(totpResolver, totpCode);
+        await logAttempt(true, 'MFA');
+        onUnlock();
+    } catch (err: any) {
+        await logAttempt(false, 'MFA');
+        setError(mfaErrorMessage(err));
+        setTotpCode('');
     } finally {
         setLoading(false);
     }
@@ -96,6 +157,41 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       </div>
 
       <div className="w-full bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02]">
+        {totpResolver ? (
+        <form onSubmit={handleTotpVerify}>
+            {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
+            <p className="text-center text-[12px] text-muted-taupe mb-4">
+                Enter the 6-digit code from your authenticator app
+            </p>
+            <div className="mb-6">
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-xl tracking-[0.5em] font-mono outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-sans"
+                    placeholder="000000"
+                    maxLength={6}
+                    autoFocus
+                />
+            </div>
+            <button
+                type="submit"
+                disabled={loading || totpCode.length < 6}
+                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+            >
+                {loading ? 'Verifying...' : 'Verify Code'}
+            </button>
+            <button
+                type="button"
+                onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); setPassword(''); }}
+                className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
+            >
+                Back to Password
+            </button>
+        </form>
+        ) : (
         <form onSubmit={handlePasswordUnlock}>
             {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
             {info && <div className="mb-4 text-center text-sage text-xs font-medium">{info}</div>}
@@ -124,7 +220,26 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             >
                 {loading ? 'Verifying...' : 'Unlock Wallet'}
             </button>
+
+            {bioReady && (
+                <>
+                    <div className="relative flex items-center gap-2 py-4">
+                        <div className="h-px bg-black/5 flex-1"></div>
+                        <span className="text-[10px] text-muted-taupe uppercase tracking-widest">Or</span>
+                        <div className="h-px bg-black/5 flex-1"></div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={tryBiometric}
+                        className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-base font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-[20px] text-sage">fingerprint</span>
+                        Unlock with Biometrics
+                    </button>
+                </>
+            )}
         </form>
+        )}
 
         <div className="mt-6 text-center border-t border-black/5 pt-4">
             <button 

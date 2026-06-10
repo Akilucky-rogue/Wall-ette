@@ -3,17 +3,22 @@ import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
+import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace } from '../services/analyticsService';
 import styles from './SpendAnalysis.module.css';
 
 interface SpendAnalysisProps {
   onNavigate: (screen: AppScreen) => void;
 }
 
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
 const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount } = useWallet();
+  const { transactions, formatAmount, formatAmountCompact, dailyLimit } = useWallet();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [chartMode, setChartMode] = useState<'WEEKLY' | 'DAILY'>('DAILY');
   const [analysisTab, setAnalysisTab] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  const [heatDay, setHeatDay] = useState<number | null>(null); // selected heatmap day (1-based)
+  const [selPoint, setSelPoint] = useState<number | null>(null); // selected trends day/week
   
   // AI Insights State
   const [aiInsights, setAiInsights] = useState<FinancialInsight | null>(null);
@@ -86,6 +91,36 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
   const netFlow = totalIncome - totalExpense;
   const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+
+  // ── New insight sections (expense tab) ─────────────────────────────────────
+
+  // Month-over-month category movers for the active tab (noise floor: ₹100 delta)
+  const movers = useMemo(
+    () => categoryMovers(transactions, selectedDate, analysisTab === 'EXPENSE' ? TransactionType.EXPENSE : TransactionType.INCOME),
+    [transactions, selectedDate, analysisTab]
+  );
+
+  // Recurring charges / subscriptions (whole history, cadence-validated)
+  const recurring = useMemo(() => detectRecurringCharges(transactions), [transactions]);
+  const recurringMonthlyTotal = useMemo(() => recurring.reduce((s, r) => s + r.monthlyCost, 0), [recurring]);
+
+  // Daily heatmap + weekday averages for the selected month
+  const dayStats = useMemo(() => monthDailyStats(filteredExpenses, selectedDate), [filteredExpenses, selectedDate]);
+  const maxWeekdayAvg = useMemo(() => Math.max(...dayStats.weekdayAvg, 1), [dayStats]);
+
+  // Budget pace — only meaningful for the live (current) month
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return selectedDate.getMonth() === now.getMonth() && selectedDate.getFullYear() === now.getFullYear();
+  }, [selectedDate]);
+  const pace = useMemo(() => {
+    if (!isCurrentMonth) return null;
+    return spendingPace(dayStats.cumulative, dayStats.daysInMonth, new Date(), dailyLimit, prevMonthData.expense);
+  }, [isCurrentMonth, dayStats, dailyLimit, prevMonthData.expense]);
+
+  // Reset selections when the context changes
+  useEffect(() => { setHeatDay(null); }, [selectedDate]);
+  useEffect(() => { setSelPoint(null); }, [selectedDate, analysisTab, chartMode]);
 
   // Calculate percentage changes
   const expenseChange = prevMonthData.expense > 0 
@@ -302,7 +337,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.6} />
       <FloatingLeaf className="top-64 left-4 opacity-25" delay={1.8} color="#A8B89E" />
@@ -414,9 +449,12 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         )}
       </div>
 
+      {/* Desktop: sections flow into two columns; phones/APK keep one column */}
+      <div className="lg:columns-2 lg:gap-x-0">
+
       {/* Quick Stats Row */}
       {txStats && (
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-4 break-inside-avoid">
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-black/5">
               <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-medium mb-1">Transactions</p>
@@ -436,7 +474,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Net Flow Card (when viewing expenses) */}
       {analysisTab === 'EXPENSE' && totalIncome > 0 && (
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-4 break-inside-avoid">
           <div className={`rounded-2xl p-4 border ${netFlow >= 0 ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex items-center justify-between">
               <div>
@@ -468,7 +506,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       )}
 
       {/* Interactive Chart Section */}
-      <div className="px-6 py-2">
+      <div className="px-6 py-2 break-inside-avoid">
         <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-serif text-base font-semibold text-premium-charcoal">Trends</h3>
@@ -492,48 +530,313 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
             </div>
           </div>
           
-          <div className="h-32 w-full relative flex items-end justify-between gap-1">
-            {chartMode === 'DAILY' ? (
-              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id={`gradient-${analysisTab}`} x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor={chartColor} stopOpacity="0.4"/>
-                    <stop offset="100%" stopColor={chartColor} stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path d={sparklinePath} fill={`url(#gradient-${analysisTab})`} />
-                <path d={sparklineStroke} fill="none" stroke={chartColor} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-              </svg>
-            ) : (
-              chartData.map((d, i) => (
-                <div key={i} className="flex flex-col items-center flex-1 gap-1 group">
-                  <div className="w-full h-24 flex items-end relative">
-                    <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      {formatAmount(d.val)}
-                    </div>
-                    <div
-                      className={`w-full group-hover:opacity-80 ${styles.chartBar} ${analysisTab === 'EXPENSE' ? styles.expenseChartBar : styles.incomeChartBar} ${styles[`h${Math.round(d.val > 0 ? Math.max(8, (d.val / (Math.max(...chartData.map(x => x.val)) || 1)) * 100) : 4)}p`]}`}
-                    />
+          {(() => {
+            const maxVal = Math.max(...chartData.map(d => d.val), 0);
+            const avgVal = chartMode === 'DAILY'
+              ? currentTotal / Math.max(chartData.length, 1)
+              : currentTotal / Math.max(chartData.filter(d => d.val > 0).length, 1);
+            const peakIdx = chartData.reduce((mi, d, i) => (d.val > chartData[mi].val ? i : mi), 0);
+            const avgY = maxVal > 0 ? Math.min(98, 100 - (avgVal / maxVal) * 100) : 100;
+            const sel = selPoint !== null ? chartData[selPoint] : null;
+            const xTicks = chartMode === 'DAILY'
+              ? [0, Math.floor(chartData.length / 4), Math.floor(chartData.length / 2), Math.floor((3 * chartData.length) / 4), chartData.length - 1]
+              : null;
+            return (
+              <>
+                <div className="flex gap-2">
+                  {/* Y axis (₹, compact) */}
+                  <div className="flex flex-col justify-between h-32 w-11 shrink-0 text-right">
+                    <span className="text-[8px] text-muted-taupe leading-none">{maxVal > 0 ? formatAmountCompact(maxVal) : ''}</span>
+                    <span className="text-[8px] text-muted-taupe leading-none">{maxVal > 0 ? formatAmountCompact(maxVal / 2) : ''}</span>
+                    <span className="text-[8px] text-muted-taupe leading-none">0</span>
                   </div>
-                  <span className="text-[8px] font-bold text-muted-taupe uppercase">{d.label}</span>
-                </div>
-              ))
-            )}
-          </div>
+                  <div className="relative h-32 flex-1">
+                    {/* Gridlines */}
+                    <div className="absolute inset-x-0 top-0 border-t border-black/[0.06]" />
+                    <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-black/[0.06]" />
+                    <div className="absolute inset-x-0 bottom-0 border-t border-black/10" />
+                    {/* Average reference line */}
+                    {maxVal > 0 && (
+                      <div
+                        className="absolute inset-x-0 border-t border-dashed opacity-50"
+                        style={{ top: `${avgY}%`, borderColor: chartColor }}
+                        title={`Average: ${formatAmount(avgVal)}`}
+                      />
+                    )}
 
-          {/* Weekly Insight */}
-          {chartMode === 'WEEKLY' && weeklyInsights && chartData.some(d => d.val > 0) && (
-            <div className="mt-3 pt-3 border-t border-black/5 text-[10px] text-muted-taupe">
-              <span className="font-medium">Peak: </span>Week {weeklyInsights.maxWeek} ({formatAmount(chartData[weeklyInsights.maxWeek - 1]?.val || 0)})
-              <span className="mx-2">•</span>
-              <span className="font-medium">Avg: </span>{formatAmount(weeklyInsights.avgWeekly)}/week
-            </div>
-          )}
+                    {chartMode === 'DAILY' ? (
+                      <>
+                        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id={`gradient-${analysisTab}`} x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor={chartColor} stopOpacity="0.4"/>
+                              <stop offset="100%" stopColor={chartColor} stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <path d={sparklinePath} fill={`url(#gradient-${analysisTab})`} />
+                          <path d={sparklineStroke} fill="none" stroke={chartColor} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                        {/* Peak marker (HTML so it stays round) */}
+                        {maxVal > 0 && chartData.length > 1 && (
+                          <div
+                            className="absolute -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white shadow pointer-events-none"
+                            style={{
+                              left: `${(peakIdx / (chartData.length - 1)) * 100}%`,
+                              top: `${100 - (chartData[peakIdx].val / maxVal) * 100}%`,
+                              backgroundColor: chartColor,
+                            }}
+                          />
+                        )}
+                        {/* Tap-to-inspect columns */}
+                        <div className="absolute inset-0 flex">
+                          {chartData.map((d, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setSelPoint(selPoint === i ? null : i)}
+                              className={`flex-1 ${selPoint === i ? 'bg-black/[0.06] rounded' : ''}`}
+                              aria-label={`Day ${d.label}: ${formatAmount(d.val)}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex items-end justify-between gap-2 px-1">
+                        {chartData.map((d, i) => (
+                          <button key={i} onClick={() => setSelPoint(selPoint === i ? null : i)} className="flex-1 h-full flex items-end" aria-label={`Week ${i + 1}: ${formatAmount(d.val)}`}>
+                            <div
+                              className={`w-full rounded-t-md transition-opacity ${selPoint === null || selPoint === i ? '' : 'opacity-40'}`}
+                              style={{ height: `${d.val > 0 ? Math.max(4, (d.val / (maxVal || 1)) * 100) : 2}%`, backgroundColor: chartColor }}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* X axis */}
+                <div className="flex justify-between mt-1.5 ml-[52px]">
+                  {xTicks
+                    ? xTicks.map((di, i) => (
+                        <span key={i} className="text-[8px] font-semibold text-muted-taupe">{chartData[di]?.label}</span>
+                      ))
+                    : chartData.map((d, i) => (
+                        <span key={i} className={`flex-1 text-center text-[8px] font-bold uppercase ${selPoint === i ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{d.label}</span>
+                      ))}
+                </div>
+
+                {/* Readout: selected point, or peak + average summary */}
+                <div className="mt-3 pt-3 border-t border-black/5 text-[10px] text-muted-taupe leading-relaxed">
+                  {selPoint !== null && sel ? (
+                    <span>
+                      <span className="font-bold text-premium-charcoal">
+                        {chartMode === 'DAILY'
+                          ? `${sel.label} ${selectedDate.toLocaleString('default', { month: 'short' })}`
+                          : `Week ${selPoint + 1}`}
+                        :
+                      </span>{' '}
+                      <span className="font-bold" style={{ color: chartColor }}>{formatAmount(sel.val)}</span>
+                      {avgVal > 0 && sel.val > 0 ? ` · ${(sel.val / avgVal).toFixed(1)}× the ${chartMode === 'DAILY' ? 'daily' : 'weekly'} average` : ''}
+                    </span>
+                  ) : maxVal > 0 ? (
+                    <span>
+                      <span className="font-medium">Peak:</span> {formatAmount(chartData[peakIdx].val)} on {chartMode === 'DAILY' ? `day ${chartData[peakIdx].label}` : `week ${peakIdx + 1}`}
+                      <span className="mx-2">•</span>
+                      <span className="font-medium">Avg:</span> {formatAmount(avgVal)}/{chartMode === 'DAILY' ? 'day' : 'week'}
+                      <span className="mx-2">•</span>
+                      tap the chart to inspect
+                    </span>
+                  ) : (
+                    <span>No {analysisTab.toLowerCase()} activity this month.</span>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 
+      {/* Budget pace (current month only) */}
+      {analysisTab === 'EXPENSE' && pace && (
+        <div className="px-6 py-2 break-inside-avoid">
+          <div className={`rounded-[28px] p-5 border ${pace.onTrack ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Month Pace</p>
+                <p className="text-[11px] text-muted-taupe mt-0.5">
+                  Day {pace.elapsedDays} of {pace.daysInMonth} · {formatAmount(pace.spentSoFar).split('.')[0]} spent
+                </p>
+              </div>
+              <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${pace.onTrack ? 'bg-sage-light text-sage' : 'bg-rose-light text-rose'}`}>
+                {pace.onTrack ? 'On track' : 'Over pace'}
+              </span>
+            </div>
+            <p className="text-[13px] text-premium-charcoal">
+              Projected: <span className={`font-serif font-bold ${pace.onTrack ? 'text-sage' : 'text-rose'}`}>{formatAmount(pace.projected).split('.')[0]}</span>
+              <span className="text-muted-taupe text-[11px]"> vs {formatAmount(pace.reference).split('.')[0]} {pace.referenceKind === 'LIMIT' ? '(your daily limit)' : '(last month)'}</span>
+            </p>
+            <div className="mt-3 h-2 w-full bg-black/5 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${pace.onTrack ? 'bg-sage' : 'bg-rose'}`}
+                style={{ width: `${Math.min(100, (pace.projected / pace.reference) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top movers vs last month — both tabs. Colors flip meaning per tab:
+          spending up = bad (rose), income up = good (sage). */}
+      {movers.hasPrevData && (movers.up.length > 0 || movers.down.length > 0) && (() => {
+        const upCls = analysisTab === 'EXPENSE' ? 'text-rose bg-rose-light' : 'text-sage bg-sage-light';
+        const upText = analysisTab === 'EXPENSE' ? 'text-rose' : 'text-sage';
+        const downCls = analysisTab === 'EXPENSE' ? 'text-sage bg-sage-light' : 'text-rose bg-rose-light';
+        const downText = analysisTab === 'EXPENSE' ? 'text-sage' : 'text-rose';
+        return (
+          <div className="px-6 py-2 break-inside-avoid">
+            <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">What Changed</p>
+              <p className="text-[10px] text-muted-taupe mb-3">
+                {analysisTab === 'EXPENSE' ? 'spending' : 'income'} vs {prevMonthData.monthName} · biggest category shifts
+              </p>
+              <div className="space-y-2">
+                {movers.up.map((m, i) => (
+                  <div key={`u${i}`} className="flex items-center gap-3">
+                    <span className={`material-symbols-outlined text-[18px] rounded-full p-1 ${upCls}`}>arrow_upward</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-premium-charcoal truncate">{m.category}</p>
+                      <p className="text-[9px] text-muted-taupe">{formatAmount(m.previous).split('.')[0]} → {formatAmount(m.current).split('.')[0]}</p>
+                    </div>
+                    <span className={`text-[12px] font-bold shrink-0 ${upText}`}>
+                      +{formatAmount(m.delta).split('.')[0]}{m.pctChange !== null ? ` (${m.pctChange > 0 ? '+' : ''}${m.pctChange}%)` : ' (new)'}
+                    </span>
+                  </div>
+                ))}
+                {movers.down.map((m, i) => (
+                  <div key={`d${i}`} className="flex items-center gap-3">
+                    <span className={`material-symbols-outlined text-[18px] rounded-full p-1 ${downCls}`}>arrow_downward</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-premium-charcoal truncate">{m.category}</p>
+                      <p className="text-[9px] text-muted-taupe">{formatAmount(m.previous).split('.')[0]} → {formatAmount(m.current).split('.')[0]}</p>
+                    </div>
+                    <span className={`text-[12px] font-bold shrink-0 ${downText}`}>
+                      −{formatAmount(Math.abs(m.delta)).split('.')[0]}{m.pctChange !== null ? ` (${m.pctChange}%)` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Spending heatmap calendar */}
+      {analysisTab === 'EXPENSE' && dayStats.maxDaily > 0 && (
+        <div className="px-6 py-2 break-inside-avoid">
+          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Daily Heatmap</p>
+              {heatDay !== null && (
+                <p className="text-[11px] font-semibold text-premium-charcoal">
+                  {heatDay} {selectedDate.toLocaleString('default', { month: 'short' })}: <span className="text-rose font-bold">{formatAmount(dayStats.daily[heatDay - 1]).split('.')[0]}</span>
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {WEEKDAY_LABELS.map((d, i) => (
+                <span key={i} className="text-center text-[8px] font-bold text-muted-taupe uppercase">{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: dayStats.firstWeekday }, (_, i) => <span key={`pad${i}`} />)}
+              {dayStats.daily.map((v, i) => {
+                const intensity = dayStats.maxDaily > 0 ? v / dayStats.maxDaily : 0;
+                const selected = heatDay === i + 1;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setHeatDay(selected ? null : i + 1)}
+                    className={`aspect-square rounded-md flex items-center justify-center text-[8px] font-semibold transition-all ${selected ? 'ring-2 ring-rose' : ''} ${intensity > 0.55 ? 'text-white' : 'text-muted-taupe'}`}
+                    style={{ backgroundColor: v > 0 ? `rgba(229, 115, 115, ${0.15 + intensity * 0.75})` : '#F4F2EE' }}
+                    title={`${i + 1}: ${formatAmount(v)}`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[9px] text-muted-taupe mt-3">
+              Darker = more spent · {dayStats.daily.filter(v => v === 0).length} no-spend day{dayStats.daily.filter(v => v === 0).length === 1 ? '' : 's'} this month
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Weekday pattern */}
+      {analysisTab === 'EXPENSE' && dayStats.txCount >= 5 && maxWeekdayAvg > 1 && (
+        <div className="px-6 py-2 break-inside-avoid">
+          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Weekday Pattern</p>
+            <div className="flex items-end justify-between gap-2 h-20">
+              {dayStats.weekdayAvg.map((v, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <div className="w-full h-16 flex items-end">
+                    <div
+                      className={`w-full rounded-t ${i === dayStats.busiestWeekday ? 'bg-rose' : 'bg-rose/30'}`}
+                      style={{ height: `${v > 0 ? Math.max(6, (v / maxWeekdayAvg) * 100) : 2}%` }}
+                    />
+                  </div>
+                  <span className={`text-[9px] font-bold uppercase ${i === dayStats.busiestWeekday ? 'text-rose' : 'text-muted-taupe'}`}>{WEEKDAY_LABELS[i]}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-taupe mt-3">
+              {['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][dayStats.busiestWeekday]} are your heaviest spend days
+              (~{formatAmount(dayStats.weekdayAvg[dayStats.busiestWeekday]).split('.')[0]} on average).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Recurring charges / subscriptions */}
+      {analysisTab === 'EXPENSE' && recurring.length > 0 && (
+        <div className="px-6 py-2 break-inside-avoid">
+          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+            <div className="flex justify-between items-end mb-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recurring Charges</p>
+                <p className="text-[10px] text-muted-taupe mt-0.5">detected across your history</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[13px] font-serif font-bold text-rose">{formatAmount(recurringMonthlyTotal).split('.')[0]}/mo</p>
+                <p className="text-[9px] text-muted-taupe">≈ {formatAmount(recurringMonthlyTotal * 12).split('.')[0]}/yr</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {recurring.map((r, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl bg-lavender-light text-lavender flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">autorenew</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-premium-charcoal truncate">{r.name}</p>
+                    <p className="text-[9px] text-muted-taupe">
+                      {r.cadence.toLowerCase()} · {r.occurrences}× · next ~{r.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[12px] font-bold text-premium-charcoal">{formatAmount(r.amount).split('.')[0]}</p>
+                    <p className="text-[9px] text-muted-taupe">{formatAmount(r.monthlyCost).split('.')[0]}/mo</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Category Breakdown */}
-      <div className="px-6 py-4">
+      <div className="px-6 py-4 break-inside-avoid">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-premium-charcoal text-base font-serif font-semibold">
             {analysisTab === 'EXPENSE' ? 'Where Money Goes' : 'Income Sources'}
@@ -591,7 +894,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Smart Insights */}
       {insights.length > 0 && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 break-inside-avoid">
           <h3 className="text-premium-charcoal text-base font-serif font-semibold mb-3">Smart Insights</h3>
           <div className="space-y-2">
             {insights.map((insight, i) => (
@@ -619,7 +922,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* AI-Powered Insights */}
       {currentData.length > 0 && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 break-inside-avoid">
           <div className="bg-gradient-to-br from-purple-50 to-lavender/20 rounded-[24px] p-5 border-2 border-purple-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -778,7 +1081,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Range Stats */}
       {txStats && (
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-6 break-inside-avoid">
           <div className="bg-gradient-to-br from-premium-charcoal to-premium-charcoal/90 rounded-[24px] p-5 text-white">
             <h4 className="text-[10px] uppercase tracking-widest font-medium text-white/60 mb-3">
               {analysisTab === 'EXPENSE' ? 'Spending' : 'Income'} Range
@@ -801,6 +1104,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      </div>{/* /lg:columns-2 */}
     </div>
   );
 };

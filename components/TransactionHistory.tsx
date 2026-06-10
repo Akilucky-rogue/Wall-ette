@@ -271,7 +271,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-28 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-28 right-4 opacity-35 z-10" delay={0.8} />
       <FloatingLeaf className="top-60 left-3 opacity-25" delay={2.2} color="#A8B89E" />

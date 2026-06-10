@@ -14,3 +14,22 @@ export const getSymbol = (code: CurrencyCode): string => {
 export const getCurrencyConfig = (code: CurrencyCode): CurrencyConfig => {
     return CURRENCIES[code];
 }
+
+// Intl.NumberFormat construction is expensive; cache one formatter per currency
+// (audit Phase 2.2). Formatters are stateless and safe to reuse.
+const formatterCache = new Map<CurrencyCode, Intl.NumberFormat>();
+
+export const getCurrencyFormatter = (code: CurrencyCode): Intl.NumberFormat => {
+  let formatter = formatterCache.get(code);
+  if (!formatter) {
+    const config = CURRENCIES[code];
+    formatter = new Intl.NumberFormat(config.locale, {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    formatterCache.set(code, formatter);
+  }
+  return formatter;
+};

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 
 import SecurityLock from './components/SecurityLock';
 import Auth, { AuthType } from './components/Auth';
@@ -8,6 +8,7 @@ import SplashScreen, { SplashVariant } from './components/SplashScreen';
 import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { auth } from './services/firebase';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -15,7 +16,6 @@ import { Capacitor } from '@capacitor/core';
 const TransactionHistory = React.lazy(() => import('./components/TransactionHistory'));
 const NewEntry = React.lazy(() => import('./components/NewEntry'));
 const SpendAnalysis = React.lazy(() => import('./components/SpendAnalysis'));
-const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const IgnoreRules = React.lazy(() => import('./components/IgnoreRules'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
@@ -23,7 +23,6 @@ const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Profile = React.lazy(() => import('./components/Profile'));
 
 function AppContent() {
-  console.error('[WALL-E] AppContent mounted');
   const { user, loading } = useAuth();
   const [isLocked, setIsLocked] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
@@ -32,42 +31,46 @@ function AppContent() {
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Auto-logout when app goes to background (Mobile Security)
+  // Ref mirror so long-lived native listeners read the current screen without
+  // re-registering on every navigation (audit Phase 6.2).
+  const currentScreenRef = useRef(currentScreen);
+  currentScreenRef.current = currentScreen;
+
+  // Lock the app when it goes to background on native (Mobile Security).
+  // We lock (requiring re-authentication on resume) rather than sign the user
+  // out, so returning from a notification or quick context switch doesn't
+  // nuke in-progress work. The IMPORT screen is exempt because the native
+  // file picker briefly backgrounds the app.
   useEffect(() => {
     if (!user) return;
-    // Only enable on native mobile platforms
-    if (Capacitor.isNativePlatform()) {
-      let listenerHandle: any = null;
-      (async () => {
-        listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-          console.error(`[WALL-E] appStateChange: isActive=${isActive}, currentScreen=${currentScreen}`);
-          if (!isActive) {
-            // Prevent auto-logout on ImportStatement screen
-            if (currentScreen !== AppScreen.IMPORT) {
-              console.error(`[WALL-E] 🔒 App backgrounded - Auto logout triggered (currentScreen=${currentScreen})`);
-              import('./services/firebase').then(({ auth }) => {
-                auth.signOut();
-              });
-            } else {
-              console.error(`[WALL-E] 🛡️ App backgrounded during import/upload - session preserved (currentScreen=${currentScreen})`);
-            }
-          }
-        });
-      })();
-      return () => {
-        if (listenerHandle && typeof listenerHandle.remove === 'function') {
-          listenerHandle.remove();
-        }
-      };
-    }
-  }, [user, currentScreen]);
+    if (!Capacitor.isNativePlatform()) return;
 
-  // Inactivity Lock Timer
+    let listenerHandle: any = null;
+    (async () => {
+      listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive && currentScreenRef.current !== AppScreen.IMPORT) {
+          setIsLocked(true);
+        }
+      });
+    })();
+    return () => {
+      if (listenerHandle && typeof listenerHandle.remove === 'function') {
+        listenerHandle.remove();
+      }
+    };
+  }, [user]);
+
+  // Inactivity Lock Timer (throttled — mousemove fires continuously, so only
+  // reset the countdown at most once per second; audit Phase 6.2)
   useEffect(() => {
     if (!user) return; // Don't lock if not logged in
 
     let timer: ReturnType<typeof setTimeout>;
+    let lastReset = 0;
     const resetTimer = () => {
+      const now = Date.now();
+      if (now - lastReset < 1000) return;
+      lastReset = now;
       if (timer) clearTimeout(timer);
       if (!isLocked) {
         timer = setTimeout(() => {
@@ -119,11 +122,9 @@ function AppContent() {
     setAuthSplashPending(null);
     // If logging out, actually sign out after splash completes
     if (isLoggingOut) {
-      import('./services/firebase').then(({ auth }) => {
-        auth.signOut();
-        setIsLoggingOut(false);
-        setCurrentScreen(AppScreen.DASHBOARD); // Reset to dashboard for next login
-      });
+      auth.signOut();
+      setIsLoggingOut(false);
+      setCurrentScreen(AppScreen.DASHBOARD); // Reset to dashboard for next login
     }
   };
 
@@ -161,8 +162,6 @@ function AppContent() {
         return <NewEntry onNavigate={handleNavigate} />;
       case AppScreen.ANALYSIS:
         return <SpendAnalysis onNavigate={handleNavigate} />;
-      case AppScreen.INCOME_INSIGHTS:
-        return <IncomeInsights onNavigate={handleNavigate} />;
       case AppScreen.CATEGORY_SPLIT:
         return <CategorySplit onNavigate={handleNavigate} />;
       case AppScreen.IGNORE_RULES:
@@ -184,14 +183,13 @@ function AppContent() {
         <Suspense fallback={<LoadingFallback />}>
             {renderScreen()}
         </Suspense>
-        {(currentScreen === AppScreen.DASHBOARD || 
-          currentScreen === AppScreen.HISTORY || 
-          currentScreen === AppScreen.ANALYSIS || 
-          currentScreen === AppScreen.CATEGORY_SPLIT || 
-          currentScreen === AppScreen.SELF || 
+        {(currentScreen === AppScreen.DASHBOARD ||
+          currentScreen === AppScreen.HISTORY ||
+          currentScreen === AppScreen.ANALYSIS ||
+          currentScreen === AppScreen.CATEGORY_SPLIT ||
+          currentScreen === AppScreen.SELF ||
           currentScreen === AppScreen.EXPORT ||
-          currentScreen === AppScreen.IGNORE_RULES ||
-          currentScreen === AppScreen.INCOME_INSIGHTS
+          currentScreen === AppScreen.IGNORE_RULES
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
         )}

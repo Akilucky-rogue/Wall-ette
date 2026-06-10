@@ -10,26 +10,12 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { getBalance, getMonthlyIncome, getMonthlyExpense, getTotalIncome, getTotalExpense, transactions, formatAmount, isCloudSyncing, retryCloudConnection, openingBalance } = useWallet();
+  const {
+    getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
+    getTotalIncome, getTotalExpense, transactions, formatAmount,
+    isCloudSyncing, retryCloudConnection, openingBalance
+  } = useWallet();
 
-  // Helper: get today's date string
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const getDailyIncome = () =>
-    transactions.filter(t => t.type === TransactionType.INCOME && t.date?.slice(0, 10) === todayStr)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-  const getDailyExpense = () =>
-    transactions.filter(t => t.type === TransactionType.EXPENSE && t.date?.slice(0, 10) === todayStr)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-  const getAllTimeIncome = () =>
-    transactions.filter(t => t.type === TransactionType.INCOME)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-  const getAllTimeExpense = () =>
-    transactions.filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((sum, t) => sum + t.amount, 0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [periodMode, setPeriodMode] = useState<'MONTH' | 'ALL'>('MONTH'); // 'MONTH' or 'ALL'
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -45,27 +31,47 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const notificationRef = useRef<HTMLDivElement>(null);
 
   // --- Balance Trend Data (last 12 months) ---
+  // Single pass: bucket net flow by calendar month, then cumulative-sum across
+  // the 12-month window (audit Phase 2.5 — was 12x3 full scans).
   const balanceTrend = useMemo(() => {
+    const endYear = selectedDate.getFullYear();
+    const endMonth = selectedDate.getMonth();
+    const lastKey = endYear * 12 + endMonth;
+    const firstKey = lastKey - 11;
+
+    const net = new Array(12).fill(0);
+    let beforeWindow = 0;
+
+    for (const t of transactions) {
+      const d = new Date(t.date);
+      const k = d.getFullYear() * 12 + d.getMonth();
+      const signed = t.type === TransactionType.INCOME ? t.amount : -t.amount;
+      if (k < firstKey) beforeWindow += signed;
+      else if (k <= lastKey) net[k - firstKey] += signed;
+      // Transactions after the selected month are excluded (as before).
+    }
+
+    let running = openingBalance + beforeWindow;
     const months: { label: string; value: number }[] = [];
-    const now = new Date(selectedDate);
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-      const txs = transactions.filter((t: any) => new Date(t.date) <= d);
-      const income = txs.filter((t: any) => t.type === TransactionType.INCOME).reduce((a: number, b: any) => a + b.amount, 0);
-      const expense = txs.filter((t: any) => t.type === TransactionType.EXPENSE).reduce((a: number, b: any) => a + b.amount, 0);
+    for (let i = 0; i < 12; i++) {
+      running += net[i];
+      const d = new Date(endYear, endMonth - (11 - i), 1);
       months.push({
         label: d.toLocaleString('default', { month: 'short' }),
-        value: openingBalance + income - expense
+        value: running
       });
     }
     return months;
   }, [transactions, openingBalance, selectedDate]);
 
-  // --- Income vs Expense Bar Data ---
+  // --- Income vs Expense Bar Data (single pass) ---
   const { income, expenses, balance, periodLabel } = useMemo(() => {
     if (periodMode === 'ALL') {
-      const totalIncome = transactions.filter((t: any) => t.type === TransactionType.INCOME).reduce((a: number, b: any) => a + b.amount, 0);
-      const totalExpenses = transactions.filter((t: any) => t.type === TransactionType.EXPENSE).reduce((a: number, b: any) => a + b.amount, 0);
+      let totalIncome = 0, totalExpenses = 0;
+      for (const t of transactions) {
+        if (t.type === TransactionType.INCOME) totalIncome += t.amount;
+        else totalExpenses += t.amount;
+      }
       return {
         income: totalIncome,
         expenses: totalExpenses,
@@ -75,46 +81,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     } else {
       const month = selectedDate.getMonth();
       const year = selectedDate.getFullYear();
-      // Only include transactions up to and including the last day of the selected month
-      const lastDay = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      // Ensure we include all transactions on the last day, regardless of time zone or missing time part
-      const txsUpToMonth = transactions.filter((t: any) => {
-        const txDate = new Date(t.date);
-        // If the transaction date has no time, treat it as end of day
-        if (
-          txDate.getFullYear() === lastDay.getFullYear() &&
-          txDate.getMonth() === lastDay.getMonth() &&
-          txDate.getDate() === lastDay.getDate()
-        ) {
-          return true;
-        }
-        return txDate < lastDay;
-      });
-      // Calculate opening balance for the month (all transactions before this month)
       const monthStart = new Date(year, month, 1);
-      const txsBeforeMonth = transactions.filter((t: any) => {
+
+      let prevNet = 0;          // net flow of everything before this month
+      let monthlyIncome = 0;
+      let monthlyExpenses = 0;
+
+      for (const t of transactions) {
         const txDate = new Date(t.date);
-        return txDate < monthStart;
-      });
-      const prevIncome = txsBeforeMonth.filter((t: any) => t.type === TransactionType.INCOME).reduce((a: number, b: any) => a + b.amount, 0);
-      const prevExpenses = txsBeforeMonth.filter((t: any) => t.type === TransactionType.EXPENSE).reduce((a: number, b: any) => a + b.amount, 0);
-      const monthOpening = openingBalance + prevIncome - prevExpenses;
-      // For the summary bar, show only this month's income/expenses
-      const monthlyIncome = txsUpToMonth.filter((t: any) => {
-        if (t.type !== TransactionType.INCOME) return false;
-        const txDate = new Date(t.date);
-        return txDate.getMonth() === month && txDate.getFullYear() === year;
-      }).reduce((a: number, b: any) => a + b.amount, 0);
-      const monthlyExpenses = txsUpToMonth.filter((t: any) => {
-        if (t.type !== TransactionType.EXPENSE) return false;
-        const txDate = new Date(t.date);
-        return txDate.getMonth() === month && txDate.getFullYear() === year;
-      }).reduce((a: number, b: any) => a + b.amount, 0);
+        const isIncome = t.type === TransactionType.INCOME;
+        if (txDate < monthStart) {
+          prevNet += isIncome ? t.amount : -t.amount;
+        } else if (txDate.getMonth() === month && txDate.getFullYear() === year) {
+          if (isIncome) monthlyIncome += t.amount;
+          else monthlyExpenses += t.amount;
+        }
+      }
+
       const label = `${selectedDate.toLocaleString('default', { month: 'short' })} ${year}`;
       return {
         income: monthlyIncome,
         expenses: monthlyExpenses,
-        balance: monthOpening + monthlyIncome - monthlyExpenses,
+        balance: openingBalance + prevNet + monthlyIncome - monthlyExpenses,
         periodLabel: label,
       };
     }
@@ -133,46 +121,49 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     return Math.max(0, Math.round(((income - expenses) / income) * 100));
   }, [income, expenses]);
 
-  // --- Category Breakdown (Top 5) ---
-  const categoryBreakdown = useMemo(() => {
-    const cats: Record<string, number> = {};
-    transactions.filter((t: any) => {
-      if (periodMode === 'ALL') return true;
-      const txDate = new Date(t.date);
-      return txDate.getMonth() === selectedDate.getMonth() && txDate.getFullYear() === selectedDate.getFullYear();
-    }).forEach((t: any) => {
-      cats[t.category] = (cats[t.category] || 0) + t.amount;
-    });
-    return Object.entries(cats)
-      .sort(([, a], [, b]) => (b as number) - (a as number))
-      .slice(0, 5)
-      .map(([name, amount]) => ({ name, amount }));
-  }, [transactions, periodMode, selectedDate]);
+  // --- Period-scoped stats in ONE pass (audit Phase 2: was 4 separate scans,
+  // each re-parsing every transaction date) ---
+  const { categoryBreakdown, quickStats, hasMonthlyData, incomeStreams } = useMemo(() => {
+    const all = periodMode === 'ALL';
+    const month = selectedDate.getMonth();
+    const year = selectedDate.getFullYear();
 
-  // --- Quick Stats ---
-  const quickStats = useMemo(() => {
-    const txs = transactions.filter((t: any) => {
-      if (periodMode === 'ALL') return true;
-      const txDate = new Date(t.date);
-      return txDate.getMonth() === selectedDate.getMonth() && txDate.getFullYear() === selectedDate.getFullYear();
-    });
-    const count = txs.length;
-    const avg = count > 0 ? txs.reduce((a: number, b: any) => a + b.amount, 0) / count : 0;
-    const max = txs.reduce((a: number, b: any) => Math.max(a, b.amount), 0);
-    return { count, avg, max };
+    const cats: Record<string, number> = {};
+    const incomeCats: Record<string, number> = {};
+    let count = 0;
+    let sum = 0;
+    let max = 0;
+
+    for (const t of transactions) {
+      if (!all) {
+        const txDate = new Date(t.date);
+        if (txDate.getMonth() !== month || txDate.getFullYear() !== year) continue;
+      }
+      count++;
+      sum += t.amount;
+      if (t.amount > max) max = t.amount;
+      cats[t.category] = (cats[t.category] || 0) + t.amount;
+      if (t.type === TransactionType.INCOME) {
+        incomeCats[t.category] = (incomeCats[t.category] || 0) + t.amount;
+      }
+    }
+
+    return {
+      categoryBreakdown: Object.entries(cats)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([name, amount]) => ({ name, amount })),
+      quickStats: { count, avg: count > 0 ? sum / count : 0, max },
+      hasMonthlyData: all || count > 0,
+      incomeStreams: Object.entries(incomeCats)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([name, amount]) => ({ name, amount })),
+    };
   }, [transactions, periodMode, selectedDate]);
 
   // Derived helpers for UI logic
   const showAllTime = periodMode === 'ALL';
-  const hasMonthlyData = useMemo(() => {
-    if (showAllTime) return true;
-    const month = selectedDate.getMonth();
-    const year = selectedDate.getFullYear();
-    return transactions.some(t => {
-      const txDate = new Date(t.date);
-      return txDate.getMonth() === month && txDate.getFullYear() === year;
-    });
-  }, [transactions, periodMode, selectedDate]);
 
   // Recent transactions (latest 5)
   const recentTransactions = useMemo(() => {
@@ -191,24 +182,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  const incomeStreams = useMemo(() => {
-    const streams: Record<string, number> = {};
-    transactions
-      .filter(t => {
-        if (t.type !== TransactionType.INCOME) return false;
-        if (periodMode === 'ALL') return true;
-        const txDate = new Date(t.date);
-        return txDate.getMonth() === selectedDate.getMonth() && txDate.getFullYear() === selectedDate.getFullYear();
-      })
-      .forEach(t => {
-        streams[t.category] = (streams[t.category] || 0) + t.amount;
-      });
-    // Convert to array and sort
-    return Object.entries(streams)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3) // Top 3
-      .map(([name, amount]) => ({ name, amount }));
-  }, [transactions, periodMode, selectedDate]);
 
 
   // Category colors (using CSS module classes to avoid Tailwind purge issues)
@@ -379,7 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             <div className="flex justify-between text-xs text-muted-taupe font-semibold">
               <span>All Time</span>
-              <span>+{formatAmount(getAllTimeIncome())}</span>
+              <span>+{formatAmount(getTotalIncome())}</span>
             </div>
           </div>
         </div>
@@ -399,7 +372,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             <div className="flex justify-between text-xs text-muted-taupe font-semibold">
               <span>All Time</span>
-              <span>-{formatAmount(getAllTimeExpense())}</span>
+              <span>-{formatAmount(getTotalExpense())}</span>
             </div>
           </div>
         </div>
@@ -426,8 +399,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Report</span>
           </button>
-          <button 
-            onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
+          <button
+            onClick={() => onNavigate(AppScreen.ANALYSIS)}
             className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
           >
             <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">

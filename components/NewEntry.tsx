@@ -49,7 +49,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     const amountInBase = convertToBase(numAmount);
 
     const success = await addTransaction({
-        id: `txn-${Date.now()}`,
+        // randomUUID prevents id collisions on rapid "Save & Add Another" (audit Phase 1.4)
+        id: `txn-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`,
         amount: amountInBase,
         type: type,
         category: category || 'Uncategorized',

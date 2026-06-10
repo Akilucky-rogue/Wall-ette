@@ -104,9 +104,15 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const recurring = useMemo(() => detectRecurringCharges(transactions), [transactions]);
   const recurringMonthlyTotal = useMemo(() => recurring.reduce((s, r) => s + r.monthlyCost, 0), [recurring]);
 
-  // Daily heatmap + weekday averages for the selected month
-  const dayStats = useMemo(() => monthDailyStats(filteredExpenses, selectedDate), [filteredExpenses, selectedDate]);
+  // Daily heatmap + weekday averages for the selected month — follows the
+  // active tab (spend days vs income days)
+  const dayStats = useMemo(
+    () => monthDailyStats(analysisTab === 'EXPENSE' ? filteredExpenses : filteredIncome, selectedDate),
+    [analysisTab, filteredExpenses, filteredIncome, selectedDate]
+  );
   const maxWeekdayAvg = useMemo(() => Math.max(...dayStats.weekdayAvg, 1), [dayStats]);
+  // Expense pace needs expense-only daily stats regardless of tab
+  const expenseDayStats = useMemo(() => monthDailyStats(filteredExpenses, selectedDate), [filteredExpenses, selectedDate]);
 
   // Budget pace — only meaningful for the live (current) month
   const isCurrentMonth = useMemo(() => {
@@ -115,11 +121,11 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   }, [selectedDate]);
   const pace = useMemo(() => {
     if (!isCurrentMonth) return null;
-    return spendingPace(dayStats.cumulative, dayStats.daysInMonth, new Date(), dailyLimit, prevMonthData.expense);
-  }, [isCurrentMonth, dayStats, dailyLimit, prevMonthData.expense]);
+    return spendingPace(expenseDayStats.cumulative, expenseDayStats.daysInMonth, new Date(), dailyLimit, prevMonthData.expense);
+  }, [isCurrentMonth, expenseDayStats, dailyLimit, prevMonthData.expense]);
 
   // Reset selections when the context changes
-  useEffect(() => { setHeatDay(null); }, [selectedDate]);
+  useEffect(() => { setHeatDay(null); }, [selectedDate, analysisTab]);
   useEffect(() => { setSelPoint(null); }, [selectedDate, analysisTab, chartMode]);
 
   // Calculate percentage changes
@@ -472,8 +478,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Net Flow Card (when viewing expenses) */}
-      {analysisTab === 'EXPENSE' && totalIncome > 0 && (
+      {/* Net Flow Card — relevant on both tabs */}
+      {totalIncome > 0 && (
         <div className="px-6 pb-4 break-inside-avoid">
           <div className={`rounded-2xl p-4 border ${netFlow >= 0 ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex items-center justify-between">
@@ -730,73 +736,89 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         );
       })()}
 
-      {/* Spending heatmap calendar */}
-      {analysisTab === 'EXPENSE' && dayStats.maxDaily > 0 && (
-        <div className="px-6 py-2 break-inside-avoid">
-          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Daily Heatmap</p>
-              {heatDay !== null && (
-                <p className="text-[11px] font-semibold text-premium-charcoal">
-                  {heatDay} {selectedDate.toLocaleString('default', { month: 'short' })}: <span className="text-rose font-bold">{formatAmount(dayStats.daily[heatDay - 1]).split('.')[0]}</span>
-                </p>
-              )}
+      {/* Daily heatmap calendar — spend days or income days, per tab */}
+      {dayStats.maxDaily > 0 && (() => {
+        const isExp = analysisTab === 'EXPENSE';
+        const rgb = isExp ? '229, 115, 115' : '155, 174, 147'; // rose / sage
+        const zeroDays = dayStats.daily.filter(v => v === 0).length;
+        return (
+          <div className="px-6 py-2 break-inside-avoid">
+            <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Daily Heatmap</p>
+                {heatDay !== null && (
+                  <p className="text-[11px] font-semibold text-premium-charcoal">
+                    {heatDay} {selectedDate.toLocaleString('default', { month: 'short' })}: <span className={`font-bold ${isExp ? 'text-rose' : 'text-sage'}`}>{formatAmount(dayStats.daily[heatDay - 1]).split('.')[0]}</span>
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {WEEKDAY_LABELS.map((d, i) => (
+                  <span key={i} className="text-center text-[8px] font-bold text-muted-taupe uppercase">{d}</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: dayStats.firstWeekday }, (_, i) => <span key={`pad${i}`} />)}
+                {dayStats.daily.map((v, i) => {
+                  const intensity = dayStats.maxDaily > 0 ? v / dayStats.maxDaily : 0;
+                  const selected = heatDay === i + 1;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setHeatDay(selected ? null : i + 1)}
+                      className={`aspect-square rounded-md flex items-center justify-center text-[8px] font-semibold transition-all ${selected ? (isExp ? 'ring-2 ring-rose' : 'ring-2 ring-sage') : ''} ${intensity > 0.55 ? 'text-white' : 'text-muted-taupe'}`}
+                      style={{ backgroundColor: v > 0 ? `rgba(${rgb}, ${0.15 + intensity * 0.75})` : '#F4F2EE' }}
+                      title={`${i + 1}: ${formatAmount(v)}`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-muted-taupe mt-3">
+                {isExp
+                  ? `Darker = more spent · ${zeroDays} no-spend day${zeroDays === 1 ? '' : 's'} this month`
+                  : `Darker = more received · income arrived on ${dayStats.daysInMonth - zeroDays} day${dayStats.daysInMonth - zeroDays === 1 ? '' : 's'} this month`}
+              </p>
             </div>
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {WEEKDAY_LABELS.map((d, i) => (
-                <span key={i} className="text-center text-[8px] font-bold text-muted-taupe uppercase">{d}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: dayStats.firstWeekday }, (_, i) => <span key={`pad${i}`} />)}
-              {dayStats.daily.map((v, i) => {
-                const intensity = dayStats.maxDaily > 0 ? v / dayStats.maxDaily : 0;
-                const selected = heatDay === i + 1;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setHeatDay(selected ? null : i + 1)}
-                    className={`aspect-square rounded-md flex items-center justify-center text-[8px] font-semibold transition-all ${selected ? 'ring-2 ring-rose' : ''} ${intensity > 0.55 ? 'text-white' : 'text-muted-taupe'}`}
-                    style={{ backgroundColor: v > 0 ? `rgba(229, 115, 115, ${0.15 + intensity * 0.75})` : '#F4F2EE' }}
-                    title={`${i + 1}: ${formatAmount(v)}`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[9px] text-muted-taupe mt-3">
-              Darker = more spent · {dayStats.daily.filter(v => v === 0).length} no-spend day{dayStats.daily.filter(v => v === 0).length === 1 ? '' : 's'} this month
-            </p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* Weekday pattern */}
-      {analysisTab === 'EXPENSE' && dayStats.txCount >= 5 && maxWeekdayAvg > 1 && (
-        <div className="px-6 py-2 break-inside-avoid">
-          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
-            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Weekday Pattern</p>
-            <div className="flex items-end justify-between gap-2 h-20">
-              {dayStats.weekdayAvg.map((v, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full h-16 flex items-end">
-                    <div
-                      className={`w-full rounded-t ${i === dayStats.busiestWeekday ? 'bg-rose' : 'bg-rose/30'}`}
-                      style={{ height: `${v > 0 ? Math.max(6, (v / maxWeekdayAvg) * 100) : 2}%` }}
-                    />
+      {/* Weekday pattern — per tab (income needs fewer events to qualify) */}
+      {dayStats.txCount >= (analysisTab === 'EXPENSE' ? 5 : 3) && maxWeekdayAvg > 1 && (() => {
+        const isExp = analysisTab === 'EXPENSE';
+        return (
+          <div className="px-6 py-2 break-inside-avoid">
+            <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Weekday Pattern</p>
+              <div className="flex items-end justify-between gap-2 h-20">
+                {dayStats.weekdayAvg.map((v, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full h-16 flex items-end">
+                      <div
+                        className="w-full rounded-t"
+                        style={{
+                          height: `${v > 0 ? Math.max(6, (v / maxWeekdayAvg) * 100) : 2}%`,
+                          backgroundColor: chartColor,
+                          opacity: i === dayStats.busiestWeekday ? 1 : 0.3,
+                        }}
+                      />
+                    </div>
+                    <span className={`text-[9px] font-bold uppercase ${i === dayStats.busiestWeekday ? (isExp ? 'text-rose' : 'text-sage') : 'text-muted-taupe'}`}>{WEEKDAY_LABELS[i]}</span>
                   </div>
-                  <span className={`text-[9px] font-bold uppercase ${i === dayStats.busiestWeekday ? 'text-rose' : 'text-muted-taupe'}`}>{WEEKDAY_LABELS[i]}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-taupe mt-3">
+                {['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][dayStats.busiestWeekday]}
+                {isExp
+                  ? ` are your heaviest spend days (~${formatAmount(dayStats.weekdayAvg[dayStats.busiestWeekday]).split('.')[0]} on average).`
+                  : ` bring in the most income (~${formatAmount(dayStats.weekdayAvg[dayStats.busiestWeekday]).split('.')[0]} on average).`}
+              </p>
             </div>
-            <p className="text-[10px] text-muted-taupe mt-3">
-              {['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][dayStats.busiestWeekday]} are your heaviest spend days
-              (~{formatAmount(dayStats.weekdayAvg[dayStats.busiestWeekday]).split('.')[0]} on average).
-            </p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Recurring charges / subscriptions */}
       {analysisTab === 'EXPENSE' && recurring.length > 0 && (

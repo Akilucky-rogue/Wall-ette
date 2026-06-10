@@ -18,7 +18,7 @@ const BADGE_STYLES: Record<StreamBadge, { label: string; cls: string }> = {
 const FLOW_COLORS = ['#9BAE93', '#9CB5C1', '#D6C6B2', '#B8B5D0', '#D4A5A5', '#C4A98E'];
 
 const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount } = useWallet();
+  const { transactions, formatAmount, formatAmountCompact } = useWallet();
   const [selectedMonthIdx, setSelectedMonthIdx] = useState<number | null>(null);
 
   // ── Income analysis (streams, stability, salary) ──
@@ -55,16 +55,23 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
       }
     }
 
-    const topN = (m: Map<string, number>, n: number) => {
+    // Keep only streams worth a visual slot (≥4% of the column) — everything
+    // smaller pools into "Other" so tiny flows can't shred the diagram.
+    const topShare = (m: Map<string, number>, total: number, maxN: number): [string, number][] => {
       const sorted = [...m.entries()].sort((a, b) => b[1] - a[1]);
-      const top = sorted.slice(0, n);
-      const rest = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
-      if (rest > 0) top.push(['Other', rest]);
+      const top: [string, number][] = [];
+      let rest = 0;
+      for (const [name, v] of sorted) {
+        if (top.length < maxN && total > 0 && v / total >= 0.04) top.push([name, v]);
+        else rest += v;
+      }
+      if (top.length === 0 && sorted.length > 0) { top.push(sorted[0]); rest -= sorted[0][1]; }
+      if (rest > 0.005) top.push(['Other', rest]);
       return top;
     };
 
-    const left = topN(sources, 3);
-    const right: [string, number][] = topN(categories, 4);
+    const left = topShare(sources, incomeTotal, 4);
+    const right = topShare(categories, expenseTotal, 4);
     const savings = incomeTotal - expenseTotal;
     if (savings > 0) right.push(['Saved', savings]);
 
@@ -254,15 +261,17 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               <p className="text-[10px] text-muted-taupe mb-3">{flow.monthLabel} · in {formatAmount(flow.incomeTotal).split('.')[0]} → out {formatAmount(flow.expenseTotal).split('.')[0]}{flow.savings > 0 ? ` → saved ${formatAmount(flow.savings).split('.')[0]}` : ''}</p>
 
               <div className="flex gap-2">
-                {/* Left labels */}
+                {/* Left labels — w-full keeps long names truncating inside
+                    their 88px column instead of bleeding off-screen */}
                 <div className="w-[88px] relative h-44 shrink-0">
                   {flowSvg.leftNodes.map((n, i) => (
-                    <div key={i} className="absolute right-0 flex flex-col justify-center text-right pr-1"
+                    n.h >= 9 && (
+                    <div key={i} className="absolute left-0 w-full flex flex-col justify-center text-right pr-1 overflow-hidden"
                          style={{ top: `${n.y}%`, height: `${n.h}%` }}>
-                      <span className="text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{n.name}</span>
-                      <span className="text-[8px] text-muted-taupe">{formatAmount(n.value).split('.')[0]}</span>
+                      <span className="block text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{n.name}</span>
+                      <span className="block text-[8px] text-muted-taupe truncate">{formatAmountCompact(n.value)}</span>
                     </div>
-                  ))}
+                  )))}
                 </div>
 
                 {/* Ribbons */}
@@ -271,21 +280,51 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     <path key={i} d={r.d} fill={r.color} fillOpacity={r.opacity} />
                   ))}
                   {flowSvg.leftNodes.map((n, i) => (
-                    <rect key={`l${i}`} x={0} y={n.y} width={flowSvg.COL} height={n.h} rx={1.5} fill={n.color} />
+                    <rect key={`l${i}`} x={0} y={n.y} width={flowSvg.COL} height={n.h} rx={1.5} fill={n.color}>
+                      <title>{n.name}</title>
+                    </rect>
                   ))}
                   {flowSvg.rightNodes.map((n, i) => (
                     <rect key={`r${i}`} x={flowSvg.W - flowSvg.COL} y={n.y} width={flowSvg.COL} height={n.h} rx={1.5}
-                          fill={n.name === 'Saved' ? '#9BAE93' : '#8E8D8A'} fillOpacity={n.name === 'Saved' ? 1 : 0.55} />
+                          fill={n.name === 'Saved' ? '#9BAE93' : '#8E8D8A'} fillOpacity={n.name === 'Saved' ? 1 : 0.55}>
+                      <title>{n.name}</title>
+                    </rect>
                   ))}
                 </svg>
 
                 {/* Right labels */}
                 <div className="w-[88px] relative h-44 shrink-0">
                   {flowSvg.rightNodes.map((n, i) => (
-                    <div key={i} className="absolute left-0 flex flex-col justify-center pl-1"
+                    n.h >= 9 && (
+                    <div key={i} className="absolute left-0 w-full flex flex-col justify-center pl-1 overflow-hidden"
                          style={{ top: `${n.y}%`, height: `${n.h}%` }}>
-                      <span className={`text-[9px] font-semibold truncate leading-tight ${n.name === 'Saved' ? 'text-sage' : 'text-premium-charcoal'}`} title={n.name}>{n.name}</span>
-                      <span className="text-[8px] text-muted-taupe">{formatAmount(n.value).split('.')[0]}</span>
+                      <span className={`block text-[9px] font-semibold truncate leading-tight ${n.name === 'Saved' ? 'text-sage' : 'text-premium-charcoal'}`} title={n.name}>{n.name}</span>
+                      <span className="block text-[8px] text-muted-taupe truncate">{formatAmountCompact(n.value)}</span>
+                    </div>
+                  )))}
+                </div>
+              </div>
+
+              {/* Legend — every flow gets a readable line, including the
+                  small ones whose in-diagram labels are hidden */}
+              <div className="mt-4 pt-3 border-t border-black/5 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                <div className="space-y-1.5">
+                  <p className="text-[8px] uppercase tracking-widest text-muted-taupe font-bold">In</p>
+                  {flowSvg.leftNodes.map((n, i) => (
+                    <div key={i} className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: n.color }} />
+                      <span className="text-[10px] text-premium-charcoal truncate flex-1" title={n.name}>{n.name}</span>
+                      <span className="text-[10px] text-muted-taupe shrink-0 tabular-nums">{formatAmountCompact(n.value)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[8px] uppercase tracking-widest text-muted-taupe font-bold">Out</p>
+                  {flowSvg.rightNodes.map((n, i) => (
+                    <div key={i} className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${n.name === 'Saved' ? 'bg-sage' : 'bg-[#8E8D8A]/60'}`} />
+                      <span className={`text-[10px] truncate flex-1 ${n.name === 'Saved' ? 'text-sage font-semibold' : 'text-premium-charcoal'}`} title={n.name}>{n.name}</span>
+                      <span className="text-[10px] text-muted-taupe shrink-0 tabular-nums">{formatAmountCompact(n.value)}</span>
                     </div>
                   ))}
                 </div>

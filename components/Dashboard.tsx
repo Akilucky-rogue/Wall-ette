@@ -39,30 +39,48 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const lastKey = endYear * 12 + endMonth;
     const firstKey = lastKey - 11;
 
-    const net = new Array(12).fill(0);
+    const inc = new Array(12).fill(0);
+    const exp = new Array(12).fill(0);
     let beforeWindow = 0;
 
     for (const t of transactions) {
       const d = new Date(t.date);
       const k = d.getFullYear() * 12 + d.getMonth();
-      const signed = t.type === TransactionType.INCOME ? t.amount : -t.amount;
-      if (k < firstKey) beforeWindow += signed;
-      else if (k <= lastKey) net[k - firstKey] += signed;
+      const isIncome = t.type === TransactionType.INCOME;
+      if (k < firstKey) beforeWindow += isIncome ? t.amount : -t.amount;
+      else if (k <= lastKey) {
+        if (isIncome) inc[k - firstKey] += t.amount;
+        else exp[k - firstKey] += t.amount;
+      }
       // Transactions after the selected month are excluded (as before).
     }
 
     let running = openingBalance + beforeWindow;
-    const months: { label: string; value: number }[] = [];
+    const months: { label: string; fullLabel: string; value: number; income: number; expense: number; net: number }[] = [];
     for (let i = 0; i < 12; i++) {
-      running += net[i];
+      running += inc[i] - exp[i];
       const d = new Date(endYear, endMonth - (11 - i), 1);
       months.push({
         label: d.toLocaleString('default', { month: 'short' }),
-        value: running
+        fullLabel: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+        value: running,
+        income: inc[i],
+        expense: exp[i],
+        net: inc[i] - exp[i],
       });
     }
     return months;
   }, [transactions, openingBalance, selectedDate]);
+
+  // Interactive trend selection (audit follow-up: tappable points).
+  // Default to the most recent month that actually had activity.
+  const [trendIdx, setTrendIdx] = useState<number | null>(null);
+  const defaultTrendIdx = useMemo(() => {
+    for (let i = balanceTrend.length - 1; i >= 0; i--) {
+      if (balanceTrend[i].income > 0 || balanceTrend[i].expense > 0) return i;
+    }
+    return balanceTrend.length - 1;
+  }, [balanceTrend]);
 
   // --- Income vs Expense Bar Data (single pass) ---
   const { income, expenses, balance, periodLabel } = useMemo(() => {
@@ -197,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
       {/* Eco decorative elements */}
       <FloatingLeaf className="top-20 right-4 opacity-40 z-10" delay={0} />
       <FloatingLeaf className="top-48 left-3 opacity-30" delay={1.2} color="#A8B89E" />
@@ -334,8 +352,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </span>
         </button>
       </div>
+      {/* Desktop: cards flow into two columns; phones/APK keep the single
+          column (CSS columns are inert below md). */}
+      <div className="md:columns-2 md:gap-x-0">
+
       {/* Income/Expense Summary (Daily, Monthly, All Time) */}
-      <div className="grid grid-cols-2 gap-4 px-6 py-2">
+      <div className="grid grid-cols-2 gap-4 px-6 py-2 break-inside-avoid">
         {/* Income Card */}
         <div className="flex flex-col gap-3 rounded-3xl bg-white p-5 shadow-soft border border-black/[0.02]">
           <div className="text-sage bg-sage-light w-9 h-9 rounded-full flex items-center justify-center">
@@ -378,7 +400,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </div>
       {/* Quick Services */}
-      <div className="px-6 py-8">
+      <div className="px-6 py-8 break-inside-avoid">
         <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight mb-5">Quick Services</h3>
         <div className="grid grid-cols-3 gap-4">
           <button 
@@ -400,7 +422,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Report</span>
           </button>
           <button
-            onClick={() => onNavigate(AppScreen.ANALYSIS)}
+            onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
             className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
           >
             <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">
@@ -410,58 +432,92 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </button>
         </div>
       </div>
-      {/* Balance Trend Sparkline (12 months) */}
-      {balanceTrend.length > 1 && (
-        <div className="px-6 py-2 mb-2">
-          <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
-            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">12-Month Balance Trend</p>
-            <div className="relative h-16">
-              {(() => {
-                const vals = balanceTrend.map(m => m.value);
-                const min = Math.min(...vals);
-                const max = Math.max(...vals);
-                const range = max - min || 1;
-                const w = 100 / (vals.length - 1);
-                const points = vals.map((v, i) => `${i * w},${100 - ((v - min) / range) * 100}`).join(' ');
-                return (
-                  <svg viewBox={`0 0 100 100`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke="#9BAE93"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                    {vals.map((v, i) => (
-                      <circle
-                        key={i}
-                        cx={i * w}
-                        cy={100 - ((v - min) / range) * 100}
-                        r="4"
-                        fill="white"
-                        stroke="#9BAE93"
-                        strokeWidth="2"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ))}
-                  </svg>
-                );
-              })()}
-            </div>
-            <div className="flex justify-between mt-2">
-              {balanceTrend.filter((_, i) => i % 3 === 0 || i === balanceTrend.length - 1).map((m, i) => (
-                <span key={i} className="text-[9px] text-muted-taupe font-medium">{m.label}</span>
-              ))}
+      {/* Balance Trend (12 months) — tap a point for details */}
+      {balanceTrend.length > 1 && (() => {
+        const vals = balanceTrend.map(m => m.value);
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const range = max - min || 1;
+        const w = 100 / (vals.length - 1);
+        // y in 8..92% so points never clip at the card edges
+        const ys = vals.map(v => 92 - ((v - min) / range) * 84);
+        const linePoints = ys.map((y, i) => `${i * w},${y}`).join(' ');
+        const selIdx = trendIdx !== null ? trendIdx : defaultTrendIdx;
+        const sel = balanceTrend[selIdx];
+        const quiet = sel.income === 0 && sel.expense === 0;
+        return (
+          <div className="px-6 py-2 mb-2 break-inside-avoid">
+            <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">12-Month Balance Trend</p>
+                <p className="text-[9px] text-muted-taupe/70">tap a point</p>
+              </div>
+              <div className="relative h-24 mx-1.5">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+                  <defs>
+                    <linearGradient id="balTrendFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#9BAE93" stopOpacity="0.28" />
+                      <stop offset="100%" stopColor="#9BAE93" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <polygon points={`0,100 ${linePoints} 100,100`} fill="url(#balTrendFill)" />
+                  <polyline
+                    points={linePoints}
+                    fill="none"
+                    stroke="#9BAE93"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                {/* Points as HTML so they stay perfectly round (SVG stretching
+                    turned them into ovals) and get real 28px tap targets */}
+                {balanceTrend.map((m, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setTrendIdx(trendIdx === i ? null : i)}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center"
+                    style={{ left: `${i * w}%`, top: `${ys[i]}%` }}
+                    aria-label={`${m.fullLabel}: ${formatAmount(m.value)}`}
+                  >
+                    <span className={`rounded-full border-2 border-sage transition-all ${i === selIdx ? 'w-3.5 h-3.5 bg-sage shadow-sm' : 'w-2 h-2 bg-white'}`} />
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between mt-1 mx-1.5">
+                {balanceTrend.filter((_, i) => i % 3 === 0 || i === balanceTrend.length - 1).map((m, i) => (
+                  <span key={i} className="text-[9px] text-muted-taupe font-medium">{m.label}</span>
+                ))}
+              </div>
+              {/* Selected month detail */}
+              <div className="mt-3 pt-3 border-t border-black/5 flex items-center justify-between gap-2">
+                <div className="shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-taupe">{sel.fullLabel}</p>
+                  <p className="text-[14px] font-serif font-bold text-premium-charcoal">{formatAmount(sel.value).split('.')[0]}</p>
+                </div>
+                {quiet ? (
+                  <p className="text-[10px] text-muted-taupe italic">No activity this month — balance unchanged</p>
+                ) : (
+                  <>
+                    <div className="text-right text-[10px] font-semibold">
+                      <p className="text-sage">+{formatAmount(sel.income).split('.')[0]} in</p>
+                      <p className="text-rose">−{formatAmount(sel.expense).split('.')[0]} out</p>
+                    </div>
+                    <div className={`text-[11px] font-bold px-3 py-1.5 rounded-full shrink-0 ${sel.net >= 0 ? 'bg-sage-light text-sage' : 'bg-rose-light text-rose'}`}>
+                      {sel.net >= 0 ? '+' : '−'}{formatAmount(Math.abs(sel.net)).split('.')[0]}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Savings Rate + Category Breakdown */}
       {(income > 0 || categoryBreakdown.length > 0) && (
-        <div className="px-6 py-2 mb-2 grid grid-cols-2 gap-4">
+        <div className="px-6 py-2 mb-2 grid grid-cols-2 gap-4 break-inside-avoid">
           {/* Savings Rate */}
           {income > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
@@ -499,7 +555,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       {/* Recent Transactions */}
       {recentTransactions.length > 0 && (
-        <div className="px-6 py-2 mb-2">
+        <div className="px-6 py-2 mb-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-4">
               <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recent</p>
@@ -534,7 +590,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       {/* Empty state when no transactions */}
       {transactions.length === 0 && (
-        <div className="px-6 py-8 flex flex-col items-center gap-4 text-center">
+        <div className="px-6 py-8 flex flex-col items-center gap-4 text-center break-inside-avoid">
           <div className="w-16 h-16 rounded-full bg-sage-light flex items-center justify-center">
             <span className="material-symbols-outlined text-sage text-[28px]">account_balance_wallet</span>
           </div>
@@ -558,6 +614,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      </div>{/* /md:columns-2 */}
     </div>
   );
 };

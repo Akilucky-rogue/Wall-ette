@@ -124,20 +124,25 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wall-ette Statement — ${escapeHtml(periodLabel)}</title>
 <style>
-  body{font-family:Georgia,'Times New Roman',serif;background:#FAF9F6;color:#333;margin:0;padding:32px 16px}
-  .page{max-width:680px;margin:0 auto;background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
-  h1{font-size:26px;margin:0}.dot{color:#9BAE93}
-  .sub{color:#8E8D8A;font-size:13px;margin-top:4px}
+  *{box-sizing:border-box}
+  body{font-family:Georgia,'Times New Roman',serif;background:#FAF9F6;color:#333;margin:0;padding:20px 8px}
+  .page{max-width:680px;margin:0 auto;background:#fff;border-radius:24px;padding:28px 18px;box-shadow:0 4px 20px rgba(0,0,0,.05);overflow:hidden}
+  @media(min-width:560px){body{padding:32px 16px}.page{padding:40px}}
+  h1{font-size:24px;margin:0}.dot{color:#9BAE93}
+  .sub{color:#8E8D8A;font-size:13px;margin-top:4px;overflow-wrap:anywhere}
   .grid{display:flex;gap:12px;margin:28px 0;flex-wrap:wrap}
-  .card{flex:1;min-width:140px;background:#FAF9F6;border-radius:16px;padding:16px}
+  .card{flex:1 1 130px;min-width:0;background:#FAF9F6;border-radius:16px;padding:14px}
   .card .l{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#8E8D8A}
-  .card .v{font-size:20px;font-weight:700;margin-top:6px}
+  .card .v{font-size:17px;font-weight:700;margin-top:6px;overflow-wrap:anywhere}
   .pos{color:#7d937a}.neg{color:#c98989}
   h2{font-size:13px;text-transform:uppercase;letter-spacing:.15em;color:#8E8D8A;margin:32px 0 12px;border-bottom:1px solid #eee;padding-bottom:8px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  td{padding:8px 4px;border-bottom:1px solid #f3f1ec}
-  .bar{height:6px;border-radius:3px;background:#9BAE93;opacity:.7}
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  td{padding:8px 4px;border-bottom:1px solid #f3f1ec;overflow-wrap:anywhere;vertical-align:middle}
+  .tname{width:30%}.tamt{width:25%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.tpct{width:13%;text-align:right;color:#8E8D8A}
+  .rname{width:34%}.rcad{width:16%;color:#8E8D8A}.ramt{width:25%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.rmo{width:25%;text-align:right;color:#8E8D8A;font-variant-numeric:tabular-nums}
+  .bar{height:6px;border-radius:3px;background:#9BAE93;opacity:.7;max-width:100%}
   ul{padding-left:18px;font-size:14px;line-height:1.7;color:#444}
+  li,p{overflow-wrap:anywhere}
   .foot{margin-top:36px;text-align:center;color:#b9b7b2;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
   @media print{body{background:#fff;padding:0}.page{box-shadow:none}}
 </style></head><body><div class="page">
@@ -154,17 +159,17 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
   ${stats.topCategories.length > 0 ? `<h2>Where the money went</h2>
   <table>${stats.topCategories.map(([name, amt]) => `
-    <tr><td style="width:32%">${escapeHtml(name)}</td>
+    <tr><td class="tname">${escapeHtml(name)}</td>
         <td><div class="bar" style="width:${Math.max(6, Math.round((amt / maxCat) * 100))}%"></div></td>
-        <td style="width:18%;text-align:right;font-weight:700">${fmt(amt)}</td>
-        <td style="width:10%;text-align:right;color:#8E8D8A">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</td></tr>`).join('')}
+        <td class="tamt">${fmt(amt)}</td>
+        <td class="tpct">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</td></tr>`).join('')}
   </table>` : ''}
 
   ${recurring.length > 0 ? `<h2>Recurring charges</h2>
   <table>${recurring.map(r => `
-    <tr><td>${escapeHtml(r.name)}</td><td style="color:#8E8D8A">${r.cadence.toLowerCase()}</td>
-        <td style="text-align:right;font-weight:700">${fmt(r.amount)}</td>
-        <td style="text-align:right;color:#8E8D8A">≈ ${fmt(r.monthlyCost)}/mo</td></tr>`).join('')}
+    <tr><td class="rname">${escapeHtml(r.name)}</td><td class="rcad">${r.cadence.toLowerCase()}</td>
+        <td class="ramt">${fmt(r.amount)}</td>
+        <td class="rmo">≈ ${fmt(r.monthlyCost)}/mo</td></tr>`).join('')}
   </table>` : ''}
 
   <h2>Insights</h2>

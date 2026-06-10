@@ -107,8 +107,11 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 │   ├── IDFCBankParser.ts# Rule-based Excel statement parser (xlsx)
 │   └── insightsService.ts # Local financial insights (no AI/API)
 ├── utils/
-│   └── log.ts           # Logger (debug/info/warn are no-ops in production)
-├── docs/                # Project documentation
+│   ├── log.ts           # Logger (debug/info/warn are no-ops in production)
+│   └── exportFile.ts    # Platform-aware export (web download / Android share sheet)
+├── docs/                # Project documentation, audit report, fix checklist
+├── scripts/             # Dev-only tools (parser debugging, icon generation)
+├── private/             # Personal files: statements, old builds (gitignored)
 ├── types.ts             # TypeScript Interfaces
 ├── currencyUtils.ts     # Currency conversion + cached formatters
 └── index.html           # Entry point

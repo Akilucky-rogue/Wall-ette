@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
-import { AppScreen } from '../types';
+import React, { useMemo, useState } from 'react';
+import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { huntSavings } from '../services/analyticsService';
+import { huntSavings, normalizeMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, RangoliCorner, MandalaDots } from './SplashScreen';
 
 interface FeeHunterProps {
@@ -9,9 +9,48 @@ interface FeeHunterProps {
 }
 
 const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, formatAmount, formatAmountCompact, deleteTransactions } = useWallet();
+  const [cleaning, setCleaning] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const hunt = useMemo(() => huntSavings(transactions), [transactions]);
+
+  // Exact duplicates INSIDE the wallet (same date + type + amount + merchant,
+  // both imported) — usually the result of "Include Anyway" on an overlap.
+  const walletDupes = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+    for (const t of transactions) {
+      const key = `${t.date.slice(0, 10)}|${t.type}|${t.amount.toFixed(2)}|${normalizeMerchant(t.merchant || '')}|${(t.merchant || '').slice(0, 60)}`;
+      const g = groups.get(key);
+      if (g) g.push(t);
+      else groups.set(key, [t]);
+    }
+    const surplus: Transaction[] = [];
+    let net = 0, groupCount = 0;
+    for (const g of groups.values()) {
+      if (g.length < 2) continue;
+      groupCount++;
+      for (const t of g.slice(1)) {
+        surplus.push(t);
+        net += t.type === TransactionType.INCOME ? t.amount : -t.amount;
+      }
+    }
+    return { surplus, net, groupCount };
+  }, [transactions]);
+
+  const cleanDupes = () => {
+    if (cleaning || walletDupes.surplus.length === 0) return;
+    const ok = window.confirm(
+      `Remove ${walletDupes.surplus.length} duplicate entr${walletDupes.surplus.length === 1 ? 'y' : 'ies'}? ` +
+      `One copy of each transaction is kept. This corrects your balance by ${formatAmount(Math.abs(walletDupes.net))}.`
+    );
+    if (!ok) return;
+    setCleaning(true);
+    deleteTransactions(walletDupes.surplus.map(t => t.id));
+    setToast(`Removed ${walletDupes.surplus.length} duplicates — balance corrected`);
+    setTimeout(() => setToast(null), 3500);
+    setCleaning(false);
+  };
   const fmt = (n: number) => formatAmount(n).split('.')[0];
   const dl = (s: string) =>
     new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
@@ -63,6 +102,44 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
             </p>
           )}
         </div>
+
+        {/* Duplicate entries in the wallet — actionable, fix with one tap */}
+        {walletDupes.surplus.length > 0 && (
+          <div className="bg-white rounded-3xl p-5 shadow-soft border-2 border-rose/20 break-inside-avoid">
+            <div className="flex items-baseline justify-between mb-1">
+              <p className="text-[10px] uppercase tracking-widest text-rose font-bold">Duplicate entries found</p>
+              <p className="text-[13px] font-serif font-bold text-rose">{walletDupes.surplus.length}</p>
+            </div>
+            <p className="text-[10px] text-muted-taupe mb-4 leading-relaxed">
+              {walletDupes.groupCount} transaction{walletDupes.groupCount === 1 ? '' : 's'} exist more than once in your wallet
+              (identical date, amount & merchant) — usually from importing an overlapping statement with
+              "Include Anyway". They skew your balance by {formatAmountCompact(Math.abs(walletDupes.net))}.
+            </p>
+            <div className="space-y-2 mb-4 max-h-44 overflow-y-auto">
+              {walletDupes.surplus.slice(0, 8).map(t => (
+                <div key={t.id} className="flex items-center gap-2 min-w-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose shrink-0" />
+                  <span className="text-[10px] text-muted-taupe shrink-0">{t.date.slice(0, 10)}</span>
+                  <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || ''}>{t.merchant || t.category}</span>
+                  <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
+                    {t.type === TransactionType.EXPENSE ? '-' : '+'}{formatAmountCompact(t.amount)}
+                  </span>
+                </div>
+              ))}
+              {walletDupes.surplus.length > 8 && (
+                <p className="text-[9px] text-muted-taupe">+{walletDupes.surplus.length - 8} more</p>
+              )}
+            </div>
+            <button
+              onClick={cleanDupes}
+              disabled={cleaning}
+              className="w-full bg-rose text-white py-3 rounded-2xl font-serif text-[14px] font-semibold active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[18px]">cleaning_services</span>
+              Remove duplicates · keep one of each
+            </button>
+          </div>
+        )}
 
         {/* Bank fees */}
         {hunt.fees.items.length > 0 && (
@@ -150,6 +227,13 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
           </div>
         )}
       </div>
+
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
+          <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
+          <span className="text-[13px] font-medium font-serif">{toast}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,6 +30,8 @@ interface WalletContextType {
   addTransaction: (transaction: Transaction) => Promise<boolean>;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
+  /** Bulk delete in ONE state update — looping deleteTransaction would race itself. */
+  deleteTransactions: (ids: string[]) => void;
   /** Clears instantly; cloud deletion runs in the background unless waitForCloud. */
   clearAllTransactions: (waitForCloud?: boolean) => Promise<void>;
   importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string) => void;
@@ -637,6 +639,28 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [transactions, persistTransactions, user, isBackendReady]);
 
+  const deleteTransactions = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const newTxs = transactions.filter(t => !idSet.has(t.id));
+    setTransactions(newTxs);
+    persistTransactions(newTxs);
+
+    if (user && isBackendReady) {
+        const uid = user.uid;
+        (async () => {
+            try {
+                const chunks = chunkArray(ids, 500);
+                await Promise.all(chunks.map(chunk => {
+                    const batch = writeBatch(db);
+                    chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
+                    return batch.commit();
+                }));
+            } catch { log.warn('Bulk delete: backend cleanup failed'); }
+        })();
+    }
+  }, [transactions, persistTransactions, user, isBackendReady]);
+
   const clearAllTransactions = useCallback(async (waitForCloud = false) => {
     // Capture ids BEFORE wiping state — deleting by known ids skips the
     // expensive getDocs read that made Clear All feel slow.
@@ -783,6 +807,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       addTransaction,
       editTransaction,
       deleteTransaction,
+      deleteTransactions,
       clearAllTransactions,
       importTransactions,
       toggleIgnoreRule,
@@ -806,7 +831,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
-      clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
+      deleteTransactions, clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatAmountCompact,
       convertToBase, retryCloudConnection, refresh, lastLoginTime

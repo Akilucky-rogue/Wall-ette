@@ -471,14 +471,22 @@ export interface HuntResult {
   totalFound: number;
 }
 
-const FEE_RX = /(\bfees?\b|charge|chrg\b|penal|penalty|\bamc\b|annual maint|sms alert|min(imum)? ?bal|non.?maint|atm decl|decl(ine)? fee|service charge|debit card amc|gst on|consolidated charg|chq return|ecs return|cheque bounce|late payment)/i;
+// Bank-charge rows never arrive via a payment rail — a "UPI/.../charger"
+// purchase or "math fees" payment must not count as a bank fee.
+const RAIL_RX = /^(upi|imps|neft|rtgs|ift|pos|atm)[\s\/\-]/i;
+const FEE_RX = /(\bfees?\b|\bcharges?\b|\bchgs?\b|penal|\bamc\b|annual maint|sms alert|min(imum)? ?bal|non.?maint|atm decl|service charge|debit card a|gst on|consolidated charg|chq return|ecs return|cheque bounce|late payment)/i;
+// Transfers/cash/person-to-person — excluded from double-charge analysis,
+// repeats there are almost always intentional.
+const TRANSFER_RX = /^(ift|imps|neft|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]|mandate/i;
 
 export const huntSavings = (transactions: Transaction[]): HuntResult => {
   // ── 1. Bank fees & charges ──
   const feeMap = new Map<string, FeeItem>();
   for (const t of transactions) {
     if (t.type !== TransactionType.EXPENSE) continue;
-    const text = `${t.merchant || ''} ${t.note || ''} ${t.category}`;
+    const merchant = t.merchant || '';
+    if (RAIL_RX.test(merchant)) continue; // user payment, not a bank charge
+    const text = `${merchant} ${t.note || ''}`;
     if (!FEE_RX.test(text)) continue;
     const key = normalizeMerchant(t.merchant || t.category) || 'bankcharges';
     const e = feeMap.get(key) ?? { merchant: t.merchant || 'Bank charges', total: 0, count: 0, lastDate: t.date };
@@ -491,11 +499,13 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
   const feeTotal = feeItems.reduce((s, i) => s + i.total, 0);
   const feeCount = feeItems.reduce((s, i) => s + i.count, 0);
 
-  // ── 2. Possible double charges ──
+  // ── 2. Possible double charges (review list — repeats can be intentional,
+  //       so these do NOT count toward the headline total) ──
   const counts = new Map<string, { merchant: string; date: string; amount: number; copies: number }>();
   for (const t of transactions) {
     if (t.type !== TransactionType.EXPENSE) continue;
     if (t.amount < 20) continue; // ignore trivia
+    if (TRANSFER_RX.test(t.merchant || '')) continue; // transfers/ATM/pay-requests repeat by design
     const key = `${t.date.slice(0, 10)}|${t.amount.toFixed(2)}|${normalizeMerchant(t.merchant || '')}`;
     const e = counts.get(key);
     if (e) e.copies++;
@@ -521,6 +531,7 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
   const creepItems: CreepItem[] = [];
   for (const g of groups.values()) {
     if (g.events.length < 4) continue;
+    if (TRANSFER_RX.test(g.name)) continue; // transfers aren't subscriptions
     g.events.sort((a, b) => (a.date < b.date ? -1 : 1));
     const spanDays = (Date.parse(g.events[g.events.length - 1].date) - Date.parse(g.events[0].date)) / 86400000;
     if (spanDays < 120) continue;
@@ -537,8 +548,20 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
       const v = arr.map(e => e.amount).sort((a, b) => a - b);
       return v[Math.floor(v.length / 2)];
     };
-    const from = median(g.events.slice(0, slice));
-    const to = median(g.events.slice(-slice));
+    const cv = (arr: { amount: number }[]) => {
+      const vals = arr.map(e => e.amount);
+      const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+      if (mean <= 0) return 9;
+      const sd = Math.sqrt(vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length);
+      return sd / mean;
+    };
+    const firstSlice = g.events.slice(0, slice);
+    const lastSlice = g.events.slice(-slice);
+    // A real subscription bills a FIXED price in each era — variable-amount
+    // payees (ticket sites, aggregators, people) are spending, not creep.
+    if (cv(firstSlice) > 0.15 || cv(lastSlice) > 0.15) continue;
+    const from = median(firstSlice);
+    const to = median(lastSlice);
     if (to > from * 1.05 && to - from >= 10) {
       creepItems.push({
         name: g.name,
@@ -556,6 +579,8 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
     fees: { total: feeTotal, count: feeCount, items: feeItems.slice(0, 10) },
     doubles: { total: dblTotal, count: dblCount, pairs },
     creep: { annualExtra: creepAnnual, items: creepItems.slice(0, 8) },
-    totalFound: feeTotal + dblTotal + creepAnnual,
+    // Doubles are review-only (often intentional) — only verified leak
+    // classes count toward the headline.
+    totalFound: feeTotal + creepAnnual,
   };
 };

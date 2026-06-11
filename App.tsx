@@ -21,6 +21,8 @@ const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const IgnoreRules = React.lazy(() => import('./components/IgnoreRules'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
+const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
+const Rewind = React.lazy(() => import('./components/Rewind'));
 const Profile = React.lazy(() => import('./components/Profile'));
 
 function AppContent() {
@@ -173,6 +175,10 @@ function AppContent() {
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:
         return <ExportReports onNavigate={handleNavigate} />;
+      case AppScreen.HUNTER:
+        return <FeeHunter onNavigate={handleNavigate} />;
+      case AppScreen.REWIND:
+        return <Rewind onNavigate={handleNavigate} />;
       case AppScreen.SELF:
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} />;
       default:
@@ -193,6 +199,8 @@ function AppContent() {
           currentScreen === AppScreen.CATEGORY_SPLIT ||
           currentScreen === AppScreen.SELF ||
           currentScreen === AppScreen.EXPORT ||
+          currentScreen === AppScreen.HUNTER ||
+          currentScreen === AppScreen.REWIND ||
           currentScreen === AppScreen.IGNORE_RULES
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />

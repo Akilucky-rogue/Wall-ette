@@ -55,3 +55,43 @@ export async function exportFile(
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return 'downloaded';
 }
+
+/**
+ * Binary image export (PNG as base64, no data: prefix).
+ * Native: writes to cache and opens the share sheet — perfect for
+ * WhatsApp-ing a Wrapped card. Web: classic download.
+ */
+export async function exportImage(
+  filename: string,
+  base64Data: string
+): Promise<ExportOutcome> {
+  if (Capacitor.isNativePlatform()) {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+
+    const result = await Filesystem.writeFile({
+      path: filename,
+      data: base64Data, // no encoding = binary from base64
+      directory: Directory.Cache,
+    });
+
+    try {
+      await Share.share({
+        title: filename,
+        files: [result.uri],
+        dialogTitle: 'Share your Wrapped',
+      });
+    } catch (e: any) {
+      log.debug('Share dismissed:', e?.message);
+    }
+    return 'shared';
+  }
+
+  const a = document.createElement('a');
+  a.href = `data:image/png;base64,${base64Data}`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return 'downloaded';
+}

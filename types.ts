@@ -49,6 +49,8 @@ export enum AppScreen {
   IGNORE_RULES = 'IGNORE_RULES',
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
+  HUNTER = 'HUNTER', // Fee & Subscription Hunter
+  REWIND = 'REWIND', // Time Machine + Wrapped
   SELF = 'SELF' // Profile
 }
 

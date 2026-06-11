@@ -451,3 +451,111 @@ export const spendingPace = (
     daysInMonth,
   };
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fee & Subscription Hunter — finds money quietly leaking out:
+//   1. bank fees / charges / penalties hiding in the history
+//   2. possible double-charges (same day, amount, merchant)
+//   3. subscription creep (recurring charges that got more expensive)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface FeeItem { merchant: string; total: number; count: number; lastDate: string }
+export interface DoubleCharge { merchant: string; date: string; amount: number; copies: number }
+export interface CreepItem { name: string; from: number; to: number; pct: number; annualExtra: number }
+
+export interface HuntResult {
+  fees: { total: number; count: number; items: FeeItem[] };
+  doubles: { total: number; count: number; pairs: DoubleCharge[] };
+  creep: { annualExtra: number; items: CreepItem[] };
+  /** Fees + double-charge overpayment + one year of subscription creep. */
+  totalFound: number;
+}
+
+const FEE_RX = /(\bfees?\b|charge|chrg\b|penal|penalty|\bamc\b|annual maint|sms alert|min(imum)? ?bal|non.?maint|atm decl|decl(ine)? fee|service charge|debit card amc|gst on|consolidated charg|chq return|ecs return|cheque bounce|late payment)/i;
+
+export const huntSavings = (transactions: Transaction[]): HuntResult => {
+  // ── 1. Bank fees & charges ──
+  const feeMap = new Map<string, FeeItem>();
+  for (const t of transactions) {
+    if (t.type !== TransactionType.EXPENSE) continue;
+    const text = `${t.merchant || ''} ${t.note || ''} ${t.category}`;
+    if (!FEE_RX.test(text)) continue;
+    const key = normalizeMerchant(t.merchant || t.category) || 'bankcharges';
+    const e = feeMap.get(key) ?? { merchant: t.merchant || 'Bank charges', total: 0, count: 0, lastDate: t.date };
+    e.total += t.amount;
+    e.count++;
+    if (t.date > e.lastDate) e.lastDate = t.date;
+    feeMap.set(key, e);
+  }
+  const feeItems = [...feeMap.values()].sort((a, b) => b.total - a.total);
+  const feeTotal = feeItems.reduce((s, i) => s + i.total, 0);
+  const feeCount = feeItems.reduce((s, i) => s + i.count, 0);
+
+  // ── 2. Possible double charges ──
+  const counts = new Map<string, { merchant: string; date: string; amount: number; copies: number }>();
+  for (const t of transactions) {
+    if (t.type !== TransactionType.EXPENSE) continue;
+    if (t.amount < 20) continue; // ignore trivia
+    const key = `${t.date.slice(0, 10)}|${t.amount.toFixed(2)}|${normalizeMerchant(t.merchant || '')}`;
+    const e = counts.get(key);
+    if (e) e.copies++;
+    else counts.set(key, { merchant: t.merchant || 'Unknown', date: t.date.slice(0, 10), amount: t.amount, copies: 1 });
+  }
+  const dblAll = [...counts.values()].filter(d => d.copies > 1);
+  const pairs = dblAll
+    .sort((a, b) => (b.copies - 1) * b.amount - (a.copies - 1) * a.amount)
+    .slice(0, 12);
+  const dblTotal = dblAll.reduce((s, d) => s + (d.copies - 1) * d.amount, 0);
+  const dblCount = dblAll.reduce((s, d) => s + (d.copies - 1), 0);
+
+  // ── 3. Subscription creep ──
+  const groups = new Map<string, { name: string; events: { date: string; amount: number }[] }>();
+  for (const t of transactions) {
+    if (t.type !== TransactionType.EXPENSE) continue;
+    const key = normalizeMerchant(t.merchant || '');
+    if (key.length < 4) continue;
+    let g = groups.get(key);
+    if (!g) { g = { name: t.merchant || '', events: [] }; groups.set(key, g); }
+    g.events.push({ date: t.date.slice(0, 10), amount: t.amount });
+  }
+  const creepItems: CreepItem[] = [];
+  for (const g of groups.values()) {
+    if (g.events.length < 4) continue;
+    g.events.sort((a, b) => (a.date < b.date ? -1 : 1));
+    const spanDays = (Date.parse(g.events[g.events.length - 1].date) - Date.parse(g.events[0].date)) / 86400000;
+    if (spanDays < 120) continue;
+    const gaps: number[] = [];
+    for (let i = 1; i < g.events.length; i++) {
+      gaps.push((Date.parse(g.events[i].date) - Date.parse(g.events[i - 1].date)) / 86400000);
+    }
+    gaps.sort((a, b) => a - b);
+    const medGap = gaps[Math.floor(gaps.length / 2)];
+    if (medGap < 20 || medGap > 45) continue; // monthly-ish subscriptions only
+
+    const slice = Math.max(2, Math.floor(g.events.length / 3));
+    const median = (arr: { amount: number }[]) => {
+      const v = arr.map(e => e.amount).sort((a, b) => a - b);
+      return v[Math.floor(v.length / 2)];
+    };
+    const from = median(g.events.slice(0, slice));
+    const to = median(g.events.slice(-slice));
+    if (to > from * 1.05 && to - from >= 10) {
+      creepItems.push({
+        name: g.name,
+        from,
+        to,
+        pct: Math.round(((to - from) / from) * 100),
+        annualExtra: (to - from) * 12,
+      });
+    }
+  }
+  creepItems.sort((a, b) => b.annualExtra - a.annualExtra);
+  const creepAnnual = creepItems.reduce((s, c) => s + c.annualExtra, 0);
+
+  return {
+    fees: { total: feeTotal, count: feeCount, items: feeItems.slice(0, 10) },
+    doubles: { total: dblTotal, count: dblCount, pairs },
+    creep: { annualExtra: creepAnnual, items: creepItems.slice(0, 8) },
+    totalFound: feeTotal + dblTotal + creepAnnual,
+  };
+};

@@ -64,7 +64,9 @@ interface ParsedStatement {
 // PDF TEXT EXTRACTION
 // ═══════════════════════════════════════════════════════════════
 
-async function extractTextFromPDF(base64Data: string): Promise<string> {
+interface PdfItem { text: string; x: number; y: number; w: number }
+
+async function extractFromPDF(base64Data: string): Promise<{ text: string; pages: PdfItem[][] }> {
     // Worker is bundled by Vite (?url emits it as a local asset) instead of
     // being fetched from unpkg at runtime — works offline and on native
     // Android, and removes the CDN supply-chain dependency (audit Phase 3.4).
@@ -73,49 +75,202 @@ async function extractTextFromPDF(base64Data: string): Promise<string> {
         import('pdfjs-dist/build/pdf.worker.min.mjs?url')
     ]);
     pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
-    
+
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
     }
-    
+
     const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
     const numPages = pdf.numPages;
     let fullText = '';
-    
+    const pages: PdfItem[][] = [];
+
     for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        
-        // Sort items by position (top to bottom, left to right)
-        const items = textContent.items.map((item: any) => ({
-            text: item.str,
-            y: item.transform[5],
-            x: item.transform[4]
-        }));
-        
-        items.sort((a, b) => {
+
+        // Positioned items — the column-aware table parser needs x/y/width.
+        const items: PdfItem[] = (textContent.items as any[])
+            .filter((it: any) => typeof it.str === 'string' && it.str.trim().length > 0)
+            .map((it: any) => ({
+                text: it.str.trim(),
+                x: it.transform[4],
+                y: it.transform[5],
+                w: it.width || 0,
+            }));
+        pages.push(items);
+
+        // Legacy flat text (header regexes + generic fallback parser).
+        const sorted = [...items].sort((a, b) => {
             if (Math.abs(a.y - b.y) > 5) return b.y - a.y; // Top to bottom
             return a.x - b.x; // Left to right
         });
-        
-        let currentY = items[0]?.y;
+        let currentY = sorted[0]?.y;
         let line = '';
-        
-        for (const item of items) {
+        for (const item of sorted) {
             if (Math.abs(item.y - currentY) > 5) {
                 fullText += line + '\n';
                 line = item.text;
                 currentY = item.y;
             } else {
-                line += ' ' + item.text;
+                line += (line ? ' ' : '') + item.text;
             }
         }
         fullText += line + '\n';
     }
-    
-    return fullText;
+
+    return { text: fullText, pages };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLUMN-AWARE TABLE PARSER (primary PDF path)
+// IDFC PDFs wrap each description onto a second line and only the
+// x-position distinguishes Debit from Credit — line-based splitting
+// cannot parse them. This rebuilds the table from item coordinates:
+// column boundaries come from the header row ("Debit"/"Credit"/
+// "Balance" midpoints), wrapped description lines are re-attached to
+// their row, and INCOME/EXPENSE is verified against the running
+// balance column. Validated row-for-row against the bank's own Excel
+// exports of the same statements.
+// ═══════════════════════════════════════════════════════════════
+
+const DATE_TOKEN = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/;
+const AMT_TOKEN = /^-?[\d,]+\.\d{2}$/;
+const MONTH_NUM: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+interface TableRow { date: string; desc: string; deb: number | null; cre: number | null; bal: number | null }
+interface TableResult {
+    rows: TableRow[];
+    summary: { opening: number; totDeb: number; totCre: number; closing: number } | null;
+}
+
+function parseIDFCTable(pages: PdfItem[][]): TableResult {
+    const rows: TableRow[] = [];
+    let summary: TableResult['summary'] = null;
+    let bounds: { chqD: number; dc: number; cb: number; partX: number } | null = null;
+
+    for (const items of pages) {
+        // Bucket into visual lines (~4pt tolerance); pdf.js y grows upward,
+        // so larger y = higher on the page.
+        const buckets = new Map<number, PdfItem[]>();
+        for (const it of items) {
+            const key = Math.round(it.y / 4);
+            const b = buckets.get(key);
+            if (b) b.push(it); else buckets.set(key, [it]);
+        }
+        const keys = [...buckets.keys()].sort((a, b) => b - a);
+        const lines = keys.map(k => buckets.get(k)!.sort((a, b) => a.x - b.x));
+
+        for (let i = 0; i < lines.length; i++) {
+            const ln = lines[i];
+            const texts = ln.map(it => it.text);
+
+            // Summary block: label line, values on the NEXT line.
+            if (!summary && texts.includes('Opening') && texts.includes('Balance') && texts.join(' ').includes('Debit')) {
+                const next = lines[i + 1];
+                const nums = next ? next.filter(it => AMT_TOKEN.test(it.text)).map(it => parseAmount(it.text)) : [];
+                if (nums.length === 4) {
+                    summary = { opening: nums[0], totDeb: nums[1], totCre: nums[2], closing: nums[3] };
+                }
+                continue;
+            }
+
+            // Header row → derive column boundaries from label midpoints.
+            if (texts.includes('Particulars') && texts.includes('Debit') && texts.includes('Credit')) {
+                const cx: Record<string, number> = {};
+                for (const it of ln) {
+                    if (['Debit', 'Credit', 'Balance', 'Particulars', 'Cheque'].includes(it.text)) {
+                        cx[it.text] = it.x + it.w / 2;
+                    }
+                }
+                if (cx.Debit !== undefined && cx.Credit !== undefined && cx.Balance !== undefined) {
+                    bounds = {
+                        dc: (cx.Debit + cx.Credit) / 2,
+                        cb: (cx.Credit + cx.Balance) / 2,
+                        chqD: ((cx.Cheque ?? cx.Debit - 70) + cx.Debit) / 2,
+                        partX: (cx.Particulars ?? 200) - 60,
+                    };
+                }
+                continue;
+            }
+            if (!bounds) continue;
+
+            const m = DATE_TOKEN.exec(texts[0]);
+            const month = m ? MONTH_NUM[m[2].toLowerCase()] : undefined;
+            if (m && month) {
+                const date = `${m[3]}-${month}-${m[1].padStart(2, '0')}`;
+                let deb: number | null = null, cre: number | null = null, bal: number | null = null;
+                const desc: string[] = [];
+                for (let j = 1; j < ln.length; j++) {
+                    const it = ln[j];
+                    const center = it.x + it.w / 2;
+                    if (DATE_TOKEN.test(it.text) && center < bounds.partX) continue; // value-date column
+                    if (AMT_TOKEN.test(it.text) && center > bounds.chqD) {
+                        const v = parseAmount(it.text);
+                        if (center < bounds.dc) deb = v;
+                        else if (center < bounds.cb) cre = v;
+                        else bal = v;
+                    } else {
+                        desc.push(it.text);
+                    }
+                }
+                rows.push({ date, desc: desc.join(' '), deb, cre, bal });
+            } else if (
+                rows.length > 0 &&
+                ln.every(it => it.x >= bounds!.partX - 25 && it.x < bounds!.chqD)
+            ) {
+                // Wrapped description line — glue back onto the open row.
+                rows[rows.length - 1].desc += texts.join('');
+            }
+            // Anything else (footers, page numbers, in-table "Opening Balance"
+            // marker) falls through harmlessly.
+        }
+    }
+
+    return { rows, summary };
+}
+
+function tableToTransactions(table: TableResult): RawTransaction[] {
+    const out: RawTransaction[] = [];
+    let prev: number | null = table.summary ? table.summary.opening : null;
+
+    for (const r of table.rows) {
+        const amount = r.deb ?? r.cre;
+        if (amount === null || amount <= 0) {
+            if (r.bal !== null) prev = r.bal;
+            continue;
+        }
+        // Column position decides the type; the running balance verifies it.
+        let type: 'INCOME' | 'EXPENSE' = r.deb !== null ? 'EXPENSE' : 'INCOME';
+        if (prev !== null && r.bal !== null) {
+            const delta = r.bal - prev;
+            if (Math.abs(Math.abs(delta) - amount) <= 0.01) {
+                type = delta > 0 ? 'INCOME' : 'EXPENSE';
+            }
+        }
+        if (r.bal !== null) prev = r.bal;
+
+        const c = classifyTransaction(r.desc, type === 'INCOME');
+        out.push({
+            date: r.date,
+            // Full narration, same as the Excel path — keeps dedup and
+            // merchant grouping identical across both import formats.
+            merchant: r.desc.substring(0, 100) || c.merchant,
+            amount,
+            type,
+            nature: c.nature,
+            category: c.category,
+            incomeSource: c.incomeSource,
+            balance: r.bal ?? undefined,
+            note: r.desc,
+        });
+    }
+    return out;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -136,8 +291,9 @@ const PATTERNS = {
     // Account number
     accountNum: /Account\s*No[:\s]+(\d+)/i,
     
-    // Statement period
+    // Statement period — named-month or ISO ("2026-06-01 TO 2026-06-11")
     period: /(?:Statement\s*Period|From)[:\s]+(\d{1,2}[\s\-\/]\w{3}[\s\-\/]\d{2,4})\s*(?:to|To|-)\s*(\d{1,2}[\s\-\/]\w{3}[\s\-\/]\d{2,4})/i,
+    periodIso: /(?:Statement\s*Period)[:\s]+(\d{4}-\d{2}-\d{2})\s*(?:to|TO)\s*(\d{4}-\d{2}-\d{2})/i,
     
     // Opening balance
     openingBalance: /Opening\s*Balance[:\s]+([\d,]+\.?\d*)/i,
@@ -418,13 +574,16 @@ function extractHeader(text: string): StatementHeader {
         header.accountNumber = accMatch[1];
     }
 
-    // Extract period
+    // Extract period (named-month first, ISO format second)
     const periodMatch = text.match(PATTERNS.period);
     if (periodMatch) {
         header.statementPeriod = {
             from: parseDate(periodMatch[1]),
             to: parseDate(periodMatch[2])
         };
+    } else {
+        const iso = text.match(PATTERNS.periodIso);
+        if (iso) header.statementPeriod = { from: iso[1], to: iso[2] };
     }
 
     // Extract balances
@@ -658,18 +817,31 @@ export async function parseIDFCStatement(base64Data: string): Promise<ParsedStat
     const startTime = Date.now();
 
     try {
-        // Extract text from PDF
-        const text = await extractTextFromPDF(base64Data);
+        // Extract positioned items + flat text from the PDF
+        const { text, pages } = await extractFromPDF(base64Data);
 
-        // Extract header info
+        // Extract header info from flat text (period, account no, …)
         const header = extractHeader(text);
 
-        // Parse transactions — IDFC table layout first, generic fallback
-        // for other banks' PDF formats.
-        let transactions = parseTransactionLines(text);
-        if (transactions.length === 0) {
-            transactions = parseGenericTransactionLines(text, header.openingBalance);
-            if (transactions.length > 0) header.bankName = 'Generic (auto-detected)';
+        // 1) Column-aware IDFC table parser (coordinates — handles wrapped
+        //    descriptions and x-position Debit/Credit columns exactly).
+        // 2) Legacy line parser. 3) Generic bank fallback.
+        let transactions: RawTransaction[];
+        const table = parseIDFCTable(pages);
+        if (table.rows.length > 0) {
+            if (table.summary) {
+                header.openingBalance = table.summary.opening;
+                header.totalDebit = table.summary.totDeb;
+                header.totalCredit = table.summary.totCre;
+                header.closingBalance = table.summary.closing;
+            }
+            transactions = tableToTransactions(table);
+        } else {
+            transactions = parseTransactionLines(text);
+            if (transactions.length === 0) {
+                transactions = parseGenericTransactionLines(text, header.openingBalance);
+                if (transactions.length > 0) header.bankName = 'Generic (auto-detected)';
+            }
         }
 
         // Validate mathematical accuracy

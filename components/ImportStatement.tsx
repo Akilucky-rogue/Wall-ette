@@ -657,7 +657,20 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 <div className="flex items-center gap-3 mt-3">
                                     <button
                                         onClick={() => {
-                                            // Select all duplicates
+                                            // One tap here once silently double-counted six weeks of
+                                            // data — make the consequence explicit first.
+                                            let dupNet = 0;
+                                            for (const t of extractedData) {
+                                                if (!duplicateIds.has(t.id)) continue;
+                                                dupNet += t.type === TransactionType.INCOME ? t.amount : -t.amount;
+                                            }
+                                            const ok = window.confirm(
+                                                `These ${duplicateIds.size} entries already exist in your wallet. ` +
+                                                `Including them AGAIN will double-count them and shift your balance by ` +
+                                                `${formatAmount(Math.abs(dupNet))}. Only do this if you're sure they are ` +
+                                                `genuinely separate transactions.\n\nInclude them anyway?`
+                                            );
+                                            if (!ok) return;
                                             const newSelected = new Set(selectedIds);
                                             duplicateIds.forEach(id => newSelected.add(id));
                                             setSelectedIds(newSelected);

@@ -540,7 +540,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
           phase === 'logo' ? 'opacity-0' : 'opacity-60'
         }`}>
           <p className="text-[10px] text-muted-taupe tracking-widest uppercase">
-            v1.1.0
+            v1.2.0
           </p>
         </div>
       )}

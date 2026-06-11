@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { huntSavings } from '../services/analyticsService';
 import CurrencySelector from './CurrencySelector';
 import { WallEEyes, WallEMascot, FloatingLeaf, LotusFlower, Sprout, RangoliCorner, Diya } from './SplashScreen';
 import styles from './Dashboard.module.css';
@@ -24,6 +25,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     refresh();
     setTimeout(() => setRefreshing(false), 900);
   };
+
+  // Hunter teaser (single pass, memoized) + lifetime hook for Rewind.
+  const hunt = useMemo(() => huntSavings(transactions), [transactions]);
+  // Sorted desc — the last element is the earliest transaction.
+  const sinceYear = transactions.length > 0
+    ? new Date(transactions[transactions.length - 1].date).getFullYear()
+    : null;
   const [periodMode, setPeriodMode] = useState<'MONTH' | 'ALL'>('MONTH'); // 'MONTH' or 'ALL'
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
@@ -406,11 +414,48 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+      {/* Hunter + Rewind teasers — the USP, front and center */}
+      {(hunt.totalFound > 0.5 || (sinceYear !== null && transactions.length > 50)) && (
+        <div className="px-6 pt-2 pb-1 space-y-3 break-inside-avoid">
+          {hunt.totalFound > 0.5 && (
+            <button
+              onClick={() => onNavigate(AppScreen.HUNTER)}
+              className="w-full bg-premium-charcoal rounded-3xl p-4 shadow-soft flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
+            >
+              <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">search_insights</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-[13px] font-semibold whitespace-nowrap">
+                  {formatAmountCompact(hunt.totalFound)} quietly leaking out
+                </p>
+                <p className="text-white/50 text-[10px] truncate">fees · double charges · subscription creep</p>
+              </div>
+              <span className="material-symbols-outlined text-white/40 text-[18px] shrink-0">chevron_right</span>
+            </button>
+          )}
+          {sinceYear !== null && transactions.length > 50 && (
+            <button
+              onClick={() => onNavigate(AppScreen.REWIND)}
+              className="w-full bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
+            >
+              <div className="w-10 h-10 rounded-2xl bg-sage-light text-sage flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">history</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-premium-charcoal text-[13px] font-semibold">Your money since {sinceYear}</p>
+                <p className="text-muted-taupe text-[10px] truncate">{transactions.length.toLocaleString('en-IN')} entries · all-time records · Wrapped</p>
+              </div>
+              <span className="material-symbols-outlined text-muted-taupe/50 text-[18px] shrink-0">chevron_right</span>
+            </button>
+          )}
+        </div>
+      )}
       {/* Quick Services */}
       <div className="px-6 py-8 break-inside-avoid">
         <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight mb-5">Quick Services</h3>
         <div className="grid grid-cols-3 gap-4">
-          <button 
+          <button
             onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
             className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
           >
@@ -419,7 +464,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Add</span>
           </button>
-          <button 
+          <button
             onClick={() => onNavigate(AppScreen.EXPORT)}
             className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
           >
@@ -436,6 +481,33 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined">bubble_chart</span>
             </div>
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Flow</span>
+          </button>
+          <button
+            onClick={() => onNavigate(AppScreen.IMPORT)}
+            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+          >
+            <div className="bg-sand-light text-sand p-3 rounded-2xl">
+              <span className="material-symbols-outlined">upload_file</span>
+            </div>
+            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Import</span>
+          </button>
+          <button
+            onClick={() => onNavigate(AppScreen.HUNTER)}
+            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+          >
+            <div className="bg-amber-50 text-amber-500 p-3 rounded-2xl">
+              <span className="material-symbols-outlined">search_insights</span>
+            </div>
+            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Hunter</span>
+          </button>
+          <button
+            onClick={() => onNavigate(AppScreen.REWIND)}
+            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+          >
+            <div className="bg-lavender/10 text-lavender p-3 rounded-2xl">
+              <span className="material-symbols-outlined">history</span>
+            </div>
+            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Rewind</span>
           </button>
         </div>
       </div>

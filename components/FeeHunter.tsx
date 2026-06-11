@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { huntSavings, normalizeMerchant } from '../services/analyticsService';
+import { huntSavings, normalizeMerchant, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, RangoliCorner, MandalaDots } from './SplashScreen';
 
 interface FeeHunterProps {
@@ -120,7 +120,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
                 <div key={t.id} className="flex items-center gap-2 min-w-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose shrink-0" />
                   <span className="text-[10px] text-muted-taupe shrink-0">{t.date.slice(0, 10)}</span>
-                  <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || ''}>{t.merchant || t.category}</span>
+                  <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || ''}>{prettyMerchant(t.merchant || t.category)}</span>
                   <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
                     {t.type === TransactionType.EXPENSE ? '-' : '+'}{formatAmountCompact(t.amount)}
                   </span>
@@ -156,7 +156,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[16px]">receipt_long</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={f.merchant}>{f.merchant}</p>
+                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={f.merchant}>{prettyMerchant(f.merchant)}</p>
                     <p className="text-[10px] text-muted-taupe">{f.count}× · last {dl(f.lastDate)}</p>
                   </div>
                   <p className="text-[12px] font-bold text-rose shrink-0 tabular-nums">{formatAmountCompact(f.total)}</p>
@@ -184,7 +184,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[16px]">content_copy</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={d.merchant}>{d.merchant}</p>
+                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={d.merchant}>{prettyMerchant(d.merchant)}</p>
                     <p className="text-[10px] text-muted-taupe">{d.copies}× {formatAmountCompact(d.amount)} on {dl(d.date)}</p>
                   </div>
                   <p className="text-[12px] font-bold text-amber-600 shrink-0 tabular-nums">+{formatAmountCompact((d.copies - 1) * d.amount)}</p>
@@ -209,7 +209,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[16px]">trending_up</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={c.name}>{c.name}</p>
+                    <p className="text-[12px] font-semibold text-premium-charcoal truncate" title={c.name}>{prettyMerchant(c.name)}</p>
                     <p className="text-[10px] text-muted-taupe">
                       {formatAmountCompact(c.from)} → {formatAmountCompact(c.to)} <span className="text-rose font-semibold">(+{c.pct}%)</span>
                     </p>

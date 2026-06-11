@@ -386,13 +386,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
           </>
         )}
         
-        {/* Floating coins for wealth context */}
-        <div className={`absolute top-1/4 left-[15%] w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-20 animate-bounce ${styles['animation-delay-02s']} ${styles['animation-duration-2s']}`}>
-          <span className="flex items-center justify-center h-full text-amber-700 text-[8px] font-bold">₹</span>
-        </div>
-        <div className={`absolute bottom-1/3 right-[10%] w-4 h-4 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 opacity-15 animate-bounce ${styles['animation-delay-08s']} ${styles['animation-duration-25s']}`}>
-          <span className="flex items-center justify-center h-full text-amber-700 text-[6px] font-bold">₹</span>
-        </div>
       </div>
 
       {/* Logo Container */}
@@ -425,26 +418,21 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
             expression={variant === 'register' ? 'happy' : variant === 'logout' ? 'sleepy' : 'neutral'}
           />
           
-          {/* Contextual accent badge */}
-          <div className={`absolute -bottom-1 -right-1 w-7 h-7 rounded-full shadow-md flex items-center justify-center border-2 border-white ${
-            variant === 'register' 
-              ? 'bg-gradient-to-br from-green-400 to-green-500' 
-              : variant === 'login'
-              ? 'bg-gradient-to-br from-amber-300 to-amber-400'
-              : variant === 'logout'
-              ? 'bg-gradient-to-br from-rose to-rose/80'
-              : 'bg-gradient-to-br from-amber-300 to-amber-400'
-          }`}>
-            {variant === 'register' ? (
-              <span className="text-white text-[12px]">+</span>
-            ) : variant === 'login' ? (
-              <span className="text-amber-700 text-[10px] font-bold">₹</span>
-            ) : variant === 'logout' ? (
-              <span className="text-white text-[11px]">👋</span>
-            ) : (
-              <span className="text-amber-700 text-[10px] font-bold">₹</span>
-            )}
-          </div>
+          {/* Contextual accent badge — register/logout only; the plain
+              robot-eyes mark is the brand, no currency symbol */}
+          {(variant === 'register' || variant === 'logout') && (
+            <div className={`absolute -bottom-1 -right-1 w-7 h-7 rounded-full shadow-md flex items-center justify-center border-2 border-white ${
+              variant === 'register'
+                ? 'bg-gradient-to-br from-green-400 to-green-500'
+                : 'bg-gradient-to-br from-rose to-rose/80'
+            }`}>
+              {variant === 'register' ? (
+                <span className="text-white text-[12px]">+</span>
+              ) : (
+                <span className="text-white text-[11px]">👋</span>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Floating hearts for logout (goodbye) */}

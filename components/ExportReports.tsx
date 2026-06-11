@@ -181,6 +181,28 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       const incomeAnalysis = analyzeIncome(transactions); // 12-month view
       const BADGE: Record<string, string> = { FIXED: 'fixed', RECURRING: 'recurring', OCCASIONAL: 'occasional', ONE_OFF: 'one-off' };
 
+      // ── Chart data (pure CSS/SVG — the export stays self-contained) ────
+      const PALETTE = ['#9BAE93', '#D4A5A5', '#D4B896', '#9CB5C1', '#B8B5D0', '#C4A98E'];
+      let donutAcc = 0;
+      const donutSegs = stats.topCategories.map(([, v], i) => {
+        const p = stats.expense > 0 ? (v / stats.expense) * 100 : 0;
+        const seg = `${PALETTE[i % PALETTE.length]} ${donutAcc.toFixed(2)}% ${(donutAcc + p).toFixed(2)}%`;
+        donutAcc += p;
+        return seg;
+      });
+      if (donutAcc < 99.9) donutSegs.push(`#EFEDE8 ${donutAcc.toFixed(2)}% 100%`);
+      const donutCss = `background:conic-gradient(${donutSegs.join(',')})`;
+
+      const maxMonthFlow = Math.max(...months.map(([, m]) => Math.max(m.inc, m.out)), 1);
+
+      const dayEntries = [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-92);
+      const maxDaySpend = Math.max(...dayEntries.map(([, v]) => v), 1);
+      const dayBarW = 100 / Math.max(dayEntries.length, 1);
+      const daySvgBars = dayEntries.map(([, v], i) => {
+        const h = Math.max(1.5, (v / maxDaySpend) * 96);
+        return `<rect x="${(i * dayBarW).toFixed(2)}" y="${(100 - h).toFixed(2)}" width="${(dayBarW * 0.72).toFixed(2)}" height="${h.toFixed(2)}" rx="0.6" fill="#D4A5A5"/>`;
+      }).join('');
+
       const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wall-ette Statement — ${escapeHtml(periodLabel)}</title>
@@ -203,6 +225,19 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   .rname{width:34%}.rcad{width:16%;color:#8E8D8A}.ramt{width:25%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.rmo{width:25%;text-align:right;color:#8E8D8A;font-variant-numeric:tabular-nums}
   .num{text-align:right;font-variant-numeric:tabular-nums}
   .muted{color:#8E8D8A}
+  .charts{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin:20px 0 8px}
+  .donut{width:132px;height:132px;border-radius:50%;position:relative;flex:0 0 auto}
+  .donut::after{content:'';position:absolute;inset:34px;background:#fff;border-radius:50%}
+  .dlegend{flex:1;min-width:170px}
+  .dlegend div{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0;min-width:0}
+  .dlegend .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dot2{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .mchart{display:flex;align-items:flex-end;gap:6px;height:120px;margin:14px 0 4px}
+  .mcol{flex:1;display:flex;align-items:flex-end;gap:2px;height:100%;min-width:0}
+  .mbar{flex:1;border-radius:3px 3px 0 0;min-height:2px}
+  .mlabels{display:flex;gap:6px}
+  .mlabels span{flex:1;text-align:center;font-size:9px;color:#8E8D8A;text-transform:uppercase;overflow:hidden}
+  .chartnote{font-size:10px;color:#8E8D8A;margin-top:6px}
   th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8E8D8A;text-align:left;padding:6px 4px;border-bottom:1px solid #eee;font-weight:600}
   th.num{text-align:right}
   .wbar{height:5px;border-radius:3px;background:#C4A98E;opacity:.65;max-width:100%}
@@ -222,6 +257,30 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     <div class="card"><div class="l">Current Balance</div><div class="v">${fmt(currentBalance)}</div></div>
   </div>
   ${stats.savingsRate !== null ? `<div class="sub">Savings rate this period: <b>${stats.savingsRate}%</b></div>` : ''}
+
+  ${stats.topCategories.length > 0 ? `<h2>Spending split</h2>
+  <div class="charts">
+    <div class="donut" style="${donutCss}"></div>
+    <div class="dlegend">
+      ${stats.topCategories.map(([name, amt], i) => `
+      <div><span class="dot2" style="background:${PALETTE[i % PALETTE.length]}"></span>
+        <span class="nm">${escapeHtml(name)}</span>
+        <b>${fmt(amt)}</b>
+        <span class="muted">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</span></div>`).join('')}
+      ${donutAcc < 99.9 ? `<div><span class="dot2" style="background:#EFEDE8"></span><span class="nm">Everything else</span><b>${fmt(Math.max(0, stats.expense - stats.topCategories.reduce((s, [, v]) => s + v, 0)))}</b></div>` : ''}
+    </div>
+  </div>` : ''}
+
+  ${months.length > 1 ? `<h2>Money in vs out by month</h2>
+  <div class="mchart">
+    ${months.map(([, m]) => `
+    <div class="mcol">
+      <div class="mbar" style="background:#9BAE93;height:${Math.max(2, (m.inc / maxMonthFlow) * 100).toFixed(1)}%"></div>
+      <div class="mbar" style="background:#D4A5A5;height:${Math.max(2, (m.out / maxMonthFlow) * 100).toFixed(1)}%"></div>
+    </div>`).join('')}
+  </div>
+  <div class="mlabels">${months.map(([k]) => `<span>${ml(k)}</span>`).join('')}</div>
+  <div class="chartnote"><span style="color:#7d937a">■</span> in &nbsp; <span style="color:#c98989">■</span> out</div>` : ''}
 
   ${months.length > 1 ? `<h2>Month by month</h2>
   <table>
@@ -269,6 +328,10 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         <td><div class="wbar" style="width:${Math.max(3, Math.round((weekdayAvg[i] / maxWd) * 100))}%"></div></td>
         <td class="num" style="width:26%">${fmt(weekdayAvg[i])}<span class="muted" style="font-weight:400">/day</span></td></tr>`).join('')}
   </table>
+
+  ${dayEntries.length > 3 ? `<h2>Daily spending${dayEntries.length === 92 ? ' · last 92 days' : ''}</h2>
+  <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:90px;display:block">${daySvgBars}</svg>
+  <div class="chartnote">${escapeHtml(dayEntries[0][0])} → ${escapeHtml(dayEntries[dayEntries.length - 1][0])} · tallest bar ${fmt(maxDaySpend)}</div>` : ''}
 
   ${top5exp.length > 0 ? `<h2>Biggest movements</h2>
   <table>

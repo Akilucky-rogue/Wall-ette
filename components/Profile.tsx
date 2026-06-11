@@ -153,7 +153,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
   const [delError, setDelError] = useState('');
 
   const wipeCloudData = async (uid: string) => {
-    await clearAllTransactions();
+    // waitForCloud: deletes must finish BEFORE the auth user is removed,
+    // otherwise security rules orphan the remaining docs.
+    await clearAllTransactions(true);
     try { await deleteDoc(doc(db, `users/${uid}/settings/preferences`)); } catch { /* may not exist */ }
     try {
       const logs = await getDocs(collection(db, `users/${uid}/security_logs`));

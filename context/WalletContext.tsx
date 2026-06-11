@@ -12,6 +12,10 @@ interface WalletContextType {
   ignoreRules: IgnoreRule[];
   dailyLimit: number;
   mfaEnabled: boolean;
+  /** Per-category monthly budgets (INR base). */
+  budgets: Record<string, number>;
+  /** Monthly savings target (INR base, 0 = unset). */
+  savingsGoal: number;
   isOnline: boolean;
   isCloudSyncing: boolean;
   openingBalance: number;
@@ -20,6 +24,8 @@ interface WalletContextType {
   setCurrency: (code: CurrencyCode) => void;
   setDailyLimit: (limit: number) => void;
   setMfaEnabled: (enabled: boolean) => void;
+  setBudget: (category: string, amount: number) => void;
+  setSavingsGoal: (amount: number) => void;
   setOpeningBalance: (balance: number, asOf?: string | null) => void;
   addTransaction: (transaction: Transaction) => Promise<boolean>;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
@@ -100,6 +106,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
   const [dailyLimit, setDailyLimitState] = useState<number>(0);
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
+  const [budgets, setBudgetsState] = useState<Record<string, number>>({});
+  const [savingsGoal, setSavingsGoalState] = useState<number>(0);
   const [lastLoginTime, setLastLoginTime] = useState<Date | null>(null);
   const [openingBalance, setOpeningBalanceState] = useState<number>(0);
   const [openingBalanceAsOf, setOpeningBalanceAsOfState] = useState<string | null>(null);
@@ -330,6 +338,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                const localMfa = loadFromLocal('mfaEnabled');
                if (localMfa !== null) setMfaEnabledState(localMfa);
 
+               const localBudgets = loadFromLocal('budgets');
+               if (localBudgets) setBudgetsState(localBudgets);
+
+               const localGoal = loadFromLocal('savingsGoal');
+               if (localGoal !== null) setSavingsGoalState(localGoal || 0);
+
                const localOpeningBalance = loadFromLocal('openingBalance');
                if (localOpeningBalance !== null) {
                    setOpeningBalanceState(localOpeningBalance || 0);
@@ -368,6 +382,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                   if (data.openingBalanceAsOf !== undefined) {
                       setOpeningBalanceAsOfState(data.openingBalanceAsOf || null);
                       saveToLocal('openingBalanceAsOf', data.openingBalanceAsOf || null);
+                  }
+                  if (data.budgets) {
+                      setBudgetsState(data.budgets);
+                      saveToLocal('budgets', data.budgets);
+                  }
+                  if (data.savingsGoal !== undefined) {
+                      setSavingsGoalState(data.savingsGoal || 0);
+                      saveToLocal('savingsGoal', data.savingsGoal || 0);
                   }
               } else if (isOnlineRef.current) {
                   setDoc(settingsRef, {
@@ -450,6 +472,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           try {
               const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
               await setDoc(settingsRef, { mfaEnabled: enabled }, { merge: true });
+          } catch (e) { log.warn('Backend update failed'); }
+      }
+  }, [user, isOnline, isBackendReady, saveToLocal]);
+
+  const setBudget = useCallback(async (category: string, amount: number) => {
+      const next = { ...budgets };
+      if (amount > 0) next[category] = amount;
+      else delete next[category];
+      setBudgetsState(next);
+      saveToLocal('budgets', next);
+      if (user && isOnline && isBackendReady) {
+          try {
+              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+              await setDoc(settingsRef, { budgets: next }, { merge: true });
+          } catch (e) { log.warn('Backend update failed'); }
+      }
+  }, [budgets, user, isOnline, isBackendReady, saveToLocal]);
+
+  const setSavingsGoal = useCallback(async (amount: number) => {
+      const value = Math.max(0, amount || 0);
+      setSavingsGoalState(value);
+      saveToLocal('savingsGoal', value);
+      if (user && isOnline && isBackendReady) {
+          try {
+              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+              await setDoc(settingsRef, { savingsGoal: value }, { merge: true });
           } catch (e) { log.warn('Backend update failed'); }
       }
   }, [user, isOnline, isBackendReady, saveToLocal]);
@@ -724,9 +772,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       mfaEnabled,
       isOnline,
       isCloudSyncing: isOnline && isBackendReady,
+      budgets,
+      savingsGoal,
       setCurrency,
       setDailyLimit,
       setMfaEnabled,
+      setBudget,
+      setSavingsGoal,
       setOpeningBalance,
       addTransaction,
       editTransaction,
@@ -751,7 +803,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       lastLoginTime
   }), [
       transactions, currency, ignoreRules, dailyLimit, mfaEnabled, isOnline,
-      isBackendReady, openingBalance, openingBalanceAsOf, setCurrency, setDailyLimit, setMfaEnabled,
+      isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
+      setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,

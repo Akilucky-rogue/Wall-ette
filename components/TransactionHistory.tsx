@@ -25,6 +25,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   // Delete Confirmation State
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('Transaction updated');
   
   // Clear All Confirmation
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -185,16 +186,22 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     if (deleteId) {
         deleteTransaction(deleteId);
         setDeleteId(null);
+        setToastMsg('Transaction deleted');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
     }
   }
   
-  const handleClearAll = async () => {
+  const handleClearAll = () => {
       if (clearInput.toUpperCase() === 'DELETE') {
-          await clearAllTransactions();
+          // Local state clears instantly; cloud deletion continues in the
+          // background — no reason to hold the modal open for the network.
+          clearAllTransactions();
           setShowClearConfirm(false);
           setClearInput('');
+          setToastMsg('History cleared');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
       }
   }
 
@@ -271,6 +278,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       
       await editTransaction(editingTransaction.id, updates);
       closeEditModal();
+      setToastMsg('Transaction updated');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (error) {
@@ -931,7 +939,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {showToast && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
               <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
-              <span className="text-[13px] font-medium font-serif">Transaction updated</span>
+              <span className="text-[13px] font-medium font-serif">{toastMsg}</span>
           </div>
       )}
     </div>

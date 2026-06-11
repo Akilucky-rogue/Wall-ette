@@ -24,7 +24,8 @@ interface WalletContextType {
   addTransaction: (transaction: Transaction) => Promise<boolean>;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
-  clearAllTransactions: () => Promise<void>;
+  /** Clears instantly; cloud deletion runs in the background unless waitForCloud. */
+  clearAllTransactions: (waitForCloud?: boolean) => Promise<void>;
   importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string) => void;
   toggleIgnoreRule: (id: string) => void;
   getBalance: () => number;
@@ -588,7 +589,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [transactions, persistTransactions, user, isBackendReady]);
 
-  const clearAllTransactions = useCallback(async () => {
+  const clearAllTransactions = useCallback(async (waitForCloud = false) => {
+    // Capture ids BEFORE wiping state — deleting by known ids skips the
+    // expensive getDocs read that made Clear All feel slow.
+    const idsToDelete = transactions.map(t => t.id);
+
     clearingRef.current = true;
     setTransactions([]);
     saveToLocal('transactions', []);
@@ -597,33 +602,49 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     saveToLocal('openingBalance', 0);
     saveToLocal('openingBalanceAsOf', null);
 
-    try {
-        if (user && isBackendReady) {
-            // Also reset the cloud opening balance, otherwise the settings
-            // snapshot restores the old value after a clear (audit Phase 1.2).
-            const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+    if (!user || !isBackendReady) {
+        clearingRef.current = false;
+        return;
+    }
+
+    // Cloud cleanup runs in the background — the UI is already cleared.
+    // Account deletion passes waitForCloud so nothing is orphaned.
+    const uid = user.uid;
+    const cloudWork = (async () => {
+        try {
+            const settingsRef = doc(db, `users/${uid}/settings/preferences`);
             setDoc(settingsRef, { openingBalance: 0, openingBalanceAsOf: null }, { merge: true })
                 .catch(() => log.warn('Failed to reset opening balance on backend'));
 
-            const q = query(collection(db, `users/${user.uid}/transactions`));
-            const snapshot = await getDocs(q);
-            const chunks = chunkArray(snapshot.docs, 500); // Firestore batch limit
-
-            for (const chunk of chunks) {
-                const batch = writeBatch(db);
-                chunk.forEach(d => {
-                    batch.delete(d.ref);
-                });
-                await batch.commit();
+            if (idsToDelete.length > 0) {
+                // Parallel batch deletes (500/batch, Firestore limit).
+                const chunks = chunkArray(idsToDelete, 500);
+                await Promise.all(chunks.map(chunk => {
+                    const batch = writeBatch(db);
+                    chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
+                    return batch.commit();
+                }));
+            } else {
+                // Local state was empty but the cloud may not be (e.g. clear
+                // before first sync) — fall back to a full sweep. Skipped in
+                // the normal case so a fresh import can't race the sweep.
+                const snapshot = await getDocs(query(collection(db, `users/${uid}/transactions`)));
+                const chunks = chunkArray(snapshot.docs, 500);
+                await Promise.all(chunks.map(chunk => {
+                    const batch = writeBatch(db);
+                    chunk.forEach(d => batch.delete(d.ref));
+                    return batch.commit();
+                }));
             }
+        } catch (e) {
+            log.warn('Failed to clear backend transactions');
+        } finally {
+            // Snapshot listener resumes only after the deletes are committed.
+            clearingRef.current = false;
         }
-    } catch (e) {
-        log.warn('Failed to clear backend transactions');
-    } finally {
-        // Snapshot listener resumes only after every batch is committed.
-        clearingRef.current = false;
-    }
-  }, [user, isBackendReady, saveToLocal]);
+    })();
+    if (waitForCloud) await cloudWork;
+  }, [transactions, user, isBackendReady, saveToLocal]);
 
   const importTransactions = useCallback(async (newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string) => {
     const existingIds = new Set(transactions.map(t => t.id));

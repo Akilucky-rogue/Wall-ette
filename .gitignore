@@ -32,6 +32,13 @@ android/key.properties
 # Build artifacts
 *.apk
 *.aab
+*.ipa
+
+# iOS (committed: ios/App sources; ignored: pods + build output)
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/DerivedData/
 
 # Bank statements and financial data (personal data — never commit)
 *.pdf

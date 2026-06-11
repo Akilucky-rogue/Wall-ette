@@ -1,0 +1,89 @@
+# Builds an unsigned iOS .ipa on GitHub's free macOS runners.
+# No Mac, no Apple Developer account needed — install the artifact on an
+# iPhone with Sideloadly/AltStore using a free Apple ID (re-sign every 7 days).
+#
+# Trigger manually (Actions tab → "iOS build" → Run workflow) or by pushing a
+# tag like ios-v1.3.0. Manual-only keeps the 10× macOS minute multiplier on
+# private repos from burning the free 2,000 min/month.
+#
+# Later, with a $99 Apple Developer account: add signing certs + an
+# App Store Connect API key as repo secrets and a TestFlight upload step —
+# same workflow, still no Mac.
+
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ios-*'
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Add iOS platform (if not committed)
+        run: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+
+      - name: Patch Info.plist (Face ID) + icon
+        run: |
+          PLIST="ios/App/App/Info.plist"
+          if ! grep -q NSFaceIDUsageDescription "$PLIST"; then
+            /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'Wall-ette uses Face ID to unlock your wallet quickly and securely.'" "$PLIST"
+          fi
+          if [ -f "store-assets/icon-ios-1024.png" ]; then
+            for f in ios/App/App/Assets.xcassets/AppIcon.appiconset/*.png; do
+              cp store-assets/icon-ios-1024.png "$f"
+            done
+          fi
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+
+      - name: Build archive (unsigned)
+        working-directory: ios/App
+        run: |
+          xcodebuild archive \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath $PWD/build/App.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        working-directory: ios/App
+        run: |
+          mkdir -p Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app Payload/
+          zip -r Wall-ette-unsigned.ipa Payload
+          ls -la Wall-ette-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wall-ette-ios
+          path: ios/App/Wall-ette-unsigned.ipa
+          retention-days: 14

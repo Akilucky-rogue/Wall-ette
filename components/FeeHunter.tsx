@@ -52,12 +52,14 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
             <>
               <p className="text-white font-serif text-[34px] font-bold leading-tight">{fmt(hunt.totalFound)}</p>
               <p className="text-white/70 text-[12px] mt-1 leading-relaxed">
-                {fmt(hunt.fees.total)} in bank charges · {fmt(hunt.doubles.total)} in possible double-charges · {fmt(hunt.creep.annualExtra)}/yr of subscription creep
+                {fmt(hunt.fees.total)} in bank charges · {fmt(hunt.creep.annualExtra)}/yr of subscription creep
+                {hunt.doubles.pairs.length > 0 ? ` · plus ${hunt.doubles.pairs.length} same-day repeats to review` : ''}
               </p>
             </>
           ) : (
             <p className="text-premium-charcoal text-[14px] leading-relaxed">
-              Nothing leaking — no fees, double-charges, or price hikes found in your history. Wall-ette keeps watching.
+              Nothing leaking — no bank fees or subscription price hikes found in your history.
+              {hunt.doubles.pairs.length > 0 ? ` ${hunt.doubles.pairs.length} same-day repeat payment${hunt.doubles.pairs.length === 1 ? '' : 's'} listed below for review.` : ' Wall-ette keeps watching.'}
             </p>
           )}
         </div>
@@ -91,11 +93,12 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
         {hunt.doubles.pairs.length > 0 && (
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
             <div className="flex items-baseline justify-between mb-1">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Possible double charges</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Same-day repeats · review</p>
               <p className="text-[13px] font-serif font-bold text-amber-600">{fmt(hunt.doubles.total)}</p>
             </div>
             <p className="text-[10px] text-muted-taupe mb-4">
-              Same merchant, same amount, same day. Some are legit (two coffees) — the rest are worth disputing.
+              Same merchant, amount & day (transfers, ATM and pay-requests excluded). Often intentional —
+              not counted in the headline. Dispute any you don't recognise.
             </p>
             <div className="space-y-3">
               {hunt.doubles.pairs.map((d, i) => (

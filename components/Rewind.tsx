@@ -21,6 +21,10 @@ interface YearAgg {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Internal transfers / cash movement / pay-requests aren't "spending moments" —
+// they'd otherwise dominate records and top-merchant slots.
+const TRANSFER_RX = /^(ift|imps|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]/i;
+
 const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
   const { transactions, formatAmount, formatAmountCompact } = useWallet();
   const [wrapYear, setWrapYear] = useState<number | null>(null);
@@ -51,23 +55,28 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       ya.count++;
       if (t.date < first) first = t.date;
       if (t.date > last) last = t.date;
+      const isTransfer = TRANSFER_RX.test(t.merchant || '');
       if (t.type === TransactionType.INCOME) {
         totalInc += t.amount; ya.inc += t.amount;
-        if (!maxInc || t.amount > maxInc.amount) maxInc = t;
+        if (!isTransfer && (!maxInc || t.amount > maxInc.amount)) maxInc = t;
       } else {
         totalOut += t.amount; ya.out += t.amount;
         ya.monthsOut[d.getMonth()] += t.amount;
         ya.spendDays.add(t.date.slice(0, 10));
         spendDates.push(t.date.slice(0, 10));
         const mer = t.merchant || t.category;
-        ya.merchants.set(mer, (ya.merchants.get(mer) || 0) + t.amount);
+        if (!isTransfer) ya.merchants.set(mer, (ya.merchants.get(mer) || 0) + t.amount);
         ya.cats.set(t.category, (ya.cats.get(t.category) || 0) + t.amount);
-        if (!maxExp || t.amount > maxExp.amount) maxExp = t;
+        if (!isTransfer && (!maxExp || t.amount > maxExp.amount)) maxExp = t;
       }
     }
 
-    // Longest no-spend streak across the whole history
-    const uniq = [...new Set(spendDates)].sort();
+    // Longest no-spend streak — measured over the last 24 months only, where
+    // the record is dense. (Sparse early years would fake huge streaks.)
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 24);
+    const cutoffKey = cutoff.toISOString().slice(0, 10);
+    const uniq = [...new Set(spendDates)].filter(d => d >= cutoffKey).sort();
     let streak = 0, streakFrom = '', streakTo = '';
     for (let i = 1; i < uniq.length; i++) {
       const gap = (Date.parse(uniq[i]) - Date.parse(uniq[i - 1])) / 86400000 - 1;
@@ -321,7 +330,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[14px]">self_improvement</span>
                   </div>
                   <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0">
-                    Longest no-spend streak: <b>{life.streak.days} days</b> ({new Date(life.streak.from).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})
+                    Longest no-spend streak: <b>{life.streak.days} days</b> ({new Date(life.streak.from).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} · last 2 yrs)
                   </p>
                 </div>
               )}

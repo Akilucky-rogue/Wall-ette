@@ -218,6 +218,7 @@ export class IDFCBankParser {
     // Parse date
     const date = this.parseDate(txnDate);
     if (!date) return null;
+    const parsedValueDate = this.parseDate(valueDate);
 
     // Parse amounts - CRITICAL: Debit = EXPENSE, Credit = INCOME
     const debitAmount = this.parseAmount(debit);
@@ -243,7 +244,10 @@ export class IDFCBankParser {
 
     return {
       id: this.generateId(),
-      date: date.toISOString().split('T')[0],
+      // LOCAL date, not toISOString(): parseDate returns local midnight, and
+      // toISOString() converts to UTC — which shifted every transaction one
+      // day earlier for IST users (a 17-Jun txn became 16-Jun).
+      date: this.toLocalISO(date),
       description,
       amount,
       type,
@@ -252,7 +256,7 @@ export class IDFCBankParser {
       notes: metadata.notes,
       tags: metadata.tags,
       balance: this.parseAmount(balance),
-      valueDate: this.parseDate(valueDate)?.toISOString().split('T')[0],
+      valueDate: parsedValueDate ? this.toLocalISO(parsedValueDate) : undefined,
       chequeNumber: chequeNo?.toString() || undefined,
       source: 'IDFC FIRST Bank',
       rawData: {
@@ -475,6 +479,11 @@ export class IDFCBankParser {
     if (!isNaN(date.getTime())) return date;
 
     return null;
+  }
+
+  /** Format a local-time Date as YYYY-MM-DD without UTC conversion. */
+  private static toLocalISO(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   /**

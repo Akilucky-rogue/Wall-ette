@@ -323,6 +323,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                        onClick={() => window.open('https://wall-e-7a113.web.app/privacy.html', '_blank')}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
                   </Row>
+                  <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms & Conditions" sub="The agreement you accepted"
+                       onClick={() => window.open('https://wall-e-7a113.web.app/terms.html', '_blank')}>
+                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
+                  </Row>
               </div>
           </section>
 

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
+import { log } from '../utils/log';
 import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
+
+// Bump when terms.html / privacy.html change materially — recorded with
+// each registration as the version the user agreed to.
+const TERMS_VERSION = '2026-06-11';
+const TERMS_URL = 'https://wall-e-7a113.web.app/terms.html';
+const PRIVACY_URL = 'https://wall-e-7a113.web.app/privacy.html';
 
 export type AuthType = 'login' | 'register';
 
@@ -17,6 +25,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  // Consent to Terms & Privacy — required for sign-up only.
+  const [agreed, setAgreed] = useState(false);
 
   // TOTP second factor at sign-in (accounts with 2FA enrolled)
   const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
@@ -71,12 +81,21 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         await signInWithEmailAndPassword(auth, email, password);
         onAuthSuccess?.('login');
       } else {
+        if (!agreed) {
+           throw new Error("Please accept the Terms & Conditions and Privacy Policy to create an account.");
+        }
         // Password validation as per specs
         const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
         if (!strongPasswordRegex.test(password)) {
            throw new Error("Password must be 8+ chars, include uppercase, lowercase, digit, and special char.");
         }
-        await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        // Record the consent with version + timestamp (audit trail).
+        setDoc(doc(db, 'users', cred.user.uid), {
+            termsAccepted: true,
+            termsVersion: TERMS_VERSION,
+            termsAcceptedAt: serverTimestamp(),
+        }, { merge: true }).catch(() => log.warn('Consent record write failed'));
         onAuthSuccess?.('register');
       }
     } catch (err: any) {
@@ -241,10 +260,31 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             />
           </div>
           
+          {!isLogin && (
+            <label className="flex items-start gap-2.5 px-1 pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[#9BAE93] shrink-0"
+              />
+              <span className="text-[11px] text-muted-taupe leading-relaxed">
+                I have read and agree to the{' '}
+                <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline" onClick={e => e.stopPropagation()}>
+                  Terms &amp; Conditions
+                </a>{' '}
+                and{' '}
+                <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline" onClick={e => e.stopPropagation()}>
+                  Privacy Policy
+                </a>.
+              </span>
+            </label>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
+            disabled={loading || (!isLogin && !agreed)}
+            className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
             {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
           </button>
@@ -261,8 +301,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             
             <div className="flex items-center gap-2">
                 <span className="text-[13px] text-muted-taupe">{isLogin ? "New here?" : "Have an account?"}</span>
-                <button 
-                    onClick={() => { setIsLogin(!isLogin); setError(''); }}
+                <button
+                    onClick={() => { setIsLogin(!isLogin); setError(''); setAgreed(false); }}
                     className="text-[13px] font-semibold text-sage hover:underline"
                 >
                     {isLogin ? "Create Account" : "Sign In"}

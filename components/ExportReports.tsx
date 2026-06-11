@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { analyzeFinancialHealth } from '../services/insightsService';
-import { detectRecurringCharges } from '../services/analyticsService';
+import { detectRecurringCharges, analyzeIncome } from '../services/analyticsService';
 import { exportFile } from '../utils/exportFile';
 import { log } from '../utils/log';
 import { WallEEyes, FloatingLeaf, PottedPlant, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
@@ -115,10 +115,71 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       const insights = await analyzeFinancialHealth(
         periodTxs.map(t => ({ ...t, merchant: t.merchant || '' }))
       );
-      const recurring = detectRecurringCharges(transactions).slice(0, 6);
+      const recurring = detectRecurringCharges(transactions).slice(0, 8);
       const maxCat = stats.topCategories[0]?.[1] || 1;
       const periodLabel = PERIOD_LABELS[period];
       const generated = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // ── Deep-dive stats (single pass over the period) ──────────────────
+      const byMonth = new Map<string, { inc: number; out: number }>();
+      const byCat = new Map<string, { total: number; count: number; merchants: Map<string, number> }>();
+      const byMerchant = new Map<string, { total: number; count: number }>();
+      const byDay = new Map<string, number>();
+      const weekday = Array.from({ length: 7 }, () => ({ sum: 0, days: new Set<string>() }));
+      const expensesArr: Transaction[] = [];
+      const incomesArr: Transaction[] = [];
+      let firstDay: string | null = null, lastDay: string | null = null;
+
+      for (const t of periodTxs) {
+        const d = new Date(t.date);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const m = byMonth.get(mk) || { inc: 0, out: 0 };
+        const dayKey = t.date.slice(0, 10);
+        if (!firstDay || dayKey < firstDay) firstDay = dayKey;
+        if (!lastDay || dayKey > lastDay) lastDay = dayKey;
+        if (t.type === TransactionType.INCOME) {
+          m.inc += t.amount; incomesArr.push(t);
+        } else {
+          m.out += t.amount; expensesArr.push(t);
+          const c = byCat.get(t.category) || { total: 0, count: 0, merchants: new Map<string, number>() };
+          c.total += t.amount; c.count++;
+          const mer = t.merchant || 'Unknown';
+          c.merchants.set(mer, (c.merchants.get(mer) || 0) + t.amount);
+          byCat.set(t.category, c);
+          const bm = byMerchant.get(mer) || { total: 0, count: 0 };
+          bm.total += t.amount; bm.count++; byMerchant.set(mer, bm);
+          byDay.set(dayKey, (byDay.get(dayKey) || 0) + t.amount);
+          const wd = (d.getDay() + 6) % 7; // Mon=0
+          weekday[wd].sum += t.amount; weekday[wd].days.add(dayKey);
+        }
+        byMonth.set(mk, m);
+      }
+
+      const months = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+      const catRows = [...byCat.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 6)
+        .map(([name, c]) => ({
+          name, total: c.total, count: c.count, avg: c.total / c.count,
+          topMerchant: [...c.merchants.entries()].sort((x, y) => y[1] - x[1])[0],
+        }));
+      const merchantRows = [...byMerchant.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+      const top5exp = [...expensesArr].sort((a, b) => b.amount - a.amount).slice(0, 5);
+      const top5inc = [...incomesArr].sort((a, b) => b.amount - a.amount).slice(0, 5);
+      const peakDay = [...byDay.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+      const spanDays = firstDay && lastDay
+        ? Math.round((+new Date(lastDay) - +new Date(firstDay)) / 86400000) + 1 : 0;
+      const activeSpendDays = byDay.size;
+      const noSpendDays = Math.max(0, spanDays - activeSpendDays);
+      const avgPerActiveDay = activeSpendDays ? stats.expense / activeSpendDays : 0;
+      const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const weekdayAvg = weekday.map(w => (w.days.size ? w.sum / w.days.size : 0));
+      const maxWd = Math.max(...weekdayAvg, 1);
+      const ml = (k: string) =>
+        new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+      const dl = (s: string) =>
+        new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const recurringAnnual = recurring.reduce((s, r) => s + r.monthlyCost * 12, 0);
+      const incomeAnalysis = analyzeIncome(transactions); // 12-month view
+      const BADGE: Record<string, string> = { FIXED: 'fixed', RECURRING: 'recurring', OCCASIONAL: 'occasional', ONE_OFF: 'one-off' };
 
       const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -140,6 +201,11 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   td{padding:8px 4px;border-bottom:1px solid #f3f1ec;overflow-wrap:anywhere;vertical-align:middle}
   .tname{width:30%}.tamt{width:25%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.tpct{width:13%;text-align:right;color:#8E8D8A}
   .rname{width:34%}.rcad{width:16%;color:#8E8D8A}.ramt{width:25%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.rmo{width:25%;text-align:right;color:#8E8D8A;font-variant-numeric:tabular-nums}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .muted{color:#8E8D8A}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8E8D8A;text-align:left;padding:6px 4px;border-bottom:1px solid #eee;font-weight:600}
+  th.num{text-align:right}
+  .wbar{height:5px;border-radius:3px;background:#C4A98E;opacity:.65;max-width:100%}
   .bar{height:6px;border-radius:3px;background:#9BAE93;opacity:.7;max-width:100%}
   ul{padding-left:18px;font-size:14px;line-height:1.7;color:#444}
   li,p{overflow-wrap:anywhere}
@@ -157,6 +223,15 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   </div>
   ${stats.savingsRate !== null ? `<div class="sub">Savings rate this period: <b>${stats.savingsRate}%</b></div>` : ''}
 
+  ${months.length > 1 ? `<h2>Month by month</h2>
+  <table>
+    <tr><th style="width:20%">Month</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th><th class="num" style="width:14%">Saved</th></tr>
+    ${months.map(([k, m]) => `
+    <tr><td>${ml(k)}</td><td class="num pos">+${fmt(m.inc)}</td><td class="num neg">−${fmt(m.out)}</td>
+        <td class="num" style="font-weight:700;color:${m.inc - m.out >= 0 ? '#7d937a' : '#c98989'}">${m.inc - m.out >= 0 ? '+' : '−'}${fmt(Math.abs(m.inc - m.out))}</td>
+        <td class="num muted">${m.inc > 0 ? Math.round(((m.inc - m.out) / m.inc) * 100) + '%' : '—'}</td></tr>`).join('')}
+  </table>` : ''}
+
   ${stats.topCategories.length > 0 ? `<h2>Where the money went</h2>
   <table>${stats.topCategories.map(([name, amt]) => `
     <tr><td class="tname">${escapeHtml(name)}</td>
@@ -165,11 +240,64 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         <td class="tpct">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</td></tr>`).join('')}
   </table>` : ''}
 
+  ${catRows.length > 0 ? `<h2>Category deep dive</h2>
+  <table>
+    <tr><th style="width:26%">Category</th><th class="num">Total</th><th class="num" style="width:11%">Txns</th><th class="num">Avg</th><th style="width:28%">Top merchant</th></tr>
+    ${catRows.map(c => `
+    <tr><td>${escapeHtml(c.name)}</td><td class="num" style="font-weight:700">${fmt(c.total)}</td>
+        <td class="num muted">${c.count}</td><td class="num muted">${fmt(c.avg)}</td>
+        <td class="muted">${escapeHtml(c.topMerchant ? c.topMerchant[0] : '—')}</td></tr>`).join('')}
+  </table>` : ''}
+
+  ${merchantRows.length > 0 ? `<h2>Top merchants</h2>
+  <table>
+    <tr><th style="width:42%">Merchant</th><th class="num" style="width:12%">Txns</th><th class="num">Total</th><th class="num">Avg</th></tr>
+    ${merchantRows.map(([name, m]) => `
+    <tr><td>${escapeHtml(name)}</td><td class="num muted">${m.count}</td>
+        <td class="num" style="font-weight:700">${fmt(m.total)}</td><td class="num muted">${fmt(m.total / m.count)}</td></tr>`).join('')}
+  </table>` : ''}
+
+  <h2>Spending behaviour</h2>
+  <div class="grid">
+    <div class="card"><div class="l">Avg / spending day</div><div class="v">${fmt(avgPerActiveDay)}</div></div>
+    <div class="card"><div class="l">Days with spending</div><div class="v">${activeSpendDays}<span style="font-size:12px;color:#8E8D8A"> / ${spanDays}</span></div></div>
+    <div class="card"><div class="l">No-spend days</div><div class="v pos">${noSpendDays}</div></div>
+    ${peakDay ? `<div class="card"><div class="l">Heaviest day</div><div class="v neg">${fmt(peakDay[1])}</div><div class="l" style="margin-top:4px;text-transform:none;letter-spacing:0">${dl(peakDay[0])}</div></div>` : ''}
+  </div>
+  <table>${WD.map((d, i) => `
+    <tr><td style="width:18%" class="muted">${d}</td>
+        <td><div class="wbar" style="width:${Math.max(3, Math.round((weekdayAvg[i] / maxWd) * 100))}%"></div></td>
+        <td class="num" style="width:26%">${fmt(weekdayAvg[i])}<span class="muted" style="font-weight:400">/day</span></td></tr>`).join('')}
+  </table>
+
+  ${top5exp.length > 0 ? `<h2>Biggest movements</h2>
+  <table>
+    <tr><th>Largest expenses</th><th style="width:24%" class="muted">Date</th><th class="num" style="width:26%">Amount</th></tr>
+    ${top5exp.map(t => `
+    <tr><td>${escapeHtml(t.merchant || t.category)}</td><td class="muted">${dl(t.date)}</td>
+        <td class="num neg" style="font-weight:700">−${fmt(t.amount)}</td></tr>`).join('')}
+    ${top5inc.length > 0 ? `<tr><th>Largest credits</th><th></th><th></th></tr>
+    ${top5inc.map(t => `
+    <tr><td>${escapeHtml(t.merchant || t.category)}</td><td class="muted">${dl(t.date)}</td>
+        <td class="num pos" style="font-weight:700">+${fmt(t.amount)}</td></tr>`).join('')}` : ''}
+  </table>` : ''}
+
   ${recurring.length > 0 ? `<h2>Recurring charges</h2>
   <table>${recurring.map(r => `
     <tr><td class="rname">${escapeHtml(r.name)}</td><td class="rcad">${r.cadence.toLowerCase()}</td>
         <td class="ramt">${fmt(r.amount)}</td>
         <td class="rmo">≈ ${fmt(r.monthlyCost)}/mo</td></tr>`).join('')}
+  </table>
+  <div class="sub" style="margin-top:8px">These subscriptions project to <b>≈ ${fmt(recurringAnnual)}/year</b>.</div>` : ''}
+
+  ${incomeAnalysis.streams.length > 0 ? `<h2>Income streams · 12-month view</h2>
+  ${incomeAnalysis.stability ? `<div class="sub" style="margin-bottom:8px">Stability score <b>${incomeAnalysis.stability.score}/100</b> (${incomeAnalysis.stability.label}) · average ${fmt(incomeAnalysis.stability.avgMonthly)}/month</div>` : ''}
+  <table>
+    <tr><th style="width:34%">Source</th><th style="width:18%">Pattern</th><th class="num" style="width:10%">×</th><th class="num">Typical</th><th class="num">12-mo total</th></tr>
+    ${incomeAnalysis.streams.slice(0, 8).map(s => `
+    <tr><td>${escapeHtml(s.name)}</td><td class="muted">${BADGE[s.badge] || ''}</td>
+        <td class="num muted">${s.occurrences}</td><td class="num">${fmt(s.typicalAmount)}</td>
+        <td class="num pos" style="font-weight:700">${fmt(s.total12m)}</td></tr>`).join('')}
   </table>` : ''}
 
   <h2>Insights</h2>

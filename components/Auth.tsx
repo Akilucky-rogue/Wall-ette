@@ -155,11 +155,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 </div>
               </div>
             </div>
-            
-            {/* Small coin accent */}
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 shadow-md flex items-center justify-center border-2 border-white">
-              <span className="text-amber-700 text-[10px] font-bold">₹</span>
-            </div>
           </div>
         </div>
         

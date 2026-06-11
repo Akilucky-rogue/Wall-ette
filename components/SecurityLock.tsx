@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric } from '../utils/biometric';
+import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
 
@@ -28,13 +28,18 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     setError('');
     const ok = await authenticateBiometric('Unlock your wallet');
     if (ok) {
-      await logAttempt(true, 'BIOMETRIC');
+      // Unlock the instant the OS confirms — the audit log is a network
+      // write and must never sit between the fingerprint and the app.
       onUnlock();
+      void logAttempt(true, 'BIOMETRIC');
     }
   };
 
   useEffect(() => {
     let cancelled = false;
+    // Load the native plugin immediately so the auto-prompt isn't
+    // waiting on a dynamic import.
+    preloadBiometric();
     (async () => {
       const uid = auth.currentUser?.uid;
       if (!uid || !isBiometricEnabled(uid)) return;
@@ -77,15 +82,15 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
         await reauthenticateWithCredential(auth.currentUser, credential);
 
-        await logAttempt(true, 'PASSWORD');
         onUnlock();
+        void logAttempt(true, 'PASSWORD');
     } catch (err: any) {
         if (isMfaRequiredError(err)) {
             // Password was correct — account has 2FA, ask for the TOTP code
             setTotpResolver(mfaResolverFromError(err));
             setError('');
         } else {
-            await logAttempt(false, 'PASSWORD');
+            void logAttempt(false, 'PASSWORD');
             setError("Incorrect password.");
             setPassword('');
         }
@@ -101,10 +106,10 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     setError('');
     try {
         await resolveTotpSignIn(totpResolver, totpCode);
-        await logAttempt(true, 'MFA');
         onUnlock();
+        void logAttempt(true, 'MFA');
     } catch (err: any) {
-        await logAttempt(false, 'MFA');
+        void logAttempt(false, 'MFA');
         setError(mfaErrorMessage(err));
         setTotpCode('');
     } finally {

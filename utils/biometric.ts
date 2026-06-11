@@ -14,11 +14,21 @@ import { log } from './log';
 
 export const isNative = (): boolean => Capacitor.isNativePlatform();
 
+// One shared module load — checkBiometry and authenticate were each paying
+// for their own dynamic import, adding visible latency to the unlock prompt.
+let pluginPromise: Promise<typeof import('@aparajita/capacitor-biometric-auth')> | null = null;
+const loadPlugin = () => (pluginPromise ??= import('@aparajita/capacitor-biometric-auth'));
+
+/** Kick off the plugin load early (e.g., the moment the lock screen mounts). */
+export function preloadBiometric(): void {
+  if (isNative()) void loadPlugin();
+}
+
 /** Is a biometric sensor available and enrolled on this device? */
 export async function isBiometricAvailable(): Promise<boolean> {
   if (!isNative()) return false;
   try {
-    const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth');
+    const { BiometricAuth } = await loadPlugin();
     const info = await BiometricAuth.checkBiometry();
     return info.isAvailable;
   } catch (e) {
@@ -31,7 +41,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
 export async function authenticateBiometric(reason: string): Promise<boolean> {
   if (!isNative()) return false;
   try {
-    const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth');
+    const { BiometricAuth } = await loadPlugin();
     await BiometricAuth.authenticate({
       reason,
       cancelTitle: 'Use password',

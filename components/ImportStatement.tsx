@@ -235,11 +235,27 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
     }
 
     const bridge = bridgeGap && gap ? gap.amount : 0;
-    const projected = getBalance() + selectedNet + openingDelta + bridge;
-    const diff = projected - parsedClosingBalance;
+    const projectedFinal = getBalance() + selectedNet + openingDelta + bridge;
+
+    // The bank's closing figure only knows about money up to the statement's
+    // last day — so the honest check is the wallet balance AS OF that day.
+    // Existing transactions dated later are excluded from the comparison
+    // (but still part of the final balance). This makes the check exact for
+    // overlapping statements and any import order.
+    let futureNet = 0;
+    for (const t of existingTransactions) {
+      if (t.date.slice(0, 10) > reviewSummary.maxDate) {
+        futureNet += t.type === TransactionType.INCOME ? t.amount : -t.amount;
+      }
+    }
+    const projectedAtEnd = projectedFinal - futureNet;
+    const diff = projectedAtEnd - parsedClosingBalance;
 
     return {
-      projected,
+      projected: projectedAtEnd,
+      projectedFinal,
+      hasNewer: futureNet !== 0,
+      endDate: reviewSummary.maxDate,
       closing: parsedClosingBalance,
       diff,
       matched: Math.abs(diff) <= 1,
@@ -249,12 +265,11 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds,
       existingTransactions, openingBalanceAsOf, openingBalance, getBalance, bridgeGap]);
 
-  // Card tone: gap (bridged → ok), older info, tallied, or off.
-  const tallyBridged = !!(tally?.gap && bridgeGap && tally.gap.direction === 'after' && tally.matched);
-  const tallyTone: 'ok' | 'gap' | 'older' | 'off' | null =
+  // Card tone: gap (bridged → ok), tallied, or off.
+  const tallyBridged = !!(tally?.gap && bridgeGap && tally.matched);
+  const tallyTone: 'ok' | 'gap' | 'off' | null =
     !tally ? null
     : tally.gap ? (tallyBridged ? 'ok' : 'gap')
-    : !tally.isNewest ? 'older'
     : tally.matched ? 'ok'
     : 'off';
 
@@ -639,15 +654,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 {/* Balance tally — statement closing vs wallet after import */}
                 {tally && (
                     <div className={`mb-4 p-4 rounded-2xl border animate-slide-up ${
-                        tallyTone === 'older' ? 'bg-white border-black/5'
-                        : tallyTone === 'ok' ? 'bg-sage-light/30 border-sage/20'
-                        : 'bg-amber-50 border-amber-200'
+                        tallyTone === 'ok' ? 'bg-sage-light/30 border-sage/20' : 'bg-amber-50 border-amber-200'
                     }`}>
                         <div className="flex items-center gap-2 mb-3">
                             <span className={`material-symbols-outlined text-[18px] ${
-                                tallyTone === 'older' ? 'text-muted-taupe' : tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
+                                tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
                             }`}>
-                                {tallyTone === 'older' ? 'history' : tallyTone === 'ok' ? 'task_alt' : 'error'}
+                                {tallyTone === 'ok' ? 'task_alt' : 'error'}
                             </span>
                             <p className="text-[11px] font-bold uppercase tracking-widest text-muted-taupe">Balance Check</p>
                         </div>
@@ -658,26 +671,28 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             </div>
                             <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
                             <div className="text-right">
-                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">Wallet after import</p>
+                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">
+                                    {tally.hasNewer ? `Wallet on ${tally.endDate}` : 'Wallet after import'}
+                                </p>
                                 <p className={`text-[15px] font-serif font-bold ${
-                                    tallyTone === 'older' ? 'text-premium-charcoal' : tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
+                                    tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
                                 }`}>{formatAmount(tally.projected)}</p>
                             </div>
                         </div>
                         <p className={`text-[10px] mt-3 leading-relaxed ${
-                            tallyTone === 'older' ? 'text-muted-taupe' : tallyTone === 'ok' ? 'text-sage' : 'text-amber-700'
+                            tallyTone === 'ok' ? 'text-sage' : 'text-amber-700'
                         }`}>
                             {tallyTone === 'ok' && tallyBridged
-                                ? '✓ Bridged — with the adjustment entry, your balance will match the bank after import.'
+                                ? '✓ Bridged — with the adjustment entry, your balance will match the bank.'
+                                : tallyTone === 'ok' && tally.hasNewer
+                                ? `✓ Tallies with the bank as of ${tally.endDate}. Final balance after import: ${formatAmount(tally.projectedFinal)}.`
                                 : tallyTone === 'ok'
                                 ? '✓ Tallies with the statement. Your balance will be accurate after import.'
-                                : tallyTone === 'older'
-                                ? 'Older statement — your wallet already has newer entries, so the final balance will reflect those too. Import any order you like; the app re-anchors automatically.'
                                 : tally.gap && tally.gap.direction === 'after'
                                 ? `The bank says this period started at ${formatAmount(parsedOpeningBalance!)}, but your wallet stands at ${formatAmount(getBalance())}. ${formatAmount(Math.abs(tally.gap.amount))} of activity between ${tally.gap.from} and ${tally.gap.to} hasn't been imported. Best fix: download that period's statement from your bank and import it (any order works).`
                                 : tally.gap
                                 ? `This statement ends ${tally.gap.from} at ${formatAmount(tally.closing)}, but your records resume ${tally.gap.to} from an opening of ${formatAmount(openingBalance)}. ${formatAmount(Math.abs(tally.gap.amount))} in between hasn't been imported — grab the statement covering that window (any order works).`
-                                : `Off by ${formatAmount(Math.abs(tally.diff))}. Check deselected rows or use Flip Types if income/expense look swapped.`}
+                                : `Off by ${formatAmount(Math.abs(tally.diff))} as of ${tally.endDate}. Check deselected rows, try Flip Types — or your bank may have posted transactions after this statement was downloaded.`}
                         </p>
                         {tally.gap && (
                             <label className="mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-white/70 border border-amber-200 cursor-pointer">

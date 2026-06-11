@@ -775,10 +775,47 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                   );
                 })}
               </div>
+              {/* Day drill-down: tap a date to see exactly what happened */}
+              {heatDay !== null && (() => {
+                const y = selectedDate.getFullYear(), mo = selectedDate.getMonth();
+                const dayTxs = transactions
+                  .filter(t => {
+                    const d = new Date(t.date);
+                    return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === heatDay
+                      && t.type === (isExp ? TransactionType.EXPENSE : TransactionType.INCOME);
+                  })
+                  .sort((a, b) => b.amount - a.amount);
+                if (dayTxs.length === 0) {
+                  return (
+                    <p className="text-[10px] text-muted-taupe mt-3 pt-3 border-t border-black/5 italic">
+                      No {isExp ? 'spending' : 'income'} on this day.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
+                    {dayTxs.slice(0, 6).map(t => (
+                      <div key={t.id} className="flex items-center gap-2 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isExp ? 'bg-rose' : 'bg-sage'}`} />
+                        <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>
+                          {t.merchant || t.category}
+                        </span>
+                        <span className="text-[9px] text-muted-taupe shrink-0 uppercase tracking-wide">{t.category}</span>
+                        <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${isExp ? 'text-rose' : 'text-sage'}`}>
+                          {isExp ? '-' : '+'}{formatAmount(t.amount).split('.')[0]}
+                        </span>
+                      </div>
+                    ))}
+                    {dayTxs.length > 6 && (
+                      <p className="text-[9px] text-muted-taupe">+{dayTxs.length - 6} more — see Vault for the full day</p>
+                    )}
+                  </div>
+                );
+              })()}
               <p className="text-[9px] text-muted-taupe mt-3">
                 {isExp
-                  ? `Darker = more spent · ${zeroDays} no-spend day${zeroDays === 1 ? '' : 's'} this month`
-                  : `Darker = more received · income arrived on ${dayStats.daysInMonth - zeroDays} day${dayStats.daysInMonth - zeroDays === 1 ? '' : 's'} this month`}
+                  ? `Darker = more spent · ${zeroDays} no-spend day${zeroDays === 1 ? '' : 's'} this month · tap a day for details`
+                  : `Darker = more received · income arrived on ${dayStats.daysInMonth - zeroDays} day${dayStats.daysInMonth - zeroDays === 1 ? '' : 's'} this month · tap a day for details`}
               </p>
             </div>
           </div>

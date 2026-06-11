@@ -372,7 +372,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Daily</span>
+              <span className="shrink-0">Today</span>
               <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getDailyIncome())}</span>
             </div>
             <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
@@ -392,7 +392,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Daily</span>
+              <span className="shrink-0">Today</span>
               <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getDailyExpense())}</span>
             </div>
             <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">

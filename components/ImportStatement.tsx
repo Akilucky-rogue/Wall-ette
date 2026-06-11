@@ -44,7 +44,7 @@ const merchantsMatch = (a: string, b: string): boolean => {
     return a === b;
 };
 
-interface DupCandidate { amount: number; merchant: string | null } // merchant pre-normalized, null = no merchant
+interface DupCandidate { amount: number; merchant: string | null; used: boolean } // merchant pre-normalized
 
 // Index existing transactions by `date|type` so duplicate detection is
 // O(new × bucket) instead of O(new × all existing), with each merchant
@@ -55,20 +55,34 @@ const buildDuplicateIndex = (existing: Transaction[]): Map<string, DupCandidate[
         const key = `${t.date}|${t.type}`;
         let bucket = index.get(key);
         if (!bucket) { bucket = []; index.set(key, bucket); }
-        bucket.push({ amount: t.amount, merchant: t.merchant ? normalizeMerchant(t.merchant) : null });
+        bucket.push({ amount: t.amount, merchant: t.merchant ? normalizeMerchant(t.merchant) : null, used: false });
     }
     return index;
 };
 
-const isDuplicateOf = (tx: Transaction, index: Map<string, DupCandidate[]>): boolean => {
+// COUNT-AWARE matching: each existing transaction can absorb exactly ONE
+// incoming duplicate. If a statement has two legit ₹249 payments and the
+// wallet only has one, the second stays selected instead of being lost.
+// Exact-merchant matches are claimed before fuzzy ones.
+const claimDuplicate = (tx: Transaction, index: Map<string, DupCandidate[]>): boolean => {
     const bucket = index.get(`${tx.date}|${tx.type}`);
     if (!bucket) return false;
-    let txMerchant: string | null = null; // lazily normalized once
+    const txMerchant = normalizeMerchant(tx.merchant || '');
+    // Pass 1: exact normalized-merchant match
     for (const cand of bucket) {
-        if (Math.abs(tx.amount - cand.amount) > 0.01) continue; // same tolerance as before
-        if (cand.merchant === null) return true; // existing has no merchant -> date/amount/type match suffices
-        if (txMerchant === null) txMerchant = normalizeMerchant(tx.merchant || '');
-        if (merchantsMatch(txMerchant, cand.merchant)) return true;
+        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
+        if (cand.merchant !== null && cand.merchant === txMerchant) {
+            cand.used = true;
+            return true;
+        }
+    }
+    // Pass 2: fuzzy (containment / shared prefix) or merchant-less existing rows
+    for (const cand of bucket) {
+        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
+        if (cand.merchant === null || merchantsMatch(txMerchant, cand.merchant)) {
+            cand.used = true;
+            return true;
+        }
     }
     return false;
 };
@@ -107,7 +121,7 @@ const mapRawToTransactions = (rawTransactions: any[]): Transaction[] => {
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
       currency, importTransactions, transactions: existingTransactions,
-      getBalance, openingBalance, openingBalanceAsOf, formatAmount
+      getBalance, openingBalance, openingBalanceAsOf, formatAmount, deleteTransaction
   } = useWallet();
 
   // Stages: IDLE (Upload), PROCESSING (AI Loading), REVIEW (Selection)
@@ -315,7 +329,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       const dupIndex = buildDuplicateIndex(existingTransactions);
       const foundDuplicates = new Set<string>();
       for (const tx of mappedTransactions) {
-          if (isDuplicateOf(tx, dupIndex)) foundDuplicates.add(tx.id);
+          if (claimDuplicate(tx, dupIndex)) foundDuplicates.add(tx.id);
       }
 
       log.debug(`Import staged: ${mappedTransactions.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
@@ -483,6 +497,19 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
               category: 'Adjustment',
               note: `Bridges un-imported period ${g.from} → ${g.to}. Delete this if you import that statement later.`
           });
+      }
+
+      // Stale bridge adjustments: this statement now covers a window an
+      // earlier adjustment entry was standing in for — remove those so the
+      // real rows don't double-count on top of the placeholder.
+      if (reviewSummary) {
+          const stale = existingTransactions.filter(t =>
+              t.id.startsWith('adjust-') &&
+              t.date.slice(0, 10) >= reviewSummary.minDate &&
+              t.date.slice(0, 10) <= reviewSummary.maxDate
+          );
+          for (const t of stale) deleteTransaction(t.id);
+          if (stale.length > 0) log.debug(`Removed ${stale.length} stale bridge adjustment(s)`);
       }
 
       log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions`);

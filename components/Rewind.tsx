@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { prettyMerchant } from '../services/analyticsService';
 import { exportImage } from '../utils/exportFile';
 import { log } from '../utils/log';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
@@ -209,7 +210,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       };
 
       let sy = 726;
-      if (wrapped.topMerchant) { small('most paid to', `${wrapped.topMerchant[0]}`, sy); sy += 62; }
+      if (wrapped.topMerchant) { small('most paid to', prettyMerchant(wrapped.topMerchant[0]), sy); sy += 62; }
       if (wrapped.topCat) { small('top category', `${wrapped.topCat[0]} · ${fmt(wrapped.topCat[1])}`, sy); sy += 62; }
       small('busiest month · no-spend days', `${wrapped.busiestMonth} · ${wrapped.noSpendDays} days`, sy);
 
@@ -309,8 +310,8 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                   <div className="w-7 h-7 rounded-full bg-rose-light text-rose flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
                   </div>
-                  <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0">
-                    Biggest spend ever: <b>{fmt(life.maxExp.amount)}</b> — {life.maxExp.merchant || life.maxExp.category}, {new Date(life.maxExp.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                  <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0 break-words">
+                    Biggest spend ever: <b>{fmt(life.maxExp.amount)}</b> — {prettyMerchant(life.maxExp.merchant || life.maxExp.category)}, {new Date(life.maxExp.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
               )}
@@ -319,8 +320,8 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                   <div className="w-7 h-7 rounded-full bg-sage-light text-sage flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[14px]">emoji_events</span>
                   </div>
-                  <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0">
-                    Biggest credit ever: <b>{fmt(life.maxInc.amount)}</b> — {life.maxInc.merchant || life.maxInc.category}, {new Date(life.maxInc.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                  <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0 break-words">
+                    Biggest credit ever: <b>{fmt(life.maxInc.amount)}</b> — {prettyMerchant(life.maxInc.merchant || life.maxInc.category)}, {new Date(life.maxInc.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
               )}
@@ -345,7 +346,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                 {life.onThisDay.map(t => (
                   <div key={t.id} className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px] font-bold text-muted-taupe w-9 shrink-0">{new Date(t.date).getFullYear()}</span>
-                    <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>{t.merchant || t.category}</span>
+                    <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>{prettyMerchant(t.merchant || t.category)}</span>
                     <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
                       {t.type === TransactionType.EXPENSE ? '-' : '+'}{formatAmountCompact(t.amount)}
                     </span>

@@ -3,7 +3,7 @@ import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
-import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace } from '../services/analyticsService';
+import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace, prettyMerchant } from '../services/analyticsService';
 import styles from './SpendAnalysis.module.css';
 
 interface SpendAnalysisProps {
@@ -458,6 +458,69 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       {/* Desktop: sections flow into two columns; phones/APK keep one column */}
       <div className="lg:columns-2 lg:gap-x-0">
 
+      {/* TODAY — daily spend analysis, front and center */}
+      {(() => {
+        const now = new Date();
+        const isExp = analysisTab === 'EXPENSE';
+        const todayTxs = transactions
+          .filter(t => {
+            const d = new Date(t.date);
+            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() &&
+              d.getDate() === now.getDate() &&
+              t.type === (isExp ? TransactionType.EXPENSE : TransactionType.INCOME);
+          })
+          .sort((a, b) => b.amount - a.amount);
+        const todayTotal = todayTxs.reduce((s, t) => s + t.amount, 0);
+        const viewingCurrentMonth =
+          selectedDate.getMonth() === now.getMonth() && selectedDate.getFullYear() === now.getFullYear();
+        if (!viewingCurrentMonth) return null;
+        const avg = txStats ? txStats.dailyAvg : 0;
+        const vsAvg = avg > 0 ? Math.round(((todayTotal - avg) / avg) * 100) : null;
+        return (
+          <div className="px-6 pb-4 break-inside-avoid">
+            <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
+              <div className="flex items-baseline justify-between mb-1">
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">
+                  Today · {now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </p>
+                <p className={`text-[16px] font-serif font-bold ${isExp ? 'text-rose' : 'text-sage'}`}>
+                  {isExp ? '-' : '+'}{formatAmount(todayTotal).split('.')[0]}
+                </p>
+              </div>
+              {todayTxs.length === 0 ? (
+                <p className="text-[11px] text-muted-taupe italic mt-1">
+                  {isExp ? 'Nothing spent yet today — keep it going.' : 'No income recorded today.'}
+                </p>
+              ) : (
+                <>
+                  <p className="text-[10px] text-muted-taupe mb-3">
+                    {todayTxs.length} transaction{todayTxs.length === 1 ? '' : 's'}
+                    {vsAvg !== null ? ` · ${Math.abs(vsAvg)}% ${vsAvg >= 0 ? 'above' : 'below'} your daily average` : ''}
+                  </p>
+                  <div className="space-y-2">
+                    {todayTxs.slice(0, 4).map(t => (
+                      <div key={t.id} className="flex items-center gap-2 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isExp ? 'bg-rose' : 'bg-sage'}`} />
+                        <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>
+                          {prettyMerchant(t.merchant || t.category)}
+                        </span>
+                        <span className="text-[9px] text-muted-taupe shrink-0 uppercase tracking-wide">{t.category}</span>
+                        <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${isExp ? 'text-rose' : 'text-sage'}`}>
+                          {isExp ? '-' : '+'}{formatAmount(t.amount).split('.')[0]}
+                        </span>
+                      </div>
+                    ))}
+                    {todayTxs.length > 4 && (
+                      <p className="text-[9px] text-muted-taupe">+{todayTxs.length - 4} more — tap today in the heatmap below</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Quick Stats Row */}
       {txStats && (
         <div className="px-6 pb-4 break-inside-avoid">
@@ -798,7 +861,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                       <div key={t.id} className="flex items-center gap-2 min-w-0">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isExp ? 'bg-rose' : 'bg-sage'}`} />
                         <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>
-                          {t.merchant || t.category}
+                          {prettyMerchant(t.merchant || t.category)}
                         </span>
                         <span className="text-[9px] text-muted-taupe shrink-0 uppercase tracking-wide">{t.category}</span>
                         <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${isExp ? 'text-rose' : 'text-sage'}`}>

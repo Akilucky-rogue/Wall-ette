@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { analyzeIncome, StreamBadge } from '../services/analyticsService';
+import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, LotusFlower, RangoliCorner, MandalaDots } from './SplashScreen';
 
 interface IncomeInsightsProps {
@@ -125,7 +125,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.inc > 0) {
       lines.push({
         icon: 'south_west', tone: 'pos',
-        text: <><b>{formatAmount(m.inc).split('.')[0]}</b> came in{topSource ? <> — mostly from <b>{topSource[0]}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
+        text: <><b>{formatAmount(m.inc).split('.')[0]}</b> came in{topSource ? <> — mostly from <b>{prettyMerchant(topSource[0])}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
       });
     }
     if (m.out > 0) {
@@ -146,7 +146,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.maxExp) {
       lines.push({
         icon: 'local_fire_department', tone: 'mid',
-        text: <>Largest single spend: <b>{m.maxExp.merchant || m.maxExp.category}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {new Date(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
+        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {new Date(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
       });
     }
     if (prev && prev.out > 0 && m.out > 0) {
@@ -332,7 +332,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${l.tone === 'pos' ? 'bg-sage-light text-sage' : l.tone === 'neg' ? 'bg-rose-light text-rose' : 'bg-sand-light text-sand'}`}>
                           <span className="material-symbols-outlined text-[15px]">{l.icon}</span>
                         </div>
-                        <p className="text-[13px] text-premium-charcoal leading-relaxed pt-1 min-w-0">{l.text}</p>
+                        <p className="text-[13px] text-premium-charcoal leading-relaxed pt-1 min-w-0 break-words">{l.text}</p>
                       </div>
                     ))}
                   </div>
@@ -353,7 +353,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         n.h >= 9 && (
                         <div key={i} className="absolute left-0 w-full flex flex-col justify-center text-right pr-1 overflow-hidden"
                              style={{ top: `${n.y}%`, height: `${n.h}%` }}>
-                          <span className="block text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{n.name}</span>
+                          <span className="block text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{prettyMerchant(n.name)}</span>
                           <span className="block text-[8px] text-muted-taupe truncate">{formatAmountCompact(n.value)}</span>
                         </div>
                       )))}
@@ -394,7 +394,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       {flowSvg.leftNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: n.color }} />
-                          <span className="text-[10px] text-premium-charcoal truncate flex-1" title={n.name}>{n.name}</span>
+                          <span className="text-[10px] text-premium-charcoal truncate flex-1" title={n.name}>{prettyMerchant(n.name)}</span>
                           <span className="text-[10px] text-muted-taupe shrink-0 tabular-nums">{formatAmountCompact(n.value)}</span>
                         </div>
                       ))}
@@ -442,7 +442,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       {salary.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · usually day {salary.typicalDay}
                     </p>
                     <p className="text-[11px] text-sage font-semibold mt-2 truncate" title={salary.streamName}>
-                      {salary.streamName}
+                      {prettyMerchant(salary.streamName)}
                     </p>
                     <p className="text-[10px] text-muted-taupe">~{formatAmount(salary.typicalAmount).split('.')[0]}</p>
                   </div>
@@ -507,7 +507,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-[13px] font-semibold text-premium-charcoal truncate">{s.name}</p>
+                            <p className="text-[13px] font-semibold text-premium-charcoal truncate" title={s.name}>{prettyMerchant(s.name)}</p>
                             <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${BADGE_STYLES[s.badge].cls}`}>
                               {BADGE_STYLES[s.badge].label}
                             </span>
@@ -586,12 +586,19 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     )}
                   </div>
                 </div>
+                <p className="text-[9px] text-muted-taupe mt-3 pt-3 border-t border-black/5 leading-relaxed">
+                  Tracked live: this month's income minus spending, recalculated with every entry,
+                  import, and sync. Resets on the 1st of each month.
+                </p>
               </div>
 
               {/* Category budgets */}
               <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
                 <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Category budgets</p>
-                <p className="text-[10px] text-muted-taupe mb-4">Spending this month vs your monthly cap. Set a cap to start tracking.</p>
+                <p className="text-[10px] text-muted-taupe mb-4">
+                  Spending this month vs your monthly cap. Bars fill automatically as you spend —
+                  sand at 80%, red when over. Caps reset every month.
+                </p>
                 {goalData.rows.length === 0 ? (
                   <p className="text-[12px] text-muted-taupe italic">No spending this month yet.</p>
                 ) : (

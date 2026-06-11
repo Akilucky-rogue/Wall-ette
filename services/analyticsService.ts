@@ -12,6 +12,41 @@ import { Transaction, TransactionType } from '../types';
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Tokens that are payment-rail plumbing, not a payee name.
+const RAIL_TOKENS = new Set([
+  'NEFT', 'UPI', 'IMPS', 'RTGS', 'IFT', 'POS', 'VISA', 'ECOM', 'NACH',
+  'ATM', 'NFS', 'OPM', 'MOB', 'DR', 'CR', 'CHQ', 'INB', 'TPT', 'BIL', 'PAYMENT',
+]);
+
+/**
+ * Human-readable payee from a raw bank narration.
+ * "NEFT/IN226.../CHOICE EQUITY BROKING PVT LTD/ICIC0099999/…" → "CHOICE EQUITY BROKING PVT LTD"
+ * "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"            → "ZOMATO L"
+ * Keep the raw string in `title=` tooltips; this is display-only.
+ */
+export function prettyMerchant(raw: string | undefined | null): string {
+  if (!raw) return 'Unknown';
+  const segs = raw.split(/[\/\\|]+/).map(s => s.trim()).filter(Boolean);
+  if (segs.length <= 1) return raw.length > 32 ? raw.slice(0, 31) + '…' : raw;
+
+  const isRef = (s: string) =>
+    /^\d{4,}$/.test(s) ||                       // numeric reference
+    /^[A-Z]{2,6}\d{4,}/i.test(s) ||             // AXNH2536…, IN226…
+    (/^[A-Z0-9]{9,}$/i.test(s) && /\d{2,}/.test(s)); // mixed long refs
+  const isRail = (s: string) =>
+    RAIL_TOKENS.has(s.toUpperCase()) ||
+    /^[A-Z]{4}0[A-Z0-9]{5,}$/i.test(s);         // IFSC codes
+
+  const score = (s: string) => (s.match(/[A-Za-z ]/g) || []).length;
+  const candidates = segs.filter(s => !isRail(s) && !isRef(s) && score(s) >= 3);
+  if (candidates.length === 0) return raw.slice(0, 28);
+
+  let best = candidates[0];
+  for (const c of candidates) if (score(c) > score(best)) best = c;
+  best = best.replace(/\s{2,}/g, ' ').trim();
+  return best.length > 32 ? best.slice(0, 31) + '…' : best;
+}
+
 /** Normalize a merchant string for grouping (same rules as import dedup). */
 export const normalizeMerchant = (merchant: string): string =>
   merchant

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 
 import SecurityLock from './components/SecurityLock';
+import AndroidInstallBanner from './components/AndroidInstallBanner';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -154,7 +155,12 @@ function AppContent() {
   }
 
   if (!user) {
-      return <Auth onAuthSuccess={handleAuthSuccess} />;
+      return (
+        <>
+          <Auth onAuthSuccess={handleAuthSuccess} />
+          <AndroidInstallBanner />
+        </>
+      );
   }
 
   if (isLocked) {
@@ -211,6 +217,7 @@ function AppContent() {
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
         )}
+        <AndroidInstallBanner />
       </div>
     </WalletProvider>
   );

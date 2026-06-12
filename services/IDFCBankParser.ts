@@ -369,7 +369,7 @@ export class IDFCBankParser {
       return 'Insurance';
 
     // ── EXPENSE: Investments ─────────────────────────────────────────────────
-    if (desc.match(/zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox/))
+    if (desc.match(/zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox|trftochoice|choice.?equity|razorpaytp.*choice/))
       return 'Investment';
     if (desc.match(/mutual.?fund|\bsip\b|\bmf\b|nfo\b|nav\b|demat/))
       return 'Investment';

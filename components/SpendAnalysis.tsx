@@ -516,6 +516,28 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                   </div>
                 </>
               )}
+              {/* Daily spend limit usage — the limit set in Self, tracked live */}
+              {isExp && dailyLimit > 0 && (
+                <div className="mt-3 pt-3 border-t border-black/5">
+                  <div className="flex justify-between text-[10px] text-muted-taupe mb-1.5">
+                    <span className="uppercase tracking-wider font-bold">Daily limit</span>
+                    <span className={`tabular-nums ${todayTotal > dailyLimit ? 'text-rose font-bold' : ''}`}>
+                      {formatAmount(todayTotal).split('.')[0]} / {formatAmount(dailyLimit).split('.')[0]}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-zen-bg rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${todayTotal > dailyLimit ? 'bg-rose' : todayTotal > dailyLimit * 0.8 ? 'bg-sand' : 'bg-sage'}`}
+                      style={{ width: `${Math.min(100, (todayTotal / dailyLimit) * 100)}%` }}
+                    />
+                  </div>
+                  {todayTotal > dailyLimit && (
+                    <p className="text-[9px] text-rose font-semibold mt-1">
+                      Over today's limit by {formatAmount(todayTotal - dailyLimit).split('.')[0]}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );

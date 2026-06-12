@@ -267,16 +267,13 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   )}
 
                   <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-Factor Auth"
-                       sub={mfaOn ? 'Authenticator app enabled' : 'Require an authenticator code at sign-in'}>
-                      <button
-                        onClick={() => (mfaOn ? (setMfaModal(true), setMfaError('')) : openMfaEnroll())}
-                        className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full ${mfaOn ? 'bg-sage-light text-sage' : 'bg-gray-100 text-muted-taupe hover:bg-gray-200'}`}
-                      >
-                        {mfaOn ? 'Enabled' : 'Set Up'}
-                      </button>
+                       sub="Authenticator-app sign-in — on the roadmap">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-gray-100 text-muted-taupe">
+                        Coming Soon
+                      </span>
                   </Row>
 
-                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Block expenses past this amount (base currency)">
+                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Caps manual entries · tracked live in Pulse's Today card">
                       <div className="relative flex items-center">
                         <input
                           id="daily-limit-input"

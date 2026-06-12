@@ -27,7 +27,10 @@ const Profile = React.lazy(() => import('./components/Profile'));
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const [isLocked, setIsLocked] = useState(false);
+  // Native cold start opens LOCKED: a signed-in session resumes behind the
+  // biometric/password gate instead of straight onto the dashboard. This is
+  // what makes "biometric login" real — open app → fingerprint → in.
+  const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   const [showSplash, setShowSplash] = useState(true);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
@@ -115,6 +118,9 @@ function AppContent() {
 
   // Handle auth success - trigger splash before showing app
   const handleAuthSuccess = (type: AuthType) => {
+    // The user JUST authenticated with their password — don't bounce them
+    // into the session lock on top of it.
+    setIsLocked(false);
     setAuthSplashPending(type);
     setSplashVariant(type);
     setShowSplash(true);

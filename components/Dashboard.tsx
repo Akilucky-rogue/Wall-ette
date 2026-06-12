@@ -516,6 +516,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         const vals = balanceTrend.map(m => m.value);
         const min = Math.min(...vals);
         const max = Math.max(...vals);
+        const mid = (max + min) / 2;
         const range = max - min || 1;
         const w = 100 / (vals.length - 1);
         // y in 8..92% so points never clip at the card edges
@@ -531,7 +532,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">12-Month Balance Trend</p>
                 <p className="text-[9px] text-muted-taupe/70">tap a point</p>
               </div>
-              <div className="relative h-24 mx-1.5">
+              <div className="flex gap-2">
+              {/* Y axis — balance at the top, middle, and bottom gridlines */}
+              <div className="relative h-24 w-9 shrink-0">
+                <span className="absolute right-0 top-[8%] -translate-y-1/2 text-[8px] text-muted-taupe tabular-nums">{formatAmountCompact(max)}</span>
+                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[8px] text-muted-taupe/70 tabular-nums">{formatAmountCompact(mid)}</span>
+                <span className="absolute right-0 top-[92%] -translate-y-1/2 text-[8px] text-muted-taupe tabular-nums">{formatAmountCompact(min)}</span>
+              </div>
+              <div className="relative h-24 flex-1">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
                   <defs>
                     <linearGradient id="balTrendFill" x1="0" y1="0" x2="0" y2="1">
@@ -539,6 +547,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                       <stop offset="100%" stopColor="#9BAE93" stopOpacity="0" />
                     </linearGradient>
                   </defs>
+                  {/* gridlines matching the axis labels */}
+                  <line x1="0" y1="8" x2="100" y2="8" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+                  <line x1="0" y1="50" x2="100" y2="50" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+                  <line x1="0" y1="92" x2="100" y2="92" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
                   <polygon points={`0,100 ${linePoints} 100,100`} fill="url(#balTrendFill)" />
                   <polyline
                     points={linePoints}
@@ -564,7 +576,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </button>
                 ))}
               </div>
-              <div className="flex justify-between mt-1 mx-1.5">
+              </div>
+              <div className="flex justify-between mt-1 ml-11 mr-1.5">
                 {balanceTrend.filter((_, i) => i % 3 === 0 || i === balanceTrend.length - 1).map((m, i) => (
                   <span key={i} className="text-[9px] text-muted-taupe font-medium">{m.label}</span>
                 ))}

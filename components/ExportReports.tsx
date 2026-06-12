@@ -140,23 +140,55 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         if (t.type === TransactionType.INCOME) {
           m.inc += t.amount; incomesArr.push(t);
         } else {
-          m.out += t.amount; expensesArr.push(t);
+          m.out += t.amount;
           const c = byCat.get(t.category) || { total: 0, count: 0, merchants: new Map<string, number>() };
           c.total += t.amount; c.count++;
           const mer = t.merchant || 'Unknown';
           c.merchants.set(mer, (c.merchants.get(mer) || 0) + t.amount);
           byCat.set(t.category, c);
-          const bm = byMerchant.get(mer) || { total: 0, count: 0 };
-          bm.total += t.amount; bm.count++; byMerchant.set(mer, bm);
-          byDay.set(dayKey, (byDay.get(dayKey) || 0) + t.amount);
-          const wd = (d.getDay() + 6) % 7; // Mon=0
-          weekday[wd].sum += t.amount; weekday[wd].days.add(dayKey);
+          // Transfers/adjustments/investments are money MOVED, not money
+          // SPENT — kept in cash-flow totals, out of spending analysis.
+          const isTransferCat = t.category === 'Transfer Out' || t.category === 'Adjustment' || t.category === 'Investment';
+          if (!isTransferCat) {
+            expensesArr.push(t);
+            const bm = byMerchant.get(mer) || { total: 0, count: 0 };
+            bm.total += t.amount; bm.count++; byMerchant.set(mer, bm);
+            byDay.set(dayKey, (byDay.get(dayKey) || 0) + t.amount);
+            const wd = (d.getDay() + 6) % 7; // Mon=0
+            weekday[wd].sum += t.amount; weekday[wd].days.add(dayKey);
+          }
         }
         byMonth.set(mk, m);
       }
+      const transfersOut = (byCat.get('Transfer Out')?.total || 0)
+        + (byCat.get('Adjustment')?.total || 0)
+        + (byCat.get('Investment')?.total || 0);
+      const spendExpense = Math.max(0, stats.expense - transfersOut);
 
       const months = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
-      const catRows = [...byCat.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 6)
+      // Charts/tables stay readable on long periods: monthly view caps at the
+      // last 24 months; longer histories get a year-by-year table instead.
+      const chartMonths = months.slice(-24);
+      const labelStep = Math.max(1, Math.ceil(chartMonths.length / 12));
+      const yearAgg = new Map<string, { inc: number; out: number }>();
+      for (const [k, m] of months) {
+        const y = k.slice(0, 4);
+        const e = yearAgg.get(y) || { inc: 0, out: 0 };
+        e.inc += m.inc; e.out += m.out; yearAgg.set(y, e);
+      }
+      const yearRows = [...yearAgg.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+
+      const SPEND_EXCLUDE = new Set(['Transfer Out', 'Adjustment', 'Investment']);
+      const topSpendCats: [string, number][] = [...byCat.entries()]
+        .filter(([name]) => !SPEND_EXCLUDE.has(name))
+        .sort((a, b) => b[1].total - a[1].total)
+        .slice(0, 6)
+        .map(([name, c]) => [name, c.total]);
+      const maxSpendCat = topSpendCats[0]?.[1] || 1;
+
+      const catRows = [...byCat.entries()]
+        .filter(([name]) => !SPEND_EXCLUDE.has(name))
+        .sort((a, b) => b[1].total - a[1].total).slice(0, 6)
         .map(([name, c]) => ({
           name, total: c.total, count: c.count, avg: c.total / c.count,
           topMerchant: [...c.merchants.entries()].sort((x, y) => y[1] - x[1])[0],
@@ -169,7 +201,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         ? Math.round((+new Date(lastDay) - +new Date(firstDay)) / 86400000) + 1 : 0;
       const activeSpendDays = byDay.size;
       const noSpendDays = Math.max(0, spanDays - activeSpendDays);
-      const avgPerActiveDay = activeSpendDays ? stats.expense / activeSpendDays : 0;
+      const avgPerActiveDay = activeSpendDays ? spendExpense / activeSpendDays : 0;
       const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       const weekdayAvg = weekday.map(w => (w.days.size ? w.sum / w.days.size : 0));
       const maxWd = Math.max(...weekdayAvg, 1);
@@ -184,8 +216,8 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       // ── Chart data (pure CSS/SVG — the export stays self-contained) ────
       const PALETTE = ['#9BAE93', '#D4A5A5', '#D4B896', '#9CB5C1', '#B8B5D0', '#C4A98E'];
       let donutAcc = 0;
-      const donutSegs = stats.topCategories.map(([, v], i) => {
-        const p = stats.expense > 0 ? (v / stats.expense) * 100 : 0;
+      const donutSegs = topSpendCats.map(([, v], i) => {
+        const p = spendExpense > 0 ? (v / spendExpense) * 100 : 0;
         const seg = `${PALETTE[i % PALETTE.length]} ${donutAcc.toFixed(2)}% ${(donutAcc + p).toFixed(2)}%`;
         donutAcc += p;
         return seg;
@@ -193,7 +225,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       if (donutAcc < 99.9) donutSegs.push(`#EFEDE8 ${donutAcc.toFixed(2)}% 100%`);
       const donutCss = `background:conic-gradient(${donutSegs.join(',')})`;
 
-      const maxMonthFlow = Math.max(...months.map(([, m]) => Math.max(m.inc, m.out)), 1);
+      const maxMonthFlow = Math.max(...chartMonths.map(([, m]) => Math.max(m.inc, m.out)), 1);
 
       const dayEntries = [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-92);
       const maxDaySpend = Math.max(...dayEntries.map(([, v]) => v), 1);
@@ -258,45 +290,55 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   </div>
   ${stats.savingsRate !== null ? `<div class="sub">Savings rate this period: <b>${stats.savingsRate}%</b></div>` : ''}
 
-  ${stats.topCategories.length > 0 ? `<h2>Spending split</h2>
+  ${transfersOut > 0 ? `<div class="sub" style="margin-top:8px">Transfers &amp; investments moved: <b>${fmt(transfersOut)}</b> — money moved, not spent, so it's excluded from the spending analysis below.</div>` : ''}
+
+  ${topSpendCats.length > 0 ? `<h2>Spending split · ${fmt(spendExpense)} actually spent</h2>
   <div class="charts">
     <div class="donut" style="${donutCss}"></div>
     <div class="dlegend">
-      ${stats.topCategories.map(([name, amt], i) => `
+      ${topSpendCats.map(([name, amt], i) => `
       <div><span class="dot2" style="background:${PALETTE[i % PALETTE.length]}"></span>
         <span class="nm">${escapeHtml(name)}</span>
         <b>${fmt(amt)}</b>
-        <span class="muted">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</span></div>`).join('')}
-      ${donutAcc < 99.9 ? `<div><span class="dot2" style="background:#EFEDE8"></span><span class="nm">Everything else</span><b>${fmt(Math.max(0, stats.expense - stats.topCategories.reduce((s, [, v]) => s + v, 0)))}</b></div>` : ''}
+        <span class="muted">${spendExpense > 0 ? Math.round((amt / spendExpense) * 100) : 0}%</span></div>`).join('')}
+      ${donutAcc < 99.9 ? `<div><span class="dot2" style="background:#EFEDE8"></span><span class="nm">Everything else</span><b>${fmt(Math.max(0, spendExpense - topSpendCats.reduce((s, [, v]) => s + v, 0)))}</b></div>` : ''}
     </div>
   </div>` : ''}
 
-  ${months.length > 1 ? `<h2>Money in vs out by month</h2>
+  ${yearRows.length > 1 ? `<h2>Year by year</h2>
+  <table>
+    <tr><th style="width:18%">Year</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th></tr>
+    ${yearRows.map(([y, m]) => `
+    <tr><td>${y}</td><td class="num pos">+${fmt(m.inc)}</td><td class="num neg">−${fmt(m.out)}</td>
+        <td class="num" style="font-weight:700;color:${m.inc - m.out >= 0 ? '#7d937a' : '#c98989'}">${m.inc - m.out >= 0 ? '+' : '−'}${fmt(Math.abs(m.inc - m.out))}</td></tr>`).join('')}
+  </table>` : ''}
+
+  ${chartMonths.length > 1 ? `<h2>Money in vs out by month${months.length > 24 ? ' · last 24 months' : ''}</h2>
   <div class="mchart">
-    ${months.map(([, m]) => `
+    ${chartMonths.map(([, m]) => `
     <div class="mcol">
       <div class="mbar" style="background:#9BAE93;height:${Math.max(2, (m.inc / maxMonthFlow) * 100).toFixed(1)}%"></div>
       <div class="mbar" style="background:#D4A5A5;height:${Math.max(2, (m.out / maxMonthFlow) * 100).toFixed(1)}%"></div>
     </div>`).join('')}
   </div>
-  <div class="mlabels">${months.map(([k]) => `<span>${ml(k)}</span>`).join('')}</div>
+  <div class="mlabels">${chartMonths.map(([k], i) => `<span>${i % labelStep === 0 ? ml(k) : ''}</span>`).join('')}</div>
   <div class="chartnote"><span style="color:#7d937a">■</span> in &nbsp; <span style="color:#c98989">■</span> out</div>` : ''}
 
-  ${months.length > 1 ? `<h2>Month by month</h2>
+  ${chartMonths.length > 1 ? `<h2>Month by month${months.length > 24 ? ' · last 24' : ''}</h2>
   <table>
     <tr><th style="width:20%">Month</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th><th class="num" style="width:14%">Saved</th></tr>
-    ${months.map(([k, m]) => `
+    ${chartMonths.map(([k, m]) => `
     <tr><td>${ml(k)}</td><td class="num pos">+${fmt(m.inc)}</td><td class="num neg">−${fmt(m.out)}</td>
         <td class="num" style="font-weight:700;color:${m.inc - m.out >= 0 ? '#7d937a' : '#c98989'}">${m.inc - m.out >= 0 ? '+' : '−'}${fmt(Math.abs(m.inc - m.out))}</td>
         <td class="num muted">${m.inc > 0 ? Math.round(((m.inc - m.out) / m.inc) * 100) + '%' : '—'}</td></tr>`).join('')}
   </table>` : ''}
 
-  ${stats.topCategories.length > 0 ? `<h2>Where the money went</h2>
-  <table>${stats.topCategories.map(([name, amt]) => `
+  ${topSpendCats.length > 0 ? `<h2>Where the money went</h2>
+  <table>${topSpendCats.map(([name, amt]) => `
     <tr><td class="tname">${escapeHtml(name)}</td>
-        <td><div class="bar" style="width:${Math.max(6, Math.round((amt / maxCat) * 100))}%"></div></td>
+        <td><div class="bar" style="width:${Math.max(6, Math.round((amt / maxSpendCat) * 100))}%"></div></td>
         <td class="tamt">${fmt(amt)}</td>
-        <td class="tpct">${stats.expense > 0 ? Math.round((amt / stats.expense) * 100) : 0}%</td></tr>`).join('')}
+        <td class="tpct">${spendExpense > 0 ? Math.round((amt / spendExpense) * 100) : 0}%</td></tr>`).join('')}
   </table>` : ''}
 
   ${catRows.length > 0 ? `<h2>Category deep dive</h2>

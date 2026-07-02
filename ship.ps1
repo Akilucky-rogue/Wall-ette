@@ -1,4 +1,4 @@
-# Walter full ship: typecheck -> build APK+web -> host APK -> deploy web
+# Wall-ette full ship: typecheck -> build APK+web -> host APK -> deploy web
 # -> install on phone -> commit & push.
 # Usage:  .\ship.ps1 "feat: my change description"
 param([string]$Message = "chore: update build")
@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "Build failed - aborting." -ForegroundColo
 
 Write-Host "`n[3/6] Stage APK for the web download banner" -ForegroundColor Cyan
 New-Item -ItemType Directory -Force dist\downloads | Out-Null
-Copy-Item android\app\build\outputs\apk\release\app-release.apk dist\downloads\walter.apk -Force
+Copy-Item android\app\build\outputs\apk\release\app-release.apk dist\downloads\wall-ette.apk -Force
 
 Write-Host "`n[4/6] Deploy web (Firebase Hosting)" -ForegroundColor Cyan
 npx firebase-tools deploy --only hosting

@@ -329,8 +329,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
         };
       default:
         return {
-          greeting: 'Walter',
-          subtitle: 'Wealth & Asset Ledger Tracking Electronic Recorder',
+          greeting: 'Wall·ette',
+          subtitle: 'Wallet Analyzer for Lavish Living',
           tagline: '"Your mindful money companion"',
           bgGradient: 'from-sage/10 via-zen-bg to-sage-light/20',
           accentColor: 'sage',
@@ -469,7 +469,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
       }`}>
         {variant === 'launch' ? (
           <h1 className="text-4xl font-serif font-bold tracking-tight text-premium-charcoal">
-            Walter<span className="text-sage">.</span>
+            Wall<span className="text-sage">·</span>ette
           </h1>
         ) : (
           <h1 className={`text-3xl font-serif font-bold tracking-tight ${

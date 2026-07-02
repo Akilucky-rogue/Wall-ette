@@ -1,4 +1,4 @@
-# Walter — Project Audit Report
+# Wall-ette — Project Audit Report
 
 **Date:** 2026-06-10
 **Scope:** Full source audit (all `.ts`/`.tsx`, configs, rules, build output). No code was changed.

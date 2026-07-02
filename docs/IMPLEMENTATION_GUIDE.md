@@ -1,6 +1,6 @@
 # 🚀 NEXT STEPS: Complete Implementation Guide
 
-**App**: Walter - Wallet Tracker  
+**App**: Wall-ette - Wallet Tracker  
 **Current Phase**: Core Feature Development (Week 1-2)  
 **Last Updated**: February 7, 2026
 

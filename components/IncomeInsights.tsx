@@ -268,7 +268,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
           <WallEMascot mood="thinking" size="md" />
           <p className="text-premium-charcoal font-serif text-lg font-semibold mt-4">Nothing to tell yet</p>
           <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">
-            Add entries or import a bank statement, and Walter will write your money story and track your goals.
+            Add entries or import a bank statement, and Wall-ette will write your money story and track your goals.
           </p>
           <button
             onClick={() => onNavigate(AppScreen.IMPORT)}

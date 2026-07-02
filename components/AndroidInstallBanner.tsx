@@ -6,10 +6,10 @@ import { Capacitor } from '@capacitor/core';
  *  - Hidden inside the native app (same bundle runs there).
  *  - Hidden for iOS/desktop visitors (no app for them yet).
  *  - Dismissal is remembered per device.
- * The APK is served from /downloads/wall-ette.apk on Firebase Hosting;
+ * The APK is served from /downloads/walter.apk on Firebase Hosting;
  * swap APK_URL for the Play Store link once the listing is live.
  */
-const APK_URL = '/downloads/wall-ette.apk';
+const APK_URL = '/downloads/walter.apk';
 const DISMISS_KEY = 'apkBannerDismissed_v1';
 
 const shouldShow = (): boolean => {

@@ -1,6 +1,6 @@
 # 🔍 DETAILED FUNCTIONALITY VERIFICATION CHECKLIST
 
-**App**: Wall-ette (Wealth & Assets Logic / Living Economy)  
+**App**: Walter (Wealth & Assets Logic / Living Economy)  
 **URL**: https://wall-e-7a113.web.app  
 **Status**: ✅ Deployed | 🔄 Feature Development in Progress  
 **Last Updated**: February 7, 2026

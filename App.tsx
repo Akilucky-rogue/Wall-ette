@@ -68,16 +68,41 @@ function AppContent() {
     if (!Capacitor.isNativePlatform()) return;
 
     let listenerHandle: any = null;
+    let backHandle: any = null;
     (async () => {
       listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
         if (!isActive && currentScreenRef.current !== AppScreen.IMPORT) {
           setIsLocked(true);
         }
       });
+
+      // System back gesture / back button: navigate WITHIN the app instead
+      // of exiting. Sub-screen → its parent; any tab → Home; Home → minimize
+      // (Android convention for a "root" screen), which also engages the
+      // background lock.
+      backHandle = await CapacitorApp.addListener('backButton', () => {
+        const cur = currentScreenRef.current;
+        const back = BACK_TARGET[cur];
+        if (back) {
+          setCurrentScreen(back);
+          window.scrollTo(0, 0);
+        } else if (cur === AppScreen.NEW_ENTRY) {
+          setCurrentScreen(AppScreen.DASHBOARD);
+          window.scrollTo(0, 0);
+        } else if (cur !== AppScreen.DASHBOARD) {
+          setCurrentScreen(AppScreen.DASHBOARD);
+          window.scrollTo(0, 0);
+        } else {
+          CapacitorApp.minimizeApp();
+        }
+      });
     })();
     return () => {
       if (listenerHandle && typeof listenerHandle.remove === 'function') {
         listenerHandle.remove();
+      }
+      if (backHandle && typeof backHandle.remove === 'function') {
+        backHandle.remove();
       }
     };
   }, [user]);

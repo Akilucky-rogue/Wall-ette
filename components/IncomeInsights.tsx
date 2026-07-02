@@ -15,7 +15,7 @@ const BADGE_STYLES: Record<StreamBadge, { label: string; cls: string }> = {
   ONE_OFF: { label: 'One-off', cls: 'bg-gray-100 text-muted-taupe' },
 };
 
-const FLOW_COLORS = ['#9BAE93', '#9CB5C1', '#D6C6B2', '#B8B5D0', '#D4A5A5', '#C4A98E'];
+const FLOW_COLORS = ['var(--sage)', 'var(--ocean)', 'var(--sand)', 'var(--lavender)', 'var(--rose)', 'var(--gold-1)'];
 
 interface MonthAgg {
   inc: number;
@@ -212,7 +212,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
         const c = (x1 + x2) / 2;
         ribbons.push({
           d: `M ${x1} ${y1a} C ${c} ${y1a}, ${c} ${y2a}, ${x2} ${y2a} L ${x2} ${y2b} C ${c} ${y2b}, ${c} ${y1b}, ${x1} ${y1b} Z`,
-          color: r.name === 'Saved' ? '#9BAE93' : l.color,
+          color: r.name === 'Saved' ? 'var(--sage)' : l.color,
           opacity: r.name === 'Saved' ? 0.5 : 0.3,
         });
         leftCursor[li] += slice;
@@ -246,9 +246,9 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="#D4B896" />
+      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="var(--sage-3)" />
+      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
+      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="var(--gold-2)" />
       <MandalaDots className="absolute bottom-44 left-6 opacity-20" />
 
       {/* Header */}
@@ -370,7 +370,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       ))}
                       {flowSvg.rightNodes.map((n, i) => (
                         <rect key={`r${i}`} x={flowSvg.W - flowSvg.COL} y={n.y} width={flowSvg.COL} height={n.h} rx={1.5}
-                              fill={n.name === 'Saved' ? '#9BAE93' : '#8E8D8A'} fillOpacity={n.name === 'Saved' ? 1 : 0.55}>
+                              fill={n.name === 'Saved' ? 'var(--sage)' : 'var(--mut)'} fillOpacity={n.name === 'Saved' ? 1 : 0.55}>
                           <title>{n.name}</title>
                         </rect>
                       ))}
@@ -403,7 +403,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       <p className="text-[8px] uppercase tracking-widest text-muted-taupe font-bold">Out</p>
                       {flowSvg.rightNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${n.name === 'Saved' ? 'bg-sage' : 'bg-[#8E8D8A]/60'}`} />
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${n.name === 'Saved' ? 'bg-sage' : 'bg-[var(--mut)]/60'}`} />
                           <span className={`text-[10px] truncate flex-1 ${n.name === 'Saved' ? 'text-sage font-semibold' : 'text-premium-charcoal'}`} title={n.name}>{n.name}</span>
                           <span className="text-[10px] text-muted-taupe shrink-0 tabular-nums">{formatAmountCompact(n.value)}</span>
                         </div>
@@ -419,10 +419,10 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col items-center">
                     <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start mb-2">Stability</p>
                     <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                      <circle cx="18" cy="18" r="14" fill="none" stroke="#E3EAE0" strokeWidth="4" />
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                       <circle
                         cx="18" cy="18" r="14" fill="none"
-                        stroke={stability.score >= 80 ? '#9BAE93' : stability.score >= 50 ? '#D4B896' : '#D4A5A5'}
+                        stroke={stability.score >= 80 ? 'var(--sage)' : stability.score >= 50 ? 'var(--gold-2)' : 'var(--rose)'}
                         strokeWidth="4"
                         strokeDasharray={`${(stability.score / 100) * 88} 88`}
                         strokeLinecap="round"
@@ -537,11 +537,11 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                 <div className="flex items-center gap-5">
                   <div className="relative w-20 h-20 shrink-0">
                     <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
-                      <circle cx="18" cy="18" r="14" fill="none" stroke="#E3EAE0" strokeWidth="4" />
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                       {savingsGoal > 0 && (
                         <circle
                           cx="18" cy="18" r="14" fill="none"
-                          stroke={goalData.saved >= savingsGoal ? '#9BAE93' : goalData.saved > 0 ? '#D4B896' : '#D4A5A5'}
+                          stroke={goalData.saved >= savingsGoal ? 'var(--sage)' : goalData.saved > 0 ? 'var(--gold-2)' : 'var(--rose)'}
                           strokeWidth="4"
                           strokeDasharray={`${Math.min(1, Math.max(0, goalData.saved / savingsGoal)) * 88} 88`}
                           strokeLinecap="round"

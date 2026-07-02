@@ -292,9 +292,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-28 right-4 opacity-35 z-10" delay={0.8} />
-      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2.2} color="#A8B89E" />
+      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2.2} color="var(--sage-3)" />
       <VineDecoration className="absolute top-20 left-0 opacity-20" />
-      <RangoliCorner className="absolute top-16 right-0 opacity-15" color="#C4A98E" mirror />
+      <RangoliCorner className="absolute top-16 right-0 opacity-15" color="var(--gold-1)" mirror />
       <Paisley className="absolute bottom-36 right-4 opacity-20" />
       
       {/* Header */}

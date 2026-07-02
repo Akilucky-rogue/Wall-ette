@@ -174,7 +174,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden">
       <FloatingLeaf className="top-20 right-5 opacity-35" delay={0.3} />
       <Sprout className="absolute top-32 left-4 opacity-40" />
-      <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="#C4A98E" mirror />
+      <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="var(--gold-1)" mirror />
 
       {/* Header */}
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">

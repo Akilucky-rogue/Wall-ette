@@ -3,6 +3,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles.css';
+import { initTheme } from './utils/theme';
+
+// Apply the stored theme before first paint (no flash of default palette).
+initTheme();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

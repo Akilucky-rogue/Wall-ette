@@ -315,7 +315,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
   const currentTotal = analysisTab === 'EXPENSE' ? totalExpense : totalIncome;
   const currentData = analysisTab === 'EXPENSE' ? filteredExpenses : filteredIncome;
-  const chartColor = analysisTab === 'EXPENSE' ? '#E57373' : '#9BAE93';
+  const chartColor = analysisTab === 'EXPENSE' ? 'var(--rose-strong)' : 'var(--sage)';
 
   // Fetch AI insights when user requests them
   const fetchAIInsights = async () => {
@@ -346,9 +346,9 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.6} />
-      <FloatingLeaf className="top-64 left-4 opacity-25" delay={1.8} color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <Paisley className="absolute bottom-40 right-5 opacity-25" color="#C4A98E" />
+      <FloatingLeaf className="top-64 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
+      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
+      <Paisley className="absolute bottom-40 right-5 opacity-25" color="var(--gold-1)" />
       <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" />
       
       {/* Header */}
@@ -852,7 +852,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                       key={i}
                       onClick={() => setHeatDay(selected ? null : i + 1)}
                       className={`aspect-square rounded-md flex items-center justify-center text-[8px] font-semibold transition-all ${selected ? (isExp ? 'ring-2 ring-rose' : 'ring-2 ring-sage') : ''} ${intensity > 0.55 ? 'text-white' : 'text-muted-taupe'}`}
-                      style={{ backgroundColor: v > 0 ? `rgba(${rgb}, ${0.15 + intensity * 0.75})` : '#F4F2EE' }}
+                      style={{ backgroundColor: v > 0 ? `rgba(${rgb}, ${0.15 + intensity * 0.75})` : 'var(--line)' }}
                       title={`${i + 1}: ${formatAmount(v)}`}
                     >
                       {i + 1}

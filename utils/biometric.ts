@@ -46,7 +46,7 @@ export async function authenticateBiometric(reason: string): Promise<boolean> {
       reason,
       cancelTitle: 'Use password',
       allowDeviceCredential: true, // fall back to PIN/pattern if biometrics fail
-      androidTitle: 'Unlock Wall-ette',
+      androidTitle: 'Unlock Walter',
       androidSubtitle: reason,
       androidConfirmationRequired: false,
     });

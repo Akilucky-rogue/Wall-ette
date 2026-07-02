@@ -98,7 +98,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
           ) : (
             <p className="text-premium-charcoal text-[14px] leading-relaxed">
               Nothing leaking — no bank fees or subscription price hikes found in your history.
-              {hunt.doubles.pairs.length > 0 ? ` ${hunt.doubles.pairs.length} same-day repeat payment${hunt.doubles.pairs.length === 1 ? '' : 's'} listed below for review.` : ' Walter keeps watching.'}
+              {hunt.doubles.pairs.length > 0 ? ` ${hunt.doubles.pairs.length} same-day repeat payment${hunt.doubles.pairs.length === 1 ? '' : 's'} listed below for review.` : ' Wall-ette keeps watching.'}
             </p>
           )}
         </div>

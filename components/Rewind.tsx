@@ -180,7 +180,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         ctx.fillText(text, W / 2, y);
       };
 
-      center('W A L T E R   W R A P P E D', 262, '600 15px Verdana, sans-serif', '#8E8D8A');
+      center('W A L L · E T T E   W R A P P E D', 262, '600 15px Verdana, sans-serif', '#8E8D8A');
       center(String(wrapped.year), 340, 'bold 76px Georgia, serif', '#333333');
 
       // stats
@@ -217,7 +217,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       center('tallied to the rupee · wall-e-7a113.web.app', H - 28, '600 12px Verdana, sans-serif', '#b9b7b2');
 
       const base64 = canvas.toDataURL('image/png').split(',')[1];
-      const outcome = await exportImage(`walter-wrapped-${wrapped.year}.png`, base64);
+      const outcome = await exportImage(`wall-ette-wrapped-${wrapped.year}.png`, base64);
       setToast(outcome === 'shared' ? 'Share sheet opened' : 'Wrapped card downloaded');
     } catch (e) {
       log.warn('Wrapped share failed');
@@ -252,7 +252,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         <div className="flex flex-col items-center py-16 px-6 text-center">
           <WallEMascot mood="thinking" size="md" />
           <p className="text-premium-charcoal font-serif text-lg font-semibold mt-4">No history yet</p>
-          <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">Import your bank statements and Walter will rebuild your entire money timeline.</p>
+          <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">Import your bank statements and Wall-ette will rebuild your entire money timeline.</p>
         </div>
       ) : (
         <div className="px-6 pt-2 space-y-4 lg:columns-2 lg:gap-x-5">
@@ -360,7 +360,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
           {wrapped && (
             <div className="bg-premium-charcoal rounded-3xl p-6 shadow-soft break-inside-avoid">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] uppercase tracking-widest text-white/60 font-bold">Walter Wrapped</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/60 font-bold">Wall·ette Wrapped</p>
                 <div className="flex gap-1.5">
                   {wrapYears.slice(0, 4).map(y => (
                     <button

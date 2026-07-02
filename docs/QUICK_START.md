@@ -1,4 +1,4 @@
-# ⚡ QUICK START - Walter
+# ⚡ QUICK START - Wall-ette
 
 **App Live**: https://wall-e-7a113.web.app ✅  
 **Status**: 🚀 Production Ready | 🔐 Secure | 💾 Real-time Sync

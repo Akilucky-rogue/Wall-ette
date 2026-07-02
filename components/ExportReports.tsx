@@ -98,7 +98,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         csvCell(t.note || ''),
       ].join(','));
       const csv = [headers.join(','), ...rows].join('\n');
-      const outcome = await exportFile(`walter-transactions-${periodSlug}-${stamp}.csv`, 'text/csv;charset=utf-8;', csv);
+      const outcome = await exportFile(`wall-ette-transactions-${periodSlug}-${stamp}.csv`, 'text/csv;charset=utf-8;', csv);
       showToast(outcome === 'shared' ? 'Share sheet opened — pick where to save' : 'CSV downloaded');
     } catch (e) {
       log.warn('CSV export failed');
@@ -237,7 +237,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
       const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Walter Statement — ${escapeHtml(periodLabel)}</title>
+<title>Wall-ette Statement — ${escapeHtml(periodLabel)}</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:Georgia,'Times New Roman',serif;background:#FAF9F6;color:#333;margin:0;padding:20px 8px}
@@ -279,7 +279,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   .foot{margin-top:36px;text-align:center;color:#b9b7b2;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
   @media print{body{background:#fff;padding:0}.page{box-shadow:none}}
 </style></head><body><div class="page">
-  <h1>Walter<span class="dot">.</span> <span style="font-weight:400">Statement</span></h1>
+  <h1>Wall<span class="dot">·</span>ette <span style="font-weight:400">Statement</span></h1>
   <div class="sub">${escapeHtml(periodLabel)} · generated ${generated} · ${stats.count} transactions</div>
 
   <div class="grid">
@@ -413,10 +413,10 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   </ul>
   ${insights.anomalies.length > 0 ? `<h2>Unusual transactions</h2><ul>${insights.anomalies.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>` : ''}
 
-  <div class="foot">Walter · your mindful money companion · print this page to save as PDF</div>
+  <div class="foot">Wall·ette · your mindful money companion · print this page to save as PDF</div>
 </div></body></html>`;
 
-      const outcome = await exportFile(`walter-statement-${periodSlug}-${stamp}.html`, 'text/html;charset=utf-8;', html);
+      const outcome = await exportFile(`wall-ette-statement-${periodSlug}-${stamp}.html`, 'text/html;charset=utf-8;', html);
       showToast(outcome === 'shared' ? 'Share sheet opened — pick where to save' : 'Statement downloaded — open it, then print to PDF if needed');
     } catch (e) {
       log.warn('Statement export failed');
@@ -431,14 +431,14 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     setBusy('backup');
     try {
       const backup = {
-        app: 'Walter',
+        app: 'Wall-ette',
         version: 1,
         exportedAt: new Date().toISOString(),
         openingBalance,
         transactionCount: transactions.length,
         transactions,
       };
-      const outcome = await exportFile(`walter-backup-${stamp}.json`, 'application/json;charset=utf-8;', JSON.stringify(backup, null, 2));
+      const outcome = await exportFile(`wall-ette-backup-${stamp}.json`, 'application/json;charset=utf-8;', JSON.stringify(backup, null, 2));
       showToast(outcome === 'shared' ? 'Share sheet opened — pick where to save' : 'Backup downloaded');
     } catch (e) {
       log.warn('Backup export failed');

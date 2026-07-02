@@ -15,6 +15,7 @@ import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenti
 import { log } from '../utils/log';
 import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
+import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
   onNavigate: (screen: AppScreen) => void;
@@ -58,6 +59,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     else { if (val < 0) val = 0; setDailyLimit(val); setLimitInput(val === 0 ? '' : val.toString()); }
     setLimitSaved(true);
     setTimeout(() => setLimitSaved(false), 1200);
+  };
+
+  // ── Appearance (device-local preference) ──
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode());
+  const [customTheme, setCustomTheme] = useState<CustomTheme>(getCustomTheme());
+  const pickTheme = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    setThemeMode(mode, mode === 'custom' ? customTheme : undefined);
+  };
+  const updateCustom = (patch: Partial<CustomTheme>) => {
+    const next = { ...customTheme, ...patch };
+    setCustomTheme(next);
+    setThemeModeState('custom');
+    setThemeMode('custom', next);
   };
 
   // ── Biometric unlock (device-local) ──
@@ -205,9 +220,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
       <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.5} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.6} color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" color="#D4B896" />
+      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.6} color="var(--sage-3)" />
+      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
+      <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" color="var(--gold-2)" />
       <MandalaDots className="absolute bottom-52 left-6 opacity-20" />
       <PottedPlant className="absolute bottom-40 right-6 opacity-35" />
 
@@ -221,7 +236,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* Hero */}
       <div className="flex flex-col items-center pt-6 pb-4 relative">
         <div className="relative">
-          <div className="absolute -top-2 -left-6 rotate-45"><LotusFlower size="sm" color="#E8A5A5" className="opacity-50" /></div>
+          <div className="absolute -top-2 -left-6 rotate-45"><LotusFlower size="sm" color="var(--rose-2)" className="opacity-50" /></div>
           <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center border-4 border-white shadow-lg">
             <WallEEyes size="lg" />
             <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 flex items-center justify-center border-2 border-white shadow-md">
@@ -300,6 +315,52 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   <Row icon="currency_exchange" iconCls="bg-sand-light text-sand" title="Display Currency" sub="Live exchange rates, INR base">
                       <CurrencySelector />
                   </Row>
+              </div>
+          </section>
+
+          {/* Appearance */}
+          <section className="break-inside-avoid md:mb-5">
+              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Appearance</h4>
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-5">
+                  <Row icon="brightness_auto" iconCls="bg-ocean-light text-ocean" title="Match System" sub="Follows your phone's light / dark setting">
+                      <Toggle checked={themeMode === 'auto'} onChange={() => pickTheme(themeMode === 'auto' ? 'sage' : 'auto')} label="Match system theme" />
+                  </Row>
+                  <div className={themeMode === 'auto' ? 'opacity-40 pointer-events-none' : ''}>
+                      <div className="grid grid-cols-3 gap-2.5">
+                          {themeSwatches().map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => pickTheme(s.id)}
+                                className={`rounded-2xl p-2.5 border text-left transition-all ${themeMode === s.id ? 'border-sage ring-2 ring-sage/40' : 'border-black/[0.08]'}`}
+                                style={{ background: s.bg }}
+                              >
+                                  <div className="flex items-center gap-1 mb-1.5">
+                                      <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: s.accent }} />
+                                      <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
+                                  </div>
+                                  <p className="text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</p>
+                              </button>
+                          ))}
+                      </div>
+                      {themeMode === 'custom' && (
+                          <div className="mt-4 flex items-center justify-between gap-3">
+                              <label className="flex items-center gap-2.5 cursor-pointer">
+                                  <input
+                                    type="color"
+                                    value={customTheme.accent}
+                                    onChange={e => updateCustom({ accent: e.target.value })}
+                                    className="w-9 h-9 rounded-xl border border-black/10 bg-transparent cursor-pointer p-0.5"
+                                    aria-label="Custom accent color"
+                                  />
+                                  <span className="text-[12px] text-muted-taupe">Accent color</span>
+                              </label>
+                              <div className="flex rounded-xl overflow-hidden border border-black/[0.08] text-[11px] font-semibold">
+                                  <button onClick={() => updateCustom({ dark: false })} className={`px-3 py-1.5 transition-colors ${!customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Light</button>
+                                  <button onClick={() => updateCustom({ dark: true })} className={`px-3 py-1.5 transition-colors ${customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Dark</button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
               </div>
           </section>
 

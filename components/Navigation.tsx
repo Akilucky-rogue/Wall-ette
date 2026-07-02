@@ -34,7 +34,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
           <Sprout size="sm" />
         </div>
         <div className="absolute -top-2 right-12 opacity-50">
-          <LotusFlower size="sm" color="#E8A5A5" />
+          <LotusFlower size="sm" color="var(--rose-2)" />
         </div>
         
         <button 

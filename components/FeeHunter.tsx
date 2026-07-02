@@ -60,8 +60,8 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
+      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="var(--sage-3)" />
+      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
       <MandalaDots className="absolute bottom-44 right-6 opacity-20" />
 
       {/* Header */}

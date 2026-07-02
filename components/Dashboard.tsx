@@ -143,8 +143,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const incomeExpenseBar = useMemo(() => {
     return [
-      { label: 'Income', value: income, color: '#9BAE93' },
-      { label: 'Expense', value: expenses, color: '#E57373' }
+      { label: 'Income', value: income, color: 'var(--sage)' },
+      { label: 'Expense', value: expenses, color: 'var(--rose-strong)' }
     ];
   }, [income, expenses]);
 
@@ -218,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
 
   // Category colors (using CSS module classes to avoid Tailwind purge issues)
-  const CAT_COLORS = ['#9BAE93', '#D4A5A5', '#FBBF24', '#A8B89E', '#94BFCA'] as const;
+  const CAT_COLORS = ['var(--sage)', 'var(--rose)', 'var(--amber)', 'var(--sage-3)', '#94BFCA'] as const;
 
   // Icons helper
   const getIconForCategory = (cat: string) => {
@@ -233,9 +233,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
       {/* Eco decorative elements */}
       <FloatingLeaf className="top-20 right-4 opacity-40 z-10" delay={0} />
-      <FloatingLeaf className="top-48 left-3 opacity-30" delay={1.2} color="#A8B89E" />
+      <FloatingLeaf className="top-48 left-3 opacity-30" delay={1.2} color="var(--sage-3)" />
       <Sprout className="absolute bottom-32 right-6 opacity-40" />
-      <RangoliCorner className="absolute top-16 right-2 opacity-20" color="#C4A98E" mirror />
+      <RangoliCorner className="absolute top-16 right-2 opacity-20" color="var(--gold-1)" mirror />
 
       {/* Header */}
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 sticky top-0 z-30">
@@ -296,10 +296,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {/* Balance Summary */}
       <div className="flex flex-col items-center py-10 relative">
         <div className="absolute top-6 left-8">
-          <LotusFlower size="sm" color="#E8A5A5" className="opacity-40" />
+          <LotusFlower size="sm" color="var(--rose-2)" className="opacity-40" />
         </div>
         <div className="absolute top-8 right-10">
-          <LotusFlower size="sm" color="#D4B896" className="opacity-30" />
+          <LotusFlower size="sm" color="var(--gold-2)" className="opacity-30" />
         </div>
         <div className="flex items-center gap-3 mb-2">
           <p className="text-muted-taupe text-xs font-medium uppercase tracking-[0.2em]">Portfolio Balance</p>
@@ -543,19 +543,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
                   <defs>
                     <linearGradient id="balTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#9BAE93" stopOpacity="0.28" />
-                      <stop offset="100%" stopColor="#9BAE93" stopOpacity="0" />
+                      <stop offset="0%" stopColor="var(--sage)" stopOpacity="0.28" />
+                      <stop offset="100%" stopColor="var(--sage)" stopOpacity="0" />
                     </linearGradient>
                   </defs>
                   {/* gridlines matching the axis labels */}
-                  <line x1="0" y1="8" x2="100" y2="8" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
-                  <line x1="0" y1="50" x2="100" y2="50" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
-                  <line x1="0" y1="92" x2="100" y2="92" stroke="#E8E5DE" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+                  <line x1="0" y1="8" x2="100" y2="8" stroke="var(--line-2)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+                  <line x1="0" y1="50" x2="100" y2="50" stroke="var(--line-2)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+                  <line x1="0" y1="92" x2="100" y2="92" stroke="var(--line-2)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
                   <polygon points={`0,100 ${linePoints} 100,100`} fill="url(#balTrendFill)" />
                   <polyline
                     points={linePoints}
                     fill="none"
-                    stroke="#9BAE93"
+                    stroke="var(--sage)"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -615,9 +615,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
               <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">Savings</p>
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#E3EAE0" strokeWidth="4" />
+                <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                 <circle
-                  cx="18" cy="18" r="14" fill="none" stroke="#9BAE93" strokeWidth="4"
+                  cx="18" cy="18" r="14" fill="none" stroke="var(--sage)" strokeWidth="4"
                   strokeDasharray={`${(savingsRate / 100) * 88} 88`}
                   strokeLinecap="round"
                   className={styles.savingsGauge}

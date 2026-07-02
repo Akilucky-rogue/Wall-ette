@@ -5,8 +5,8 @@
 	transition: all 1s cubic-bezier(.4,1.4,.6,1);
 }
 .trendDot {
-	fill: #fff;
-	stroke: #9BAE93;
+	fill: var(--card);
+	stroke: var(--sage);
 	stroke-width: 1;
 }
 .barChartBar {
@@ -28,13 +28,13 @@
 .barChartBar.height72 { height: 72px; }
 .barChartBar.height80 { height: 80px; }
 .barSage {
-	background: #9BAE93;
+	background: var(--sage);
 }
 .barRose {
-	background: #E57373;
+	background: var(--rose-strong);
 }
-.bg-dashboard-cat1 { background-color: #9BAE93; }
-.bg-dashboard-cat2 { background-color: #E3EAE0; }
-.bg-dashboard-cat3 { background-color: #D4A5A5; }
-.bg-dashboard-cat4 { background-color: #FBBF24; }
-.bg-dashboard-cat5 { background-color: #A8B89E; }
+.bg-dashboard-cat1 { background-color: var(--sage); }
+.bg-dashboard-cat2 { background-color: var(--sage-soft); }
+.bg-dashboard-cat3 { background-color: var(--rose); }
+.bg-dashboard-cat4 { background-color: var(--amber); }
+.bg-dashboard-cat5 { background-color: var(--sage-3); }

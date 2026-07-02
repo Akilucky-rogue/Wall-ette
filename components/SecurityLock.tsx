@@ -132,12 +132,12 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
       {/* Eco & Indian decorative elements - guardians of wealth */}
       <FloatingLeaf className="top-16 right-8 opacity-40" delay={0} />
-      <FloatingLeaf className="top-32 left-6 opacity-30" delay={1.5} color="#A8B89E" />
+      <FloatingLeaf className="top-32 left-6 opacity-30" delay={1.5} color="var(--sage-3)" />
       <FloatingLeaf className="bottom-24 right-6 opacity-35" delay={2.5} />
-      <RangoliCorner className="absolute top-8 left-4 opacity-25" color="#8B9E82" />
-      <RangoliCorner className="absolute top-8 right-4 opacity-25" color="#8B9E82" mirror />
-      <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="#C4A98E" mirror />
-      <RangoliCorner className="absolute bottom-16 right-4 opacity-20 rotate-180" color="#C4A98E" />
+      <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
+      <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
+      <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="var(--gold-1)" mirror />
+      <RangoliCorner className="absolute bottom-16 right-4 opacity-20 rotate-180" color="var(--gold-1)" />
       <MandalaDots className="absolute top-24 right-10 opacity-15" />
       <MandalaDots className="absolute bottom-32 left-8 opacity-15" />
       <LotusFlower className="absolute top-28 left-8 opacity-30" size="sm" />

@@ -25,6 +25,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/ios": "^8.4.0",
     "@capacitor/share": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.0",
     "firebase": "^11.10.0",
     "pdfjs-dist": "^5.4.624",
     "qrcode": "^1.5.4",

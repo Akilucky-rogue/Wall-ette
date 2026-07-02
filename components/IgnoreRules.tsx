@@ -24,8 +24,8 @@ const IgnoreRules: React.FC<IgnoreRulesProps> = ({ onNavigate }) => {
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       {/* Eco decorative elements */}
       <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.5} />
-      <FloatingLeaf className="top-52 left-4 opacity-25" delay={1.8} color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="#C4A98E" mirror />
+      <FloatingLeaf className="top-52 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
+      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
       <Paisley className="absolute bottom-40 left-6 opacity-25" flip />
       
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">

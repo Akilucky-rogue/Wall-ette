@@ -2,10 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme variables — Sage (default) values as the no-JS / first-paint
+   fallback. utils/theme.ts overwrites all of these on <html> at boot and on
+   every theme switch. Channel vars (--c-*) feed Tailwind; hex aliases (--*)
+   feed inline SVG/chart colors. */
+:root {
+	--c-bg: 250 249 246; --c-card: 255 255 255; --c-card-alt: 253 251 247;
+	--c-ink: 51 51 51; --c-ink-2: 74 73 71; --c-mut: 142 141 138;
+	--c-line: 239 237 232; --c-line-2: 232 229 222;
+	--c-sage: 155 174 147; --c-sage-soft: 227 234 224; --c-sage-line: 209 221 203;
+	--c-rose: 212 165 165; --c-rose-soft: 245 230 230;
+	--c-lavender: 184 181 208; --c-lavender-soft: 235 234 242;
+	--c-sand: 214 198 178; --c-sand-soft: 244 239 233;
+	--c-ocean: 156 181 193; --c-ocean-soft: 230 238 242;
+	--c-bluez: 167 187 199; --c-bluez-soft: 230 238 242;
+
+	--bg: #FAF9F6; --card: #FFFFFF; --card-alt: #FDFBF7;
+	--ink: #333333; --ink-2: #4A4947; --mut: #8E8D8A; --mut-2: #B9B7B2;
+	--line: #EFEDE8; --line-2: #E8E5DE;
+	--sage: #9BAE93; --sage-2: #8B9E82; --sage-3: #A8B89E;
+	--sage-deep: #7D937A; --sage-soft: #E3EAE0; --sage-line: #D1DDCB;
+	--rose: #D4A5A5; --rose-2: #E8A5A5; --rose-3: #C98989;
+	--rose-strong: #E57373; --rose-soft: #F5E6E6;
+	--sand: #D6C6B2; --sand-soft: #F4EFE9; --gold-1: #C4A98E; --gold-2: #D4B896;
+	--amber: #FBBF24; --amber-2: #F5D485; --amber-3: #F59E42;
+	--lavender: #B8B5D0; --lavender-soft: #EBEAF2;
+	--ocean: #9CB5C1; --ocean-soft: #E6EEF2;
+	--bluez: #A7BBC7; --bluez-soft: #E6EEF2;
+}
 
 /* Zen Theme Global Styles */
 body {
 	@apply bg-zen-bg font-sans text-premium-charcoal antialiased;
+	transition: background-color 0.3s ease, color 0.3s ease;
 }
 h1, h2, h3, h4, h5, h6, .heading-serif {
 	@apply font-serif;

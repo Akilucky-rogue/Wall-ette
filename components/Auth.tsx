@@ -137,17 +137,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
       {/* Decorative eco & Indian elements */}
       <FloatingLeaf className="top-16 left-6 opacity-60" delay={0} />
-      <FloatingLeaf className="top-24 right-8 opacity-40" delay={1.5} color="#A8B89E" />
+      <FloatingLeaf className="top-24 right-8 opacity-40" delay={1.5} color="var(--sage-3)" />
       <FloatingLeaf className="bottom-32 left-10 opacity-50" delay={2.5} />
-      <RangoliCorner className="absolute top-4 left-4 opacity-40" color="#8B9E82" />
-      <RangoliCorner className="absolute top-4 right-4 opacity-40" color="#8B9E82" mirror />
-      <Paisley className="absolute bottom-20 right-6 opacity-30" color="#C4A98E" />
-      <Paisley className="absolute top-40 left-4 opacity-25" color="#A8B89E" flip />
+      <RangoliCorner className="absolute top-4 left-4 opacity-40" color="var(--sage-2)" />
+      <RangoliCorner className="absolute top-4 right-4 opacity-40" color="var(--sage-2)" mirror />
+      <Paisley className="absolute bottom-20 right-6 opacity-30" color="var(--gold-1)" />
+      <Paisley className="absolute top-40 left-4 opacity-25" color="var(--sage-3)" flip />
       
       <div className="relative text-center mb-10">
         {/* Small lotus above logo */}
         <div className="flex justify-center mb-3">
-          <LotusFlower size="sm" color="#E8A5A5" />
+          <LotusFlower size="sm" color="var(--rose-2)" />
         </div>
         {/* Wall-ette Robot Logo with Wealth Context */}
         <div className="relative inline-flex items-center justify-center mb-6">
@@ -185,10 +185,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
       <div className="relative bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02] overflow-hidden">
         {/* Corner decorations */}
-        <RangoliCorner className="absolute -top-1 -left-1 opacity-30" color="#8B9E82" />
-        <RangoliCorner className="absolute -top-1 -right-1 opacity-30" color="#8B9E82" mirror />
-        <RangoliCorner className="absolute -bottom-1 -left-1 opacity-20 rotate-180" color="#C4A98E" mirror />
-        <RangoliCorner className="absolute -bottom-1 -right-1 opacity-20 rotate-180" color="#C4A98E" />
+        <RangoliCorner className="absolute -top-1 -left-1 opacity-30" color="var(--sage-2)" />
+        <RangoliCorner className="absolute -top-1 -right-1 opacity-30" color="var(--sage-2)" mirror />
+        <RangoliCorner className="absolute -bottom-1 -left-1 opacity-20 rotate-180" color="var(--gold-1)" mirror />
+        <RangoliCorner className="absolute -bottom-1 -right-1 opacity-20 rotate-180" color="var(--gold-1)" />
         
         <h2 className="relative text-xl font-serif font-semibold text-premium-charcoal mb-6 text-center">
             {totpResolver ? 'Two-Factor Verification' : isLogin ? 'Welcome Back' : 'Create Account'}
@@ -266,7 +266,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 type="checkbox"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-[#9BAE93] shrink-0"
+                className="mt-0.5 w-4 h-4 accent-[var(--sage)] shrink-0"
               />
               <span className="text-[11px] text-muted-taupe leading-relaxed">
                 I have read and agree to the{' '}

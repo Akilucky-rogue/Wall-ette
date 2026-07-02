@@ -15,7 +15,7 @@ type View = 'SPEND' | 'MOVED';
 // same rule the reports use, so numbers agree everywhere.
 const MOVED_CATS = new Set(['Transfer Out', 'Adjustment', 'Investment']);
 
-const COLORS = ['#9BAE93', '#D4A5A5', '#B8B5D0', '#9CB5C1', '#D6C6B2', '#E8C1A0', '#AED5D5', '#C5B8D9'];
+const COLORS = ['var(--sage)', 'var(--rose)', 'var(--lavender)', 'var(--ocean)', 'var(--sand)', '#E8C1A0', '#AED5D5', '#C5B8D9'];
 
 interface CatEntry {
   name: string;
@@ -168,9 +168,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
       <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.7} />
-      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2} color="#A8B89E" />
+      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2} color="var(--sage-3)" />
       <MandalaDots className="absolute top-36 left-4 opacity-20" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="#C4A98E" mirror />
+      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
       <Paisley className="absolute bottom-36 left-6 opacity-25" flip />
 
       {/* Header */}
@@ -216,7 +216,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
         <div className="relative w-[220px] h-[220px]">
           <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90">
             {segments.length === 0 ? (
-              <circle cx="100" cy="100" r={R} fill="none" stroke="#EFEDE8" strokeWidth={SW} />
+              <circle cx="100" cy="100" r={R} fill="none" stroke="var(--line)" strokeWidth={SW} />
             ) : segments.map(s => (
               <circle
                 key={s.name}

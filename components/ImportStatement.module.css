@@ -4,9 +4,9 @@
   width: 100%;
   padding: 0.75rem 1rem;
   border-radius: 1rem;
-  border: 1px solid #e5e7eb; /* gray-200 */
-  background-color: #f9fafb; /* gray-50 */
-  color: #2d2d2d; /* premium-charcoal */
+  border: 1px solid var(--line); /* gray-200 */
+  background-color: var(--card-alt); /* gray-50 */
+  color: var(--ink); /* premium-charcoal */
   font-weight: 500;
   font-family: inherit;
   outline: none;
@@ -20,7 +20,7 @@
 }
 
 .categorySelect:focus {
-  border-color: #a8b89e; /* sage */
+  border-color: var(--sage-3); /* sage */
 }
 
 /* Animation delay utility */

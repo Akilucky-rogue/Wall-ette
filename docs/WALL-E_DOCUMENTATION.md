@@ -1,10 +1,10 @@
-# Wall-ette Wallet App - Complete Documentation
+# Walter Wallet App - Complete Documentation
 
 ⚠️ **NOTE**: This file is being consolidated. See [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [NEXT_STEPS.md](NEXT_STEPS.md) for current information.
 
 ---
 
-**Wall-ette** is a personal finance tracking app built with React + TypeScript + Firebase, featuring AI-powered bank statement parsing.
+**Walter** is a personal finance tracking app built with React + TypeScript + Firebase, featuring AI-powered bank statement parsing.
 
 ---
 

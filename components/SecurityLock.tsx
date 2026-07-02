@@ -258,7 +258,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       
       <div className="absolute bottom-8 left-0 right-0 text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe/60 font-medium">
-          Wall-ette Secured
+          Walter Secured
         </p>
       </div>
     </div>

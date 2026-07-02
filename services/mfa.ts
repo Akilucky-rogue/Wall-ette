@@ -38,7 +38,7 @@ export const isTotpEnrolled = (user: User): boolean =>
 export async function startTotpEnrollment(user: User): Promise<TotpEnrollmentStart> {
   const session = await multiFactor(user).getSession();
   const secret = await TotpMultiFactorGenerator.generateSecret(session);
-  const uri = secret.generateQrCodeUrl(user.email ?? 'Wall-ette user', 'Wall-ette');
+  const uri = secret.generateQrCodeUrl(user.email ?? 'Walter user', 'Walter');
   return { secret, uri, secretKey: secret.secretKey };
 }
 

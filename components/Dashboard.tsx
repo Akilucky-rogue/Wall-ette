@@ -242,7 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         {/* Left: Logo and Name */}
         <div className="flex items-center gap-3 min-w-0">
           <WallEMascot mood="happy" size="sm" />
-          <span className="text-premium-charcoal font-serif text-xl font-bold tracking-tight select-none">Wall-ette</span>
+          <span className="text-premium-charcoal font-serif text-xl font-bold tracking-tight select-none">Walter<span className="text-sage">.</span></span>
         </div>
         {/* Right: Currency + Notification bell */}
         <div className="relative flex items-center ml-auto min-w-0 gap-2">
@@ -282,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                                 <span className="material-symbols-outlined text-[16px]">handshake</span>
                             </div>
                             <div>
-                                <p className="text-xs font-serif font-semibold text-premium-charcoal">Welcome to Wall-ette</p>
+                                <p className="text-xs font-serif font-semibold text-premium-charcoal">Welcome to Walter</p>
                                 <p className="text-[10px] text-muted-taupe">Start your mindful journey.</p>
                             </div>
                         </div>

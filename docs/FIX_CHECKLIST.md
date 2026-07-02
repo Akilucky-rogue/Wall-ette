@@ -1,4 +1,4 @@
-# Wall-ette — Prioritized Fix Checklist
+# Walter — Prioritized Fix Checklist
 
 Execution-ready plan derived from `AUDIT_REPORT.md` (2026-06-10).
 Order matters: each phase is independently shippable. Test after each phase (see §Verification).

@@ -635,7 +635,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <div className="absolute -bottom-1 -left-3 text-sm animate-pulse animation-delay-03s">✨</div>
                 </div>
                 <h3 className="text-xl font-serif font-semibold text-premium-charcoal mb-2">{loadingMessage}</h3>
-                <p className="text-muted-taupe text-xs animate-pulse">Wall-ette is analyzing your document</p>
+                <p className="text-muted-taupe text-xs animate-pulse">Walter is analyzing your document</p>
                 <p className="text-[10px] text-muted-taupe/50 mt-3 italic">"Processing... beep boop!"</p>
             </div>
         )}

@@ -1,4 +1,4 @@
-# Wall-ette — Google Play Submission Guide
+# Walter — Google Play Submission Guide
 
 Everything needed to publish, in order. Items marked **[YOU]** need your account/judgment;
 everything else is already prepared in the repo.
@@ -43,7 +43,7 @@ Each future upload must bump `versionCode` in `android/app/build.gradle`.
 
 ## 5. Store listing — ready to paste
 
-**App name:** Wall-ette
+**App name:** Walter
 **Category:** Finance · **Tags:** personal finance, expense tracker
 **Contact email:** akshatbvora@gmail.com
 
@@ -51,11 +51,11 @@ Each future upload must bump `versionCode` in `android/app/build.gradle`.
 > Mindful expense tracker: import bank statements, get insights, stay on budget.
 
 **Full description:**
-> Wall-ette is a calm, private way to understand your money.
+> Walter is a calm, private way to understand your money.
 >
 > 🌿 MINDFUL BY DESIGN — A zen, clutter-free interface that makes checking your finances a pleasant ritual instead of a chore.
 >
-> 📄 IMPORT YOUR BANK STATEMENTS — Drop in an IDFC FIRST Bank PDF or Excel statement and Wall-ette parses every transaction on your device — the file never leaves your phone. Automatic categorization tuned for Indian merchants and UPI, with duplicate detection built in.
+> 📄 IMPORT YOUR BANK STATEMENTS — Drop in an IDFC FIRST Bank PDF or Excel statement and Walter parses every transaction on your device — the file never leaves your phone. Automatic categorization tuned for Indian merchants and UPI, with duplicate detection built in.
 >
 > 📊 INSIGHTS THAT MEAN SOMETHING — A live Pulse of your spending: month-over-month category shifts, a daily spending heatmap, weekday patterns, budget pace projection, and automatic detection of recurring charges and subscriptions.
 >
@@ -65,7 +65,7 @@ Each future upload must bump `versionCode` in `android/app/build.gradle`.
 >
 > 💱 MULTI-CURRENCY — INR, USD, EUR and GBP with live exchange rates.
 >
-> Wall-ette — your mindful money companion.
+> Walter — your mindful money companion.
 
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`
@@ -77,7 +77,7 @@ Each future upload must bump `versionCode` in `android/app/build.gradle`.
 - [ ] Content rating questionnaire → finance app, no objectionable content → rates "Everyone".
 - [ ] Target audience: 18+ (finance) or 13+; pick 18+ to keep it simple.
 - [ ] App access: provide a **test account** (create a dummy email/password in the app) so reviewers can log in. Note in the access instructions: "Statement import is optional; sample data can be added via New Entry."
-- [ ] Government apps / financial features declaration: Wall-ette is a **personal expense tracker** — it does NOT provide loans, banking, investments, or money transfer. Declare "None of the above" in the Financial features form.
+- [ ] Government apps / financial features declaration: Walter is a **personal expense tracker** — it does NOT provide loans, banking, investments, or money transfer. Declare "None of the above" in the Financial features form.
 - [ ] Countries: start with India (+ anywhere else you like).
 
 ## 7. Rollout

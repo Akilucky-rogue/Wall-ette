@@ -178,7 +178,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         </div>
         
         <h1 className="text-premium-charcoal font-serif text-3xl font-semibold mb-2">
-          Wall<span className="text-sage">·</span>ette
+          Walter<span className="text-sage">.</span>
         </h1>
         <p className="text-muted-taupe text-[15px]">Mindful Wealth Management</p>
       </div>

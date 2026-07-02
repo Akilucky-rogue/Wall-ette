@@ -1,4 +1,4 @@
-# ✅ LAUNCH CHECKLIST - Wall-ette
+# ✅ LAUNCH CHECKLIST - Walter
 
 **Current Status**: 🔄 In Development | 🎯 Feature Complete Target: Week 2
 

@@ -1,4 +1,4 @@
-# 📚 Walter Documentation Guide
+# 📚 Wall-ette Documentation Guide
 
 **Status**: ✅ Production Ready | 🔄 Feature Development  
 **Last Updated**: February 7, 2026  
@@ -11,7 +11,7 @@
 | Document | Purpose | Time | Best For |
 |----------|---------|------|----------|
 | **[QUICK_START.md](QUICK_START.md)** | 5-minute start | 5 min | Users wanting to try the app NOW |
-| **[README.md](README.md)** | Project overview | 5 min | Understanding what Walter is |
+| **[README.md](README.md)** | Project overview | 5 min | Understanding what Wall-ette is |
 | **[COMMAND_REFERENCE.md](COMMAND_REFERENCE.md)** | All CLI commands | Ref | Developers running commands |
 
 ---
@@ -38,7 +38,7 @@
 |----------|---------|
 | [CODE_VERIFICATION_COMPLETE.md](CODE_VERIFICATION_COMPLETE.md) | Feature analysis |
 | [LIVE_TESTING_LOG.md](LIVE_TESTING_LOG.md) | Test scenarios |
-| [Walter_DOCUMENTATION.md](Walter_DOCUMENTATION.md) | Legacy docs (consolidated) |
+| [Wall-ette_DOCUMENTATION.md](Wall-ette_DOCUMENTATION.md) | Legacy docs (consolidated) |
 
 ---
 

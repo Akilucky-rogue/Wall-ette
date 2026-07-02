@@ -26,6 +26,21 @@ const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
 const Profile = React.lazy(() => import('./components/Profile'));
 
+// ── Swipe navigation ──────────────────────────────────────────────────────
+// Swipe left/right on the four main tabs to move between them; swipe right
+// on a sub-screen to go back. Swipes that start on horizontally scrollable
+// strips, charts, or text fields are ignored so nothing fights the content.
+const TAB_ORDER = [AppScreen.DASHBOARD, AppScreen.HISTORY, AppScreen.ANALYSIS, AppScreen.SELF];
+const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
+  [AppScreen.IMPORT]: AppScreen.DASHBOARD,
+  [AppScreen.EXPORT]: AppScreen.DASHBOARD,
+  [AppScreen.INCOME_INSIGHTS]: AppScreen.DASHBOARD,
+  [AppScreen.CATEGORY_SPLIT]: AppScreen.ANALYSIS,
+  [AppScreen.IGNORE_RULES]: AppScreen.SELF,
+  [AppScreen.HUNTER]: AppScreen.DASHBOARD,
+  [AppScreen.REWIND]: AppScreen.DASHBOARD,
+};
+
 function AppContent() {
   const { user, loading } = useAuth();
   // Native cold start opens LOCKED: a signed-in session resumes behind the
@@ -104,6 +119,35 @@ function AppContent() {
 
   const handleUnlock = () => {
     setIsLocked(false);
+  };
+
+  // Swipe gesture handling (attached to the app shell below)
+  const swipeRef = useRef<{ x: number; y: number; t: number; skip: boolean } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const el = e.target as HTMLElement;
+    const skip = !!el.closest('.overflow-x-auto, .no-scrollbar, svg, input, textarea, select, canvas');
+    swipeRef.current = { x: t.clientX, y: t.clientY, t: Date.now(), skip };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s || s.skip) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    // Fast, clearly horizontal, decisive swipes only.
+    if (Date.now() - s.t > 600) return;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const cur = currentScreenRef.current;
+    const tabIdx = TAB_ORDER.indexOf(cur);
+    if (tabIdx !== -1) {
+      const next = dx < 0 ? tabIdx + 1 : tabIdx - 1;
+      if (next >= 0 && next < TAB_ORDER.length) handleNavigate(TAB_ORDER[next]);
+    } else if (dx > 0) {
+      const back = BACK_TARGET[cur];
+      if (back) handleNavigate(back);
+    }
   };
 
   const handleNavigate = (screen: AppScreen) => {
@@ -200,7 +244,11 @@ function AppContent() {
 
   return (
     <WalletProvider>
-      <div className="font-sans antialiased text-premium-charcoal bg-zen-bg min-h-screen">
+      <div
+        className="font-sans antialiased text-premium-charcoal bg-zen-bg min-h-screen"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <Suspense fallback={<LoadingFallback />}>
             {renderScreen()}
         </Suspense>

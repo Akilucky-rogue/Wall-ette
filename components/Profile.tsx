@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { EmailAuthProvider, reauthenticateWithCredential, type MultiFactorResolver } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, type MultiFactorResolver } from 'firebase/auth';
 import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
@@ -45,6 +45,15 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; label: string }
   </label>
 );
 
+// Same strength rules as sign-up (Auth.tsx) — keep in sync.
+const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
+  { label: '8+ characters', test: s => s.length >= 8 },
+  { label: 'Uppercase letter', test: s => /[A-Z]/.test(s) },
+  { label: 'Lowercase letter', test: s => /[a-z]/.test(s) },
+  { label: 'Number', test: s => /\d/.test(s) },
+  { label: 'Special (@$!%*?&)', test: s => /[@$!%*?&]/.test(s) },
+];
+
 const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
   const { user } = useAuth();
   const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions } = useWallet();
@@ -59,6 +68,50 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     else { if (val < 0) val = 0; setDailyLimit(val); setLimitInput(val === 0 ? '' : val.toString()); }
     setLimitSaved(true);
     setTimeout(() => setLimitSaved(false), 1200);
+  };
+
+  // ── Change password (reauthenticate, then update) ──
+  const [pwModal, setPwModal] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwDone, setPwDone] = useState(false);
+  const pwRulesOk = PW_RULES.every(r => r.test(pwNew));
+  const pwValid = pwRulesOk && pwNew === pwConfirm && pwCurrent.length > 0;
+
+  const openPwModal = () => {
+    setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    setPwError(''); setPwDone(false); setPwModal(true);
+  };
+
+  const changePassword = async () => {
+    if (!user?.email || pwBusy || !pwValid) return;
+    if (pwNew === pwCurrent) { setPwError('New password must be different from the current one.'); return; }
+    setPwBusy(true);
+    setPwError('');
+    try {
+      // Fresh credential proof is required by Firebase before a password change.
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, pwCurrent));
+      await updatePassword(user, pwNew);
+      setPwDone(true);
+      setTimeout(() => setPwModal(false), 1800);
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setPwError('Current password is incorrect.');
+      } else if (code === 'auth/weak-password') {
+        setPwError('New password is too weak.');
+      } else if (code === 'auth/too-many-requests') {
+        setPwError('Too many attempts — please try again in a few minutes.');
+      } else {
+        log.warn('Password change failed');
+        setPwError('Could not change the password. Please try again.');
+      }
+    } finally {
+      setPwBusy(false);
+    }
   };
 
   // ── Appearance (device-local preference) ──
@@ -288,6 +341,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                       </span>
                   </Row>
 
+                  <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change Password"
+                       sub="Re-verify your current password to set a new one" onClick={openPwModal}>
+                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
+                  </Row>
+
                   <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Caps manual entries · tracked live in Pulse's Today card">
                       <div className="relative flex items-center">
                         <input
@@ -410,7 +468,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
 
       <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.0</p>
+        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.1</p>
       </div>
 
       {/* ── 2FA modal ── */}
@@ -467,6 +525,85 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                 </button>
               </>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ── Change password modal ── */}
+      {pwModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change Password</h3>
+              <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
+                <span className="material-symbols-outlined text-muted-taupe">close</span>
+              </button>
+            </div>
+
+            {pwDone ? (
+              <div className="p-5 bg-sage-light/40 border border-sage/20 rounded-2xl text-center">
+                <span className="material-symbols-outlined text-sage text-[36px] mb-1">check_circle</span>
+                <p className="text-[14px] font-serif font-semibold text-premium-charcoal">Password changed</p>
+                <p className="text-[12px] text-muted-taupe mt-1">Use the new password from your next sign-in.</p>
+              </div>
+            ) : (
+              <>
+                {pwError && <div className="mb-4 p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-rose text-xs font-medium leading-relaxed">{pwError}</div>}
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Current password</label>
+                    <input type="password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
+                           autoComplete="current-password" autoFocus
+                           className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
+                           placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">New password</label>
+                    <input type="password" value={pwNew} onChange={e => setPwNew(e.target.value)}
+                           autoComplete="new-password"
+                           className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
+                           placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Confirm new password</label>
+                    <input type="password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
+                           autoComplete="new-password"
+                           className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
+                           placeholder="••••••••" />
+                    {pwConfirm.length > 0 && pwNew !== pwConfirm && (
+                      <p className="text-[11px] text-rose mt-1.5 ml-2">Passwords don't match yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live strength checklist (same rules as sign-up) */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-4 mb-5 px-1">
+                  {PW_RULES.map(r => {
+                    const ok = r.test(pwNew);
+                    return (
+                      <div key={r.label} className="flex items-center gap-1.5">
+                        <span className={`material-symbols-outlined text-[14px] ${ok ? 'text-sage' : 'text-muted-taupe/50'}`}>
+                          {ok ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span className={`text-[11px] ${ok ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{r.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={changePassword}
+                  disabled={pwBusy || !pwValid}
+                  className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {pwBusy ? 'Updating…' : 'Update Password'}
+                </button>
+                <p className="text-[10px] text-muted-taupe text-center mt-3 leading-relaxed">
+                  Forgot the current one? Sign out and use "Forgot Password?" on the login screen.
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

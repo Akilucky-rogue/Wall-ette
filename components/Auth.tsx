@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
@@ -25,8 +25,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  // Dedicated forgot-password panel + resend cooldown
+  const [resetMode, setResetMode] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   // Consent to Terms & Privacy — required for sign-up only.
   const [agreed, setAgreed] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   // TOTP second factor at sign-in (accounts with 2FA enrolled)
   const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
@@ -120,17 +129,37 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   };
 
   const handleResetPassword = async () => {
-      if (!email) {
-          setError("Please enter your email address first.");
+      const target = email.trim();
+      if (!target || !target.includes('@')) {
+          setError('Please enter a valid email address.');
           return;
       }
+      setLoading(true);
+      setError('');
       try {
-          await sendPasswordResetEmail(auth, email);
-          setResetSent(true);
-          setError("");
+          await sendPasswordResetEmail(auth, target);
       } catch (err: any) {
-          setError(getErrorMessage(err.code, err.message));
+          // Never reveal whether an account exists (anti-enumeration):
+          // user-not-found is shown as success. Real failures still surface.
+          if (err.code === 'auth/invalid-email') {
+              setError('Please enter a valid email address.');
+              setLoading(false);
+              return;
+          }
+          if (err.code === 'auth/too-many-requests') {
+              setError('Too many attempts — please wait a few minutes and try again.');
+              setLoading(false);
+              return;
+          }
+          if (err.code !== 'auth/user-not-found') {
+              setError(getErrorMessage(err.code, err.message));
+              setLoading(false);
+              return;
+          }
       }
+      setLoading(false);
+      setResetSent(true);
+      setCooldown(30);
   };
 
   return (
@@ -191,18 +220,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <RangoliCorner className="absolute -bottom-1 -right-1 opacity-20 rotate-180" color="var(--gold-1)" />
         
         <h2 className="relative text-xl font-serif font-semibold text-premium-charcoal mb-6 text-center">
-            {totpResolver ? 'Two-Factor Verification' : isLogin ? 'Welcome Back' : 'Create Account'}
+            {totpResolver ? 'Two-Factor Verification' : resetMode ? 'Reset Password' : isLogin ? 'Welcome Back' : 'Create Account'}
         </h2>
 
         {error && (
             <div className="mb-4 p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-rose text-xs font-medium leading-relaxed">
                 {error}
-            </div>
-        )}
-
-        {resetSent && (
-            <div className="mb-4 p-3 bg-sage-light/40 border border-sage/20 rounded-xl text-sage text-xs font-medium leading-relaxed">
-                Password recovery email sent.
             </div>
         )}
 
@@ -235,6 +258,62 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             Back
           </button>
         </form>
+        ) : resetMode ? (
+        <div className="space-y-4">
+          {resetSent ? (
+            <>
+              <div className="p-4 bg-sage-light/40 border border-sage/20 rounded-2xl">
+                <p className="text-[13px] text-premium-charcoal font-semibold mb-1">Check your inbox</p>
+                <p className="text-[12px] text-muted-taupe leading-relaxed">
+                  If an account exists for <span className="font-semibold text-premium-charcoal">{email.trim()}</span>,
+                  a password-reset link is on its way. The link expires in about an hour — check
+                  your spam folder if it doesn't appear within a minute.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={cooldown > 0 || loading}
+                className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-[15px] font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {loading ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Email'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-[12px] text-muted-taupe leading-relaxed text-center px-2">
+                Enter your account email and we'll send you a link to set a new password.
+              </p>
+              <div>
+                <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
+                <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleResetPassword(); } }}
+                    className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
+                    placeholder="you@example.com"
+                    autoFocus
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={loading || !email.includes('@')}
+                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {loading ? 'Sending…' : 'Send Reset Link'}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => { setResetMode(false); setResetSent(false); setError(''); setCooldown(0); }}
+            className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
+          >
+            Back to Sign In
+          </button>
+        </div>
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -291,10 +370,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         </form>
         )}
 
-        {!totpResolver && (
+        {!totpResolver && !resetMode && (
         <div className="mt-6 flex flex-col items-center gap-4">
             {isLogin && (
-                <button onClick={handleResetPassword} className="text-[12px] text-muted-taupe hover:text-sage transition-colors">
+                <button
+                    onClick={() => { setResetMode(true); setResetSent(false); setError(''); }}
+                    className="text-[12px] text-muted-taupe hover:text-sage transition-colors"
+                >
                     Forgot Password?
                 </button>
             )}

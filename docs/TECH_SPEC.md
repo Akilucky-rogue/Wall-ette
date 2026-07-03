@@ -1,6 +1,6 @@
 # Wall-ette — Technical Specification
 
-**Version:** 1.5.0 (versionCode 7) · **App ID:** `com.wallet.walle` · **Updated:** 3 July 2026
+**Version:** 1.5.1 (versionCode 8) · **App ID:** `com.wallet.walle` · **Updated:** 3 July 2026
 **Live web:** https://wall-e-7a113.web.app · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
@@ -169,6 +169,9 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 - Per-UID Firestore rules; offline cache cleared on uninstall.
 - Biometric unlock (fingerprint/face, PIN/pattern fallback) at cold start and session re-lock;
   unlock attempts recorded to a per-user security log.
+- Account recovery: anti-enumeration password-reset flow on the login screen (dedicated panel,
+  30 s resend cooldown), a reset-link escape hatch on the lock screen, and in-app password
+  change in Self → Security gated by fresh reauthentication with live strength rules.
 - Statement parsing is fully client-side; documents are never uploaded.
 - No secrets in the repo: `.env` intentionally empty (documented no-secrets policy — `VITE_*`
   vars are public by nature), keystore lives in gitignored `private/`, and git history was

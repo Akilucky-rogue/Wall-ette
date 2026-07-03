@@ -12,7 +12,7 @@ everything else is already prepared in the repo.
 ## 1. Signing (prepared)
 
 - Gradle now signs release builds automatically when `android/key.properties` exists.
-- [ ] **[YOU]** Find your key alias: `keytool -list -keystore my-release-key.keystore` (from project root, prompts for store password).
+- [ ] **[YOU]** Find your key alias: `keytool -list -keystore private/my-release-key.keystore` (from project root, prompts for store password).
 - [ ] **[YOU]** `Copy-Item android\key.properties.example android\key.properties` and fill in the password(s) + alias. The file is gitignored.
 - When Play asks about **Play App Signing** during app creation: accept it (Google holds the final signing key; your keystore becomes the *upload key*). Recommended — it makes a lost keystore recoverable.
 

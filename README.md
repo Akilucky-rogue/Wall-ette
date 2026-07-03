@@ -64,8 +64,8 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/wall-e.git
-    cd wall-e
+    git clone https://github.com/Akilucky-rogue/Wall-ette.git
+    cd Wall-ette
     ```
 
 2.  **Install Dependencies**
@@ -126,7 +126,7 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 3. **Next Week (6 hrs)**: Mobile optimization and final testing
 4. **Week 3-4 (6 hrs)**: Android prep and launch
 
-**Full timeline?** → See [docs/VISUAL_ROADMAP.md](docs/VISUAL_ROADMAP.md)
+**Full timeline?** → See [docs/VISUAL_ROADMAP.md](docs/archive/VISUAL_ROADMAP.md)
 
 ---
 
@@ -136,8 +136,8 @@ Project documentation lives in [`docs/`](docs/). Key entry points:
 
 | Document | Purpose |
 |----------|---------|
-| [AUDIT_REPORT.md](AUDIT_REPORT.md) | Full code audit findings (2026-06) |
-| [FIX_CHECKLIST.md](FIX_CHECKLIST.md) | Executed fix plan with phase status |
+| [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) | Full code audit findings (2026-06) |
+| [FIX_CHECKLIST.md](docs/FIX_CHECKLIST.md) | Executed fix plan with phase status |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design & data flow |
 | [docs/QUICK_START.md](docs/QUICK_START.md) | Getting started |
 | [docs/PRODUCTION_ROADMAP.md](docs/PRODUCTION_ROADMAP.md) | Launch strategy |
@@ -166,7 +166,7 @@ The app uses a custom Tailwind configuration defined in `index.html`:
 
 This is a personal finance app built for multiple platforms:
 - **Web** (React + Vite)
-- **Android** (Flutter - upcoming)
+- **Android** (Capacitor 8 — shipped, sideloaded APK)
 
 When contributing, ensure code is **type-safe** (TypeScript), **secure** (no hardcoded credentials), and **documented** (comments for complex logic).
 

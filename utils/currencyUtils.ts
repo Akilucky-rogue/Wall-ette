@@ -1,4 +1,4 @@
-import { CurrencyCode, CurrencyConfig } from './types';
+import { CurrencyCode, CurrencyConfig } from '../types';
 
 export const CURRENCIES: Record<CurrencyCode, CurrencyConfig> = {
   INR: { code: 'INR', symbol: '₹', rate: 1, locale: 'en-IN' },

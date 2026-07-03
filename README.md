@@ -136,6 +136,7 @@ Project documentation lives in [`docs/`](docs/). Key entry points:
 
 | Document | Purpose |
 |----------|---------|
+| [TECH_SPEC.md](docs/TECH_SPEC.md) | Complete technical specification |
 | [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) | Full code audit findings (2026-06) |
 | [FIX_CHECKLIST.md](docs/FIX_CHECKLIST.md) | Executed fix plan with phase status |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design & data flow |

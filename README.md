@@ -19,7 +19,8 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 ### 🛡️ Security & Privacy
 *   **Session Security**: Automatic application lock after 15 minutes of inactivity (and on backgrounding, on Android).
 *   **Authentication**: Secure Firebase Email/Password login.
-*   **2FA & Biometrics (demo)**: The MFA and Face ID unlock flows are simulated placeholders — they are labeled "(demo)" in the UI and are not yet real second factors.
+*   **Password Reset & Recovery**: Anti-enumeration reset flow at login, recovery from the lock screen, and in-app password change (re-authentication + strength rules).
+*   **Biometric Unlock**: Real fingerprint/face unlock on Android (cold start + session lock) with PIN/pattern fallback. Authenticator-app 2FA (TOTP) is built and parked as "Coming Soon".
 *   **Daily Limits**: Set daily spending limits with real-time blocking and alerts.
 *   **Security Logs**: Tracks login attempts and unlocking methods (Password/Bio/MFA).
 

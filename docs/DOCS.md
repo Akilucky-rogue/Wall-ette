@@ -10,6 +10,7 @@
 
 | Document | Purpose | Time | Best For |
 |----------|---------|------|----------|
+| [TECH_SPEC.md](TECH_SPEC.md) | Complete technical specification |
 | **[QUICK_START.md](QUICK_START.md)** | 5-minute start | 5 min | Users wanting to try the app NOW |
 | **[README.md](README.md)** | Project overview | 5 min | Understanding what Wall-ette is |
 | **[COMMAND_REFERENCE.md](COMMAND_REFERENCE.md)** | All CLI commands | Ref | Developers running commands |

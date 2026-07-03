@@ -21,23 +21,23 @@
 ### Planning & Architecture
 | Document | Purpose | Time |
 |----------|---------|------|
-| **[NEXT_STEPS.md](NEXT_STEPS.md)** | What to build next (Week 1-2) | 10 min |
+| **[NEXT_STEPS.md](archive/NEXT_STEPS.md)** | What to build next (Week 1-2) | 10 min |
 | **[PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md)** | Launch strategy & timeline | 15 min |
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | System design & data flow | 15 min |
-| **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** | Code examples & patterns | 20 min |
+| **[IMPLEMENTATION_GUIDE.md](archive/IMPLEMENTATION_GUIDE.md)** | Code examples & patterns | 20 min |
 
 ### Quality & Verification
 | Document | Purpose | Time |
 |----------|---------|------|
 | **[LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)** | Pre-launch verification | 10 min |
-| **[TEST_CHECKLIST.md](TEST_CHECKLIST.md)** | Functional test matrix | 15 min |
-| **[VERIFICATION_REPORT.md](VERIFICATION_REPORT.md)** | Test execution log | 20 min |
+| **[TEST_CHECKLIST.md](archive/TEST_CHECKLIST.md)** | Functional test matrix | 15 min |
+| **[VERIFICATION_REPORT.md](archive/VERIFICATION_REPORT.md)** | Test execution log | 20 min |
 
 ### Reference Files
 | Document | Purpose |
 |----------|---------|
-| [CODE_VERIFICATION_COMPLETE.md](CODE_VERIFICATION_COMPLETE.md) | Feature analysis |
-| [LIVE_TESTING_LOG.md](LIVE_TESTING_LOG.md) | Test scenarios |
+| [CODE_VERIFICATION_COMPLETE.md](archive/CODE_VERIFICATION_COMPLETE.md) | Feature analysis |
+| [LIVE_TESTING_LOG.md](archive/LIVE_TESTING_LOG.md) | Test scenarios |
 | [Wall-ette_DOCUMENTATION.md](Wall-ette_DOCUMENTATION.md) | Legacy docs (consolidated) |
 
 ---
@@ -52,22 +52,22 @@
 ### "I want to understand the architecture"
 1. Read [README.md](README.md) overview (5 min)
 2. Review [ARCHITECTURE.md](ARCHITECTURE.md) for system design (15 min)
-3. Check [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for code patterns
+3. Check [IMPLEMENTATION_GUIDE.md](archive/IMPLEMENTATION_GUIDE.md) for code patterns
 
 ### "I want to know what to build next"
-1. Start with [NEXT_STEPS.md](NEXT_STEPS.md) (what to do this week)
+1. Start with [NEXT_STEPS.md](archive/NEXT_STEPS.md) (what to do this week)
 2. Reference [PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md) for timeline
-3. Follow [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for code
+3. Follow [IMPLEMENTATION_GUIDE.md](archive/IMPLEMENTATION_GUIDE.md) for code
 
 ### "I want to deploy to production"
 1. Check [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for verification items
-2. Run [TEST_CHECKLIST.md](TEST_CHECKLIST.md) tests
+2. Run [TEST_CHECKLIST.md](archive/TEST_CHECKLIST.md) tests
 3. Execute [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) deployment commands
 
 ### "I want to test all features"
-1. Use [TEST_CHECKLIST.md](TEST_CHECKLIST.md) test matrix
-2. Follow [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) scenarios
-3. Check [CODE_VERIFICATION_COMPLETE.md](CODE_VERIFICATION_COMPLETE.md) for feature list
+1. Use [TEST_CHECKLIST.md](archive/TEST_CHECKLIST.md) test matrix
+2. Follow [VERIFICATION_REPORT.md](archive/VERIFICATION_REPORT.md) scenarios
+3. Check [CODE_VERIFICATION_COMPLETE.md](archive/CODE_VERIFICATION_COMPLETE.md) for feature list
 
 ---
 
@@ -150,9 +150,9 @@ npm run android      # Sync & build Android project
 | Question | Answer |
 |----------|--------|
 | **Where's the live app?** | https://wall-e-7a113.web.app |
-| **How do I start coding?** | See [NEXT_STEPS.md](NEXT_STEPS.md) |
-| **What features exist?** | See [CODE_VERIFICATION_COMPLETE.md](CODE_VERIFICATION_COMPLETE.md) |
-| **How do I test?** | Use [TEST_CHECKLIST.md](TEST_CHECKLIST.md) |
+| **How do I start coding?** | See [NEXT_STEPS.md](archive/NEXT_STEPS.md) |
+| **What features exist?** | See [CODE_VERIFICATION_COMPLETE.md](archive/CODE_VERIFICATION_COMPLETE.md) |
+| **How do I test?** | Use [TEST_CHECKLIST.md](archive/TEST_CHECKLIST.md) |
 | **What runs the app?** | See [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **How do I deploy?** | See [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) |
 

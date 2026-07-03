@@ -3,7 +3,7 @@ import { Transaction, TransactionType, CurrencyCode, IgnoreRule } from '../types
 import { db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../currencyUtils';
+import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
 import { log } from '../utils/log';
 
 interface WalletContextType {

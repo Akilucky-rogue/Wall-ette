@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType, CATEGORIES } from '../types';
-import { getSymbol } from '../currencyUtils';
+import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { prettyMerchant } from '../services/analyticsService';
 import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';

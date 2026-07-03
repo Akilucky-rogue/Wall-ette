@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { CURRENCIES } from '../currencyUtils';
+import { CURRENCIES } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 
 const CurrencySelector: React.FC = () => {

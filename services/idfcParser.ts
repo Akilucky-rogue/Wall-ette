@@ -170,8 +170,11 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
             const ln = lines[i];
             const texts = ln.map(it => it.text);
 
-            // Summary block: label line, values on the NEXT line.
-            if (!summary && texts.includes('Opening') && texts.includes('Balance') && texts.join(' ').includes('Debit')) {
+            // Summary block: label line, values on the NEXT line. Match the
+            // joined line: pdf.js 5.x returns 'Opening Balance' as ONE item, so
+            // testing for separate 'Opening' and 'Balance' items never matched.
+            const joined = texts.join(' ');
+            if (!summary && /Opening\s*Balance/i.test(joined) && /Total\s*Debit/i.test(joined)) {
                 const next = lines[i + 1];
                 const nums = next ? next.filter(it => AMT_TOKEN.test(it.text)).map(it => parseAmount(it.text)) : [];
                 if (nums.length === 4) {
@@ -304,6 +307,9 @@ const PATTERNS = {
     // Total debit/credit
     totalDebit: /Total\s*(?:Debit|Withdrawals?)[:\s]+([\d,]+\.?\d*)/i,
     totalCredit: /Total\s*(?:Credit|Deposits?)[:\s]+([\d,]+\.?\d*)/i,
+
+    // IDFC summary block: four labels on one line, their values on the next.
+    summaryBlock: /Opening\s*Balance\s+Total\s*Debit\s+Total\s*Credit\s+Closing\s*Balance\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/i,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -606,6 +612,17 @@ function extractHeader(text: string): StatementHeader {
     const creditMatch = text.match(PATTERNS.totalCredit);
     if (creditMatch) {
         header.totalCredit = parseAmount(creditMatch[1]);
+    }
+
+    // The single-label patterns above misread IDFC's layout in flat text:
+    // 'Closing Balance' is followed by the OPENING figure, and both totals
+    // by other labels. When the whole summary block is present, it wins.
+    const block = text.match(PATTERNS.summaryBlock);
+    if (block) {
+        header.openingBalance = parseAmount(block[1]);
+        header.totalDebit = parseAmount(block[2]);
+        header.totalCredit = parseAmount(block[3]);
+        header.closingBalance = parseAmount(block[4]);
     }
 
     header.bankName = 'IDFC FIRST Bank';

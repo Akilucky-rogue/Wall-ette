@@ -70,9 +70,11 @@ async function extractFromPDF(base64Data: string): Promise<{ text: string; pages
     // Worker is bundled by Vite (?url emits it as a local asset) instead of
     // being fetched from unpkg at runtime — works offline and on native
     // Android, and removes the CDN supply-chain dependency (audit Phase 3.4).
+    // The legacy build ships polyfills (Uint8Array.toHex, Promise.try and
+    // others), so PDF import also works on Android WebView < 140 and iOS < 18.2.
     const [pdfjsLib, worker] = await Promise.all([
-        import('pdfjs-dist'),
-        import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+        import('pdfjs-dist/legacy/build/pdf.mjs'),
+        import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
     ]);
     pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
 

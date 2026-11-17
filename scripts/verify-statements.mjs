@@ -52,7 +52,7 @@ await build({
   plugins: [{
     name: 'node-pdfjs',
     setup(b) {
-      b.onResolve({ filter: /^pdfjs-dist$/ }, () => ({ path: pdfjs, external: true }));
+      b.onResolve({ filter: /^pdfjs-dist(\/legacy\/build\/pdf\.mjs)?$/ }, () => ({ path: pdfjs, external: true }));
       b.onResolve({ filter: /\?url$/ }, (a) => ({ path: a.path, namespace: 'worker-url' }));
       b.onLoad({ filter: /.*/, namespace: 'worker-url' }, () => ({ contents: `export default ${JSON.stringify(worker)};`, loader: 'js' }));
     },

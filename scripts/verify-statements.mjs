@@ -8,6 +8,8 @@
  *   - debit total and credit total
  *   - opening + credits - debits = closing
  *   - the parser's own validation flag
+ * When the folder holds both PDF and Excel exports covering the same rows, it
+ * also checks that each row lands in the same category in both formats.
  *
  * Usage (after `npm ci`):
  *   node scripts/verify-statements.mjs [folder]     default: private/statements
@@ -98,7 +100,12 @@ async function check(file) {
   if (closing !== paise(head.closingBalance)) problems.push(`closing ${rupees(closing)} vs bank ${rupees(paise(head.closingBalance))}`);
   if (!valid) problems.push('parser validation failed');
   const categorised = rows.filter((t) => t.category && t.category !== 'Uncategorized').length;
-  return { rows: rows.length, categorised, problems };
+  // Pair rows across formats on date, amount, direction and running balance.
+  const keyed = rows.map((t) => ({
+    key: `${t.date}|${paise(t.amount)}|${String(t.type).toUpperCase()}|${paise(t.balance)}`,
+    category: t.category || 'Uncategorized',
+  }));
+  return { rows: rows.length, categorised, problems, isPdf: extname(file).toLowerCase() === '.pdf', keyed };
 }
 
 const files = readdirSync(folder).filter((f) => /\.(pdf|xlsx|xls)$/i.test(f)).sort();
@@ -107,10 +114,12 @@ if (files.length === 0) {
   process.exit(1);
 }
 let failed = 0;
+const results = [];
 for (const f of files) {
   let line;
   try {
     const r = await check(f);
+    results.push(r);
     if (r.problems.length) failed++;
     line = `${r.problems.length ? 'FAIL' : 'ok  '}  ${mask(f).padEnd(46)} ${String(r.rows).padStart(5)} rows  ${String(r.categorised).padStart(5)} categorised`;
     if (r.problems.length) line += `  ${r.problems.join('; ')}`;
@@ -121,5 +130,35 @@ for (const f of files) {
   console.log(line);
 }
 rmSync(tmp, { recursive: true, force: true });
+
+// A row must land in the same category whether it came from a PDF or an
+// Excel export (audit H2). Only category names are printed, never narrations.
+const excelCategories = new Map();
+for (const r of results) {
+  if (r.isPdf) continue;
+  for (const t of r.keyed) {
+    if (!excelCategories.has(t.key)) excelCategories.set(t.key, new Set());
+    excelCategories.get(t.key).add(t.category);
+  }
+}
+let paired = 0, disagree = 0;
+const kinds = new Map();
+for (const r of results) {
+  if (!r.isPdf) continue;
+  for (const t of r.keyed) {
+    const cats = excelCategories.get(t.key);
+    if (!cats) continue;
+    paired++;
+    if (cats.has(t.category)) continue;
+    disagree++;
+    const kind = `Excel ${[...cats].join(' / ')}, PDF ${t.category}`;
+    kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
+  }
+}
+if (paired) {
+  console.log(`\nCategories: ${paired} PDF rows paired with Excel rows; ${disagree} disagree.`);
+  for (const [kind, n] of kinds) console.log(`  ${String(n).padStart(5)} rows  ${kind}`);
+}
+
 console.log(`\n${files.length - failed} of ${files.length} statements match the bank to the paisa.`);
-process.exit(failed ? 1 : 0);
+process.exit(failed || disagree ? 1 : 0);

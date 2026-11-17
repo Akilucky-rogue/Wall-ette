@@ -468,7 +468,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
 
       <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.1</p>
+        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.2</p>
       </div>
 
       {/* ── 2FA modal ── */}

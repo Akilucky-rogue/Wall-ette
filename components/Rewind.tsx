@@ -5,6 +5,7 @@ import { localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { exportImage } from '../utils/exportFile';
 import { log } from '../utils/log';
+import { SITE_HOST } from '../utils/site';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
 
 interface RewindProps {
@@ -218,7 +219,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       if (wrapped.topCat) { small('top category', `${wrapped.topCat[0]} · ${fmt(wrapped.topCat[1])}`, sy); sy += 62; }
       small('busiest month · no-spend days', `${wrapped.busiestMonth} · ${wrapped.noSpendDays} days`, sy);
 
-      center('tallied to the rupee · wall-e-7a113.web.app', H - 28, '600 12px Verdana, sans-serif', '#b9b7b2');
+      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px Verdana, sans-serif', '#b9b7b2');
 
       const base64 = canvas.toDataURL('image/png').split(',')[1];
       const outcome = await exportImage(`wall-ette-wrapped-${wrapped.year}.png`, base64);

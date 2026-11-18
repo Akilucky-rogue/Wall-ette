@@ -2,7 +2,7 @@
 
 ## 🚀 Wall-ette is Live!
 
-**Visit**: https://wall-e-7a113.web.app  
+**Visit**: https://wall-ette.com  
 **Status**: ✅ Production Ready with Real-time Sync
 
 ---
@@ -12,7 +12,7 @@
 ### Option 1: Test Online (Right Now!)
 ```
 1. Open browser
-2. Go to: https://wall-e-7a113.web.app
+2. Go to: https://wall-ette.com
 3. Click "Sign Up"
 4. Create account with any email/password
 5. Click "Add Entry"
@@ -22,7 +22,7 @@
 
 ### Option 2: Test Offline
 ```
-1. Open app at https://wall-e-7a113.web.app
+1. Open app at https://wall-ette.com
 2. Sign in
 3. Add a transaction
 4. Press F12 → Network tab
@@ -34,7 +34,7 @@
 
 ### Option 3: Test Multi-Device Sync
 ```
-1. Open on phone: https://wall-e-7a113.web.app
+1. Open on phone: https://wall-ette.com
 2. Sign in with account
 3. Add transaction on phone
 4. Open on computer with same account
@@ -139,7 +139,7 @@ Press: F12 (Windows/Linux) or Cmd+Option+I (Mac)
 
 ### Check Console for Errors
 ```
-1. Open app at https://wall-e-7a113.web.app
+1. Open app at https://wall-ette.com
 2. Press F12
 3. Go to Console tab
 4. Look for red errors
@@ -165,7 +165,7 @@ Same WiFi connection:
 4. Press F12 to see mobile console
 
 OR just visit the live version:
-https://wall-e-7a113.web.app
+https://wall-ette.com
 ```
 
 ---
@@ -236,7 +236,7 @@ In Firebase Console:
 
 ### Your App
 ```
-Live: https://wall-e-7a113.web.app
+Live: https://wall-ette.com
 Local: http://localhost:5173 (after npm run dev)
 ```
 
@@ -290,7 +290,7 @@ npm run preview
 firebase deploy
 
 # 6. Visit live app
-# https://wall-e-7a113.web.app
+# https://wall-ette.com
 ```
 
 ---
@@ -401,7 +401,7 @@ firebase deploy
 Your app is live, your tools are ready, and you have everything you need.
 
 **Next step**: 
-1. Open https://wall-e-7a113.web.app
+1. Open https://wall-ette.com
 2. Test it out
 3. Then pick a task from NEXT_STEPS.md
 4. Start coding!

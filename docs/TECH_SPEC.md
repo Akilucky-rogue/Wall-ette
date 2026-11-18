@@ -1,7 +1,7 @@
 # Wall-ette — Technical Specification
 
 **Version:** 1.5.1 (versionCode 8) · **App ID:** `com.wallet.walle` · **Updated:** 3 July 2026
-**Live web:** https://wall-e-7a113.web.app · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
+**Live web:** https://wall-ette.com · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
 transactions manually or import real bank statements (PDF/Excel), and the app reconstructs a

@@ -4,7 +4,7 @@
 
 Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to personal finance with Zen design, robust security, and AI-powered automation.
 
-**🌍 LIVE APP**: https://wall-e-7a113.web.app  
+**🌍 LIVE APP**: https://wall-ette.com  
 **STATUS**: ✅ Production Deployed | ✅ Fully Secured | ✅ Real-time Sync
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)

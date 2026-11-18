@@ -2,7 +2,7 @@
 
 **Status**: ✅ Production Ready | 🔄 Feature Development  
 **Last Updated**: February 7, 2026  
-**Live App**: https://wall-e-7a113.web.app
+**Live App**: https://wall-ette.com
 
 ---
 
@@ -47,7 +47,7 @@
 
 ### "I want to test the app right now"
 1. Go to [QUICK_START.md](QUICK_START.md)
-2. Click the link to https://wall-e-7a113.web.app
+2. Click the link to https://wall-ette.com
 3. Sign up and test
 
 ### "I want to understand the architecture"
@@ -131,7 +131,7 @@
 - **Styling**: Tailwind CSS
 - **Backend**: Firebase (Firestore + Auth)
 - **AI**: Google Gemini API
-- **Hosting**: Firebase Hosting (https://wall-e-7a113.web.app)
+- **Hosting**: Firebase Hosting (https://wall-ette.com; also https://wall-e-7a113.web.app)
 - **Mobile**: Capacitor 7 (Android ready)
 
 ### Key Commands
@@ -150,7 +150,7 @@ npm run android      # Sync & build Android project
 
 | Question | Answer |
 |----------|--------|
-| **Where's the live app?** | https://wall-e-7a113.web.app |
+| **Where's the live app?** | https://wall-ette.com |
 | **How do I start coding?** | See [NEXT_STEPS.md](archive/NEXT_STEPS.md) |
 | **What features exist?** | See [CODE_VERIFICATION_COMPLETE.md](archive/CODE_VERIFICATION_COMPLETE.md) |
 | **How do I test?** | Use [TEST_CHECKLIST.md](archive/TEST_CHECKLIST.md) |

@@ -4,13 +4,12 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { log } from '../utils/log';
+import { PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 
 // Bump when terms.html / privacy.html change materially — recorded with
 // each registration as the version the user agreed to.
 const TERMS_VERSION = '2026-06-11';
-const TERMS_URL = 'https://wall-e-7a113.web.app/terms.html';
-const PRIVACY_URL = 'https://wall-e-7a113.web.app/privacy.html';
 
 export type AuthType = 'login' | 'register';
 

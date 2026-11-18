@@ -13,6 +13,7 @@ import {
 } from '../services/mfa';
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateBiometric, isNative } from '../utils/biometric';
 import { log } from '../utils/log';
+import { PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
@@ -436,11 +437,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
                   <Row icon="policy" iconCls="bg-sand-light text-sand" title="Privacy Policy" sub="How your data is handled"
-                       onClick={() => window.open('https://wall-e-7a113.web.app/privacy.html', '_blank')}>
+                       onClick={() => window.open(PRIVACY_URL, '_blank')}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
                   </Row>
                   <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms & Conditions" sub="The agreement you accepted"
-                       onClick={() => window.open('https://wall-e-7a113.web.app/terms.html', '_blank')}>
+                       onClick={() => window.open(TERMS_URL, '_blank')}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
                   </Row>
               </div>

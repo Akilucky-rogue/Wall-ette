@@ -10,11 +10,13 @@ interface FeeHunterProps {
 }
 
 const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact, deleteTransactions } = useWallet();
+  const { transactions, counted, formatAmount, formatAmountCompact, deleteTransactions } = useWallet();
   const [cleaning, setCleaning] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const hunt = useMemo(() => huntSavings(transactions), [transactions]);
+  // Fees, double charges and creep among real spending; money moved to your
+  // own accounts or family repeats by design (audit H3).
+  const hunt = useMemo(() => huntSavings(counted), [counted]);
 
   // Exact duplicates INSIDE the wallet (same date + type + amount + merchant,
   // both imported) — usually the result of "Include Anyway" on an overlap.

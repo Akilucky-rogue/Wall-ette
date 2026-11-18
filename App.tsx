@@ -19,7 +19,7 @@ const NewEntry = React.lazy(() => import('./components/NewEntry'));
 const SpendAnalysis = React.lazy(() => import('./components/SpendAnalysis'));
 const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
-const IgnoreRules = React.lazy(() => import('./components/IgnoreRules'));
+const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
@@ -36,7 +36,7 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.EXPORT]: AppScreen.DASHBOARD,
   [AppScreen.INCOME_INSIGHTS]: AppScreen.DASHBOARD,
   [AppScreen.CATEGORY_SPLIT]: AppScreen.ANALYSIS,
-  [AppScreen.IGNORE_RULES]: AppScreen.SELF,
+  [AppScreen.MONEY_MOVED]: AppScreen.SELF,
   [AppScreen.HUNTER]: AppScreen.DASHBOARD,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
 };
@@ -250,8 +250,8 @@ function AppContent() {
         return <IncomeInsights onNavigate={handleNavigate} />;
       case AppScreen.CATEGORY_SPLIT:
         return <CategorySplit onNavigate={handleNavigate} />;
-      case AppScreen.IGNORE_RULES:
-        return <IgnoreRules onNavigate={handleNavigate} />;
+      case AppScreen.MONEY_MOVED:
+        return <MoneyMoved onNavigate={handleNavigate} />;
       case AppScreen.IMPORT:
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:
@@ -286,7 +286,7 @@ function AppContent() {
           currentScreen === AppScreen.EXPORT ||
           currentScreen === AppScreen.HUNTER ||
           currentScreen === AppScreen.REWIND ||
-          currentScreen === AppScreen.IGNORE_RULES
+          currentScreen === AppScreen.MONEY_MOVED
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
         )}

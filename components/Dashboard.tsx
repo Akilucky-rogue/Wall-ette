@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { byNewest, parseDay } from '../utils/dates';
 import { huntSavings } from '../services/analyticsService';
 import CurrencySelector from './CurrencySelector';
+import UnsortedTransfers from './UnsortedTransfers';
 import { WallEEyes, WallEMascot, FloatingLeaf, LotusFlower, Sprout, RangoliCorner, Diya } from './SplashScreen';
 import styles from './Dashboard.module.css';
 
@@ -14,7 +15,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
     getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
-    getTotalIncome, getTotalExpense, transactions, formatAmount,
+    getTotalIncome, getTotalExpense, transactions, counted, flowOf, formatAmount,
     formatAmountCompact, isCloudSyncing, refresh, openingBalance
   } = useWallet();
 
@@ -28,7 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   };
 
   // Hunter teaser (single pass, memoized) + lifetime hook for Rewind.
-  const hunt = useMemo(() => huntSavings(transactions), [transactions]);
+  const hunt = useMemo(() => huntSavings(counted), [counted]);
   // Sorted desc — the last element is the earliest transaction.
   const sinceYear = transactions.length > 0
     ? parseDay(transactions[transactions.length - 1].date).getFullYear()
@@ -98,56 +99,39 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     return balanceTrend.length - 1;
   }, [balanceTrend]);
 
-  // --- Income vs Expense Bar Data (single pass) ---
+  // --- Period figures (single pass) ---
+  // The balance counts every transaction. Income and expenses count only
+  // real income and spending: money moved to your own accounts, family or
+  // investments is left out (audit H3), so the savings rate means something.
   const { income, expenses, balance, periodLabel } = useMemo(() => {
-    if (periodMode === 'ALL') {
-      let totalIncome = 0, totalExpenses = 0;
-      for (const t of transactions) {
-        if (t.type === TransactionType.INCOME) totalIncome += t.amount;
-        else totalExpenses += t.amount;
+    const all = periodMode === 'ALL';
+    const month = selectedDate.getMonth();
+    const year = selectedDate.getFullYear();
+    const monthStart = new Date(year, month, 1);
+
+    let net = 0;              // every transaction up to the end of the period
+    let periodIncome = 0;
+    let periodExpenses = 0;
+
+    for (const t of transactions) {
+      const txDate = parseDay(t.date);
+      const inPeriod = all || (txDate.getMonth() === month && txDate.getFullYear() === year);
+      if (!inPeriod && txDate >= monthStart) continue; // after the selected month
+      const isIncome = t.type === TransactionType.INCOME;
+      net += isIncome ? t.amount : -t.amount;
+      if (inPeriod && flowOf(t).flow !== 'moved') {
+        if (isIncome) periodIncome += t.amount;
+        else periodExpenses += t.amount;
       }
-      return {
-        income: totalIncome,
-        expenses: totalExpenses,
-        balance: openingBalance + totalIncome - totalExpenses,
-        periodLabel: 'All Time',
-      };
-    } else {
-      const month = selectedDate.getMonth();
-      const year = selectedDate.getFullYear();
-      const monthStart = new Date(year, month, 1);
-
-      let prevNet = 0;          // net flow of everything before this month
-      let monthlyIncome = 0;
-      let monthlyExpenses = 0;
-
-      for (const t of transactions) {
-        const txDate = parseDay(t.date);
-        const isIncome = t.type === TransactionType.INCOME;
-        if (txDate < monthStart) {
-          prevNet += isIncome ? t.amount : -t.amount;
-        } else if (txDate.getMonth() === month && txDate.getFullYear() === year) {
-          if (isIncome) monthlyIncome += t.amount;
-          else monthlyExpenses += t.amount;
-        }
-      }
-
-      const label = `${selectedDate.toLocaleString('default', { month: 'short' })} ${year}`;
-      return {
-        income: monthlyIncome,
-        expenses: monthlyExpenses,
-        balance: openingBalance + prevNet + monthlyIncome - monthlyExpenses,
-        periodLabel: label,
-      };
     }
-  }, [transactions, openingBalance, periodMode, selectedDate]);
 
-  const incomeExpenseBar = useMemo(() => {
-    return [
-      { label: 'Income', value: income, color: 'var(--sage)' },
-      { label: 'Expense', value: expenses, color: 'var(--rose-strong)' }
-    ];
-  }, [income, expenses]);
+    return {
+      income: periodIncome,
+      expenses: periodExpenses,
+      balance: openingBalance + net,
+      periodLabel: all ? 'All Time' : `${selectedDate.toLocaleString('default', { month: 'short' })} ${year}`,
+    };
+  }, [transactions, flowOf, openingBalance, periodMode, selectedDate]);
 
   // --- Savings Rate ---
   const savingsRate = useMemo(() => {
@@ -155,46 +139,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     return Math.max(0, Math.round(((income - expenses) / income) * 100));
   }, [income, expenses]);
 
-  // --- Period-scoped stats in ONE pass (audit Phase 2: was 4 separate scans,
-  // each re-parsing every transaction date) ---
-  const { categoryBreakdown, quickStats, hasMonthlyData, incomeStreams } = useMemo(() => {
+  // --- Top Spend for the period: spending only (audit M7 — it used to add
+  // up income too, so Transfer In topped the card) ---
+  const categoryBreakdown = useMemo(() => {
     const all = periodMode === 'ALL';
     const month = selectedDate.getMonth();
     const year = selectedDate.getFullYear();
 
     const cats: Record<string, number> = {};
-    const incomeCats: Record<string, number> = {};
-    let count = 0;
-    let sum = 0;
-    let max = 0;
-
-    for (const t of transactions) {
+    for (const t of counted) {
+      if (t.type !== TransactionType.EXPENSE) continue;
       if (!all) {
         const txDate = parseDay(t.date);
         if (txDate.getMonth() !== month || txDate.getFullYear() !== year) continue;
       }
-      count++;
-      sum += t.amount;
-      if (t.amount > max) max = t.amount;
       cats[t.category] = (cats[t.category] || 0) + t.amount;
-      if (t.type === TransactionType.INCOME) {
-        incomeCats[t.category] = (incomeCats[t.category] || 0) + t.amount;
-      }
     }
 
-    return {
-      categoryBreakdown: Object.entries(cats)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([name, amount]) => ({ name, amount })),
-      quickStats: { count, avg: count > 0 ? sum / count : 0, max },
-      hasMonthlyData: all || count > 0,
-      incomeStreams: Object.entries(incomeCats)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-        .map(([name, amount]) => ({ name, amount })),
-    };
-  }, [transactions, periodMode, selectedDate]);
+    return Object.entries(cats)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, amount]) => ({ name, amount }));
+  }, [counted, periodMode, selectedDate]);
 
   // Derived helpers for UI logic
   const showAllTime = periodMode === 'ALL';
@@ -415,6 +381,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+      {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
+      <UnsortedTransfers onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
       {/* Hunter + Rewind teasers — the USP, front and center */}
       {(hunt.totalFound > 0.5 || (sinceYear !== null && transactions.length > 50)) && (
         <div className="px-6 pt-2 pb-1 space-y-3 break-inside-avoid">

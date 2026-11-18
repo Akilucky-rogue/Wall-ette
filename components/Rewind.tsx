@@ -28,7 +28,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const TRANSFER_RX = /^(ift|imps|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]/i;
 
 const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, formatAmount, formatAmountCompact } = useWallet();
   const [wrapYear, setWrapYear] = useState<number | null>(null);
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -57,6 +57,9 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       ya.count++;
       if (t.date < first) first = t.date;
       if (t.date > last) last = t.date;
+      // Money moved to your own accounts, family or investments is neither
+      // income nor spending (audit H3): it counts as an entry, nothing more.
+      if (flowOf(t).flow === 'moved') continue;
       const isTransfer = TRANSFER_RX.test(t.merchant || '');
       if (t.type === TransactionType.INCOME) {
         totalInc += t.amount; ya.inc += t.amount;
@@ -109,7 +112,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       yearRows, maxYearFlow,
       onThisDay,
     };
-  }, [transactions]);
+  }, [transactions, flowOf]);
 
   const wrapYears = useMemo(() => (life ? life.yearRows.map(([y]) => y).reverse() : []), [life]);
   const activeWrapYear = wrapYear ?? (wrapYears[0] ?? null);

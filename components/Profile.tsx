@@ -432,7 +432,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
-                  <Row icon="filter_alt" iconCls="bg-lavender-light text-lavender" title="Ignore Rules" sub="Exclude transfers & reimbursables" onClick={() => onNavigate(AppScreen.IGNORE_RULES)}>
+                  <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money Moved" sub="Your accounts, family, investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
                   <Row icon="policy" iconCls="bg-sand-light text-sand" title="Privacy Policy" sub="How your data is handled"

@@ -53,7 +53,7 @@ const CAT_ICON = (cat: string): string => {
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
-  const { currency, addTransaction, convertToBase, transactions, dailyLimit, formatAmount } = useWallet();
+  const { currency, addTransaction, convertToBase, transactions, counted, flowOf, dailyLimit, formatAmount } = useWallet();
   const [amount, setAmount] = useState('0.00');
   const [note, setNote] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -82,17 +82,24 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n]) => n);
   }, [transactions, type]);
 
-  // Today's expense total (base) for the daily-limit preview
+  // Today's spending (base) for the daily-limit preview. Like the check on
+  // save, only spending counts: money moved to family or your own accounts
+  // doesn't use up the limit.
   const todaySpend = useMemo(() => {
     const today = localDay();
     let sum = 0;
-    for (const t of transactions) {
+    for (const t of counted) {
       if (t.type === TransactionType.EXPENSE && t.date === today) sum += t.amount;
     }
     return sum;
-  }, [transactions]);
+  }, [counted]);
 
-  const overLimit = type === TransactionType.EXPENSE && dailyLimit > 0 && numAmount > 0
+  const entryCounts = useMemo(() => flowOf({
+    id: 'draft', amount: 1, type, category: category || 'Uncategorized', date: localDay(),
+    merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
+  }).flow === 'spend', [flowOf, type, category, merchant, note]);
+
+  const overLimit = type === TransactionType.EXPENSE && entryCounts && dailyLimit > 0 && numAmount > 0
     && todaySpend + convertToBase(numAmount) > dailyLimit;
 
   const applyMerchant = (value: string) => {

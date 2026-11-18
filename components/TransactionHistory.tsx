@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
+import { MOVED_LABELS } from '../services/spend';
 import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
 
 interface TransactionHistoryProps {
@@ -16,7 +17,7 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -682,6 +683,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                             <p className="text-[13px] text-premium-charcoal font-serif italic">{t.note || "No notes added."}</p>
                                         </div>
                                     </div>
+                                    {(() => {
+                                        // Money moved isn't spending or income (audit H3): say why
+                                        const info = flowOf(t);
+                                        if (info.flow !== 'moved' || !info.moved) return null;
+                                        return (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
+                                                className="flex items-center gap-1.5 text-[11px] text-lavender font-semibold"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                                                Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
+                                            </button>
+                                        );
+                                    })()}
                                     <div className="flex justify-between items-center pt-1">
                                          <div>
                                             <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">{entryTime(t) ? 'Time' : 'Date'}</p>

@@ -26,13 +26,19 @@ export interface IncomeSource {
   icon: string;
 }
 
-export interface IgnoreRule {
+/**
+ * How payments to or from a payee count (Money Moved screen, audit H3).
+ * mine, family, investment and ignore are money moved: in the balance, but
+ * neither spending nor income. counts keeps a payee counted; salary also marks
+ * its credits as your pay.
+ */
+export type PayeeKind = 'mine' | 'family' | 'investment' | 'ignore' | 'counts' | 'salary';
+
+export interface PayeeRule {
   id: string;
-  name: string;
-  description: string;
-  isActive: boolean;
-  icon: string;
-  color: string;
+  /** Words to look for in the payee, e.g. "ravi kumar". Matched as whole words. */
+  match: string;
+  kind: PayeeKind;
 }
 
 export interface UserProfile {
@@ -49,7 +55,7 @@ export enum AppScreen {
   ANALYSIS = 'ANALYSIS', // Pulse
   INCOME_INSIGHTS = 'INCOME_INSIGHTS', // Flow
   CATEGORY_SPLIT = 'CATEGORY_SPLIT',
-  IGNORE_RULES = 'IGNORE_RULES',
+  MONEY_MOVED = 'MONEY_MOVED', // payee rules: what counts as spending
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
   HUNTER = 'HUNTER', // Fee & Subscription Hunter

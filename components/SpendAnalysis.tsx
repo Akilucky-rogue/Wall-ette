@@ -5,6 +5,7 @@ import { parseDay } from '../utils/dates';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
 import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace, prettyMerchant } from '../services/analyticsService';
+import UnsortedTransfers from './UnsortedTransfers';
 import styles from './SpendAnalysis.module.css';
 
 interface SpendAnalysisProps {
@@ -14,7 +15,9 @@ interface SpendAnalysisProps {
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact, dailyLimit } = useWallet();
+  // Pulse analyses real spending and income only: money moved to your own
+  // accounts, family or investments is left out (audit H3).
+  const { counted, formatAmount, formatAmountCompact, dailyLimit } = useWallet();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [chartMode, setChartMode] = useState<'WEEKLY' | 'DAILY'>('DAILY');
   const [analysisTab, setAnalysisTab] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
@@ -29,14 +32,14 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   // Auto-detect the month with most recent transactions
   // (single O(n) max scan instead of copy + sort — audit Phase 2.6)
   const latestTxDate = useMemo(() => {
-    if (transactions.length === 0) return new Date();
+    if (counted.length === 0) return new Date();
     let maxTs = -Infinity;
-    for (const t of transactions) {
+    for (const t of counted) {
       const ts = parseDay(t.date).getTime();
       if (ts > maxTs) maxTs = ts;
     }
     return new Date(maxTs);
-  }, [transactions]);
+  }, [counted]);
 
   const [selectedDate, setSelectedDate] = useState(latestTxDate);
   
@@ -58,11 +61,11 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     const prevMonth = prevDate.getMonth();
     const prevYear = prevDate.getFullYear();
 
-    const expensesArr: typeof transactions = [];
-    const incomeArr: typeof transactions = [];
+    const expensesArr: typeof counted = [];
+    const incomeArr: typeof counted = [];
     let expSum = 0, incSum = 0, prevExpSum = 0, prevIncSum = 0;
 
-    for (const t of transactions) {
+    for (const t of counted) {
       const d = parseDay(t.date);
       const m = d.getMonth();
       const y = d.getFullYear();
@@ -88,7 +91,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         monthName: prevDate.toLocaleDateString('en-US', { month: 'short' })
       }
     };
-  }, [transactions, selectedDate]);
+  }, [counted, selectedDate]);
 
   const netFlow = totalIncome - totalExpense;
   const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
@@ -97,12 +100,12 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
   // Month-over-month category movers for the active tab (noise floor: ₹100 delta)
   const movers = useMemo(
-    () => categoryMovers(transactions, selectedDate, analysisTab === 'EXPENSE' ? TransactionType.EXPENSE : TransactionType.INCOME),
-    [transactions, selectedDate, analysisTab]
+    () => categoryMovers(counted, selectedDate, analysisTab === 'EXPENSE' ? TransactionType.EXPENSE : TransactionType.INCOME),
+    [counted, selectedDate, analysisTab]
   );
 
   // Recurring charges / subscriptions (whole history, cadence-validated)
-  const recurring = useMemo(() => detectRecurringCharges(transactions), [transactions]);
+  const recurring = useMemo(() => detectRecurringCharges(counted), [counted]);
   const recurringMonthlyTotal = useMemo(() => recurring.reduce((s, r) => s + r.monthlyCost, 0), [recurring]);
 
   // Daily heatmap + weekday averages for the selected month — follows the
@@ -324,7 +327,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     
     setLoadingInsights(true);
     try {
-      const monthTransactions = transactions.filter(t => {
+      const monthTransactions = counted.filter(t => {
         const txDate = parseDay(t.date);
         return txDate.getMonth() === selectedDate.getMonth() &&
                txDate.getFullYear() === selectedDate.getFullYear();
@@ -456,6 +459,9 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         )}
       </div>
 
+      {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
+      <UnsortedTransfers onNavigate={onNavigate} className="px-6 pb-4" />
+
       {/* Desktop: sections flow into two columns; phones/APK keep one column */}
       <div className="lg:columns-2 lg:gap-x-0">
 
@@ -463,7 +469,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       {(() => {
         const now = new Date();
         const isExp = analysisTab === 'EXPENSE';
-        const todayTxs = transactions
+        const todayTxs = counted
           .filter(t => {
             const d = parseDay(t.date);
             return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() &&
@@ -864,7 +870,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
               {/* Day drill-down: tap a date to see exactly what happened */}
               {heatDay !== null && (() => {
                 const y = selectedDate.getFullYear(), mo = selectedDate.getMonth();
-                const dayTxs = transactions
+                const dayTxs = counted
                   .filter(t => {
                     const d = parseDay(t.date);
                     return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === heatDay

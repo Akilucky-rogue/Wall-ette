@@ -12,6 +12,13 @@ import type { Category } from '../types';
 export type RowDirection = 'income' | 'expense';
 
 /**
+ * Brokers and investment platforms, matched on a lower-cased narration. Debits
+ * to them are filed as Investment; services/spend.ts also treats credits from
+ * them as money moved, not income.
+ */
+export const INVESTMENT_PLATFORM = /zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox|trftochoice|choice.?equity|razorpaytp.*choice/;
+
+/**
  * Clean up a statement narration: collapse whitespace and drop punctuation,
  * keeping - / @ . : for UPI IDs and transfer references.
  */
@@ -125,7 +132,7 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
     return 'Insurance';
 
   // ── EXPENSE: Investments ─────────────────────────────────────────────────
-  if (desc.match(/zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox|trftochoice|choice.?equity|razorpaytp.*choice/))
+  if (INVESTMENT_PLATFORM.test(desc))
     return 'Investment';
   if (desc.match(/mutual.?fund|\bsip\b|\bmf\b|nfo\b|nav\b|demat/))
     return 'Investment';

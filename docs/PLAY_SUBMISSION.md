@@ -34,22 +34,21 @@ npm run android:bundle
 Output: `android\app\build\outputs\bundle\release\app-release.aab`, signed with the upload key. The build stops with a message if `android/upload.properties` is missing.
 Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`.
 
-## 3. Web address and contact email
+## 3. Web address
 
-The app, the privacy policy and the terms point to **wall-ette.com** and **support@wall-ette.com**. Set both up before the next hosting deploy (`ship.ps1` deploys hosting):
+The app, the privacy policy and the terms point to **wall-ette.com**. The contact email stays **akshatbvora@gmail.com**.
 
-- [ ] **[YOU]** Firebase console → Hosting → **Add custom domain** → `wall-ette.com`. Add the TXT and A records it shows at your DNS provider, then wait for the certificate (up to 24 hours). If the DNS is on Cloudflare, set those records to **DNS only**.
-- [ ] **[YOU]** Add `www.wall-ette.com`, `wall-ette.in` and `www.wall-ette.in` the same way, each set to **redirect** to `wall-ette.com`.
-- [ ] **[YOU]** Firebase console → Authentication → Settings → **Authorized domains** → add `wall-ette.com` and `www.wall-ette.com`.
+- [x] **[YOU]** Firebase console → Hosting → **Add custom domain** → `wall-ette.com`. DNS at GoDaddy: A `@` → `199.36.158.100`, TXT `@` → `hosting-site=wall-e-7a113`, CNAME `www` → `wall-e-7a113.web.app`.
+- [x] **[YOU]** `www.wall-ette.com`, `wall-ette.in` and `www.wall-ette.in` added the same way, each **redirecting** to `wall-ette.com`.
+- [x] **[YOU]** Firebase console → Authentication → Settings → **Authorized domains**: `wall-ette.com` and `www.wall-ette.com` added.
 - [ ] **[YOU]** If the Firebase web API key is restricted to certain websites (Google Cloud console → APIs & Services → Credentials), add `https://wall-ette.com/*`.
-- [ ] **[YOU]** Create `support@wall-ette.com`, forwarding to your inbox (for example Cloudflare Email Routing, or your registrar's free forwarding).
 - `https://wall-e-7a113.web.app` keeps serving the same site. Web users who move to the new address sign in again there, because browser storage is per domain.
 
 ## 4. Privacy policy and account deletion (prepared)
 
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
-- Until the domain is live, the same paths work on `https://wall-e-7a113.web.app`.
+- The live pages are the June version until the next hosting deploy; the new deletion section goes live with it.
 
 ## 5. Data safety form — answers that match the app
 
@@ -60,15 +59,15 @@ The app, the privacy policy and the terms point to **wall-ette.com** and **suppo
 | Financial info → "Other financial info" | Collected (user-entered/imported transactions) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
-| Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to support@wall-ette.com; URL in section 4 |
+| Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |
 | Ads / advertising ID | **None** |
 
 ## 6. Store listing — ready to paste
 
-**App name:** Wall-ette
+**App name:** Wall-ette · **Package name:** `com.wallet.walle` (permanent; it must match the AAB)
 **Category:** Finance · **Tags:** personal finance, expense tracker
-**Contact email:** support@wall-ette.com · **Website:** https://wall-ette.com
+**Contact email:** akshatbvora@gmail.com (shown publicly on Google Play) · **Website:** https://wall-ette.com
 
 **Short description (≤80 chars):**
 > Mindful expense tracker: import bank statements, get insights, stay on budget.

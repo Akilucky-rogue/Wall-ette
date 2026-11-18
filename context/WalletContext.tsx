@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, IgnoreRule, canonicalCategory } from '../types';
 import { db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
+import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { log } from '../utils/log';
 
 // Category names from earlier versions (audit M10) are mapped once, as data
@@ -14,6 +15,24 @@ const withListCategories = (list: Transaction[]): Transaction[] =>
     const category = canonicalCategory(t.category, t.type);
     return category === t.category ? t : { ...t, category };
   });
+
+// The day and time to store for an entry an earlier version saved as a UTC
+// timestamp (audit H4), or null when its date is already a local day.
+const localDayFields = (t: Transaction): { date: string; createdAt?: string } | null => {
+  const fixed = fromTimestamp(t.date);
+  if (!fixed) return null;
+  return t.createdAt || !fixed.createdAt ? { date: fixed.date } : fixed;
+};
+
+// Everything that loads passes through here, so every screen sees list
+// category names and local days, newest first.
+const asLoaded = (list: Transaction[]): Transaction[] =>
+  withListCategories(list)
+    .map(t => {
+      const fields = localDayFields(t);
+      return fields ? { ...t, ...fields } : t;
+    })
+    .sort(byNewest);
 
 // A budget saved under a list name wins; budgets kept only under old names
 // (Phone and Internet, say) are added together under the list name.
@@ -253,6 +272,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [saveToLocal]);
   useEffect(() => () => { if (mirrorTimer.current) clearTimeout(mirrorTimer.current); }, []);
 
+  // Entries saved as UTC timestamps get their local day in the cloud too, once
+  // (audit H4). Screens already show the right day from asLoaded; this keeps
+  // the stored copy from depending on the phone's time zone. Each entry is
+  // tried once per session.
+  const dayFixesTried = useRef(new Set<string>());
+  const saveLocalDays = useCallback((stored: { ref: DocumentReference; t: Transaction }[]) => {
+      const fixes: { ref: DocumentReference; fields: { date: string; createdAt?: string } }[] = [];
+      for (const { ref, t } of stored) {
+          if (dayFixesTried.current.has(ref.path)) continue;
+          const fields = localDayFields(t);
+          if (!fields) continue;
+          // The update rule's own checks, so one odd document can't fail a batch.
+          if (typeof t.amount !== 'number' || !(t.amount > 0)) continue;
+          if (t.type !== TransactionType.INCOME && t.type !== TransactionType.EXPENSE) continue;
+          dayFixesTried.current.add(ref.path);
+          fixes.push({ ref, fields });
+      }
+      for (const chunk of chunkArray(fixes, 500)) {
+          const batch = writeBatch(db);
+          chunk.forEach(({ ref, fields }) => batch.update(ref, fields));
+          batch.commit().catch(e => log.warn('Saving local days failed:', e?.code || e?.message));
+      }
+  }, []);
+
   // Persist transactions: immediate when running local-only, debounced otherwise.
   const persistTransactions = useCallback((txs: Transaction[]) => {
       if (isBackendReadyRef.current) scheduleMirror(txs);
@@ -302,7 +345,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (!isBackendReady) {
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(withListCategories(localData));
+        if (localData) setTransactions(asLoaded(localData));
         return;
     }
 
@@ -316,12 +359,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             // half-deleted snapshots repopulate the UI mid-clear.
             if (clearingRef.current) return;
             const txData: Transaction[] = [];
+            const timestamped: { ref: DocumentReference; t: Transaction }[] = [];
             snapshot.forEach((d) => {
-                txData.push(d.data() as Transaction);
+                const t = d.data() as Transaction;
+                txData.push(t);
+                if (!isDay(t.date)) timestamped.push({ ref: d.ref, t });
             });
-            const listed = withListCategories(txData);
+            const listed = asLoaded(txData);
             setTransactions(listed);
             scheduleMirror(listed);
+            if (timestamped.length > 0) saveLocalDays(timestamped);
         }, (error) => {
             log.warn('Firestore access failed, switching to local-only mode:', error.message);
             setIsBackendReady(false);
@@ -330,18 +377,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setTransactions(prev => {
                 if (prev.length > 0) return prev;
                 const localData = loadFromLocal('transactions');
-                return localData ? withListCategories(localData) : prev;
+                return localData ? asLoaded(localData) : prev;
             });
         });
     } catch (e) {
         log.warn('Firestore setup error:', e);
         setIsBackendReady(false);
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(withListCategories(localData));
+        if (localData) setTransactions(asLoaded(localData));
     }
 
     return () => unsubscribe();
-  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror]);
+  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror, saveLocalDays]);
 
   // Sync Settings (Currency, Rules, Limits, MFA, Opening Balance)
   useEffect(() => {
@@ -548,12 +595,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // ── Aggregates ────────────────────────────────────────────────────────────
   // Single pass over transactions, recomputed only when data changes
-  // (audit Phase 2.3). Each transaction's date is parsed exactly once here.
+  // (audit Phase 2.3). Dates are local days, so they compare as strings.
   const aggregates = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const dayKey = now.toDateString();
+    const dayKey = localDay();
+    const monthKey = dayKey.slice(0, 7);
 
     let totalIncome = 0, totalExpense = 0;
     let monthlyIncome = 0, monthlyExpense = 0;
@@ -563,11 +608,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const isIncome = t.type === TransactionType.INCOME;
       if (isIncome) totalIncome += t.amount; else totalExpense += t.amount;
 
-      const d = new Date(t.date);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      if (t.date.slice(0, 7) === monthKey) {
         if (isIncome) monthlyIncome += t.amount; else monthlyExpense += t.amount;
       }
-      if (d.toDateString() === dayKey) {
+      if (t.date === dayKey) {
         if (isIncome) todayIncome += t.amount; else todayExpense += t.amount;
       }
     }
@@ -596,11 +640,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Check Daily Limit (audit Phase 2.8: reuse the aggregate when it is for
     // today; recompute only across a midnight boundary).
     if (transaction.type === TransactionType.EXPENSE && dailyLimit > 0) {
-        const today = new Date().toDateString();
+        const today = localDay();
         const todaySpend = aggregates.dayKey === today
             ? aggregates.todayExpense
             : transactions
-                .filter(t => t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === today)
+                .filter(t => t.type === TransactionType.EXPENSE && t.date === today)
                 .reduce((acc, t) => acc + t.amount, 0);
 
         if (todaySpend + transaction.amount > dailyLimit) {
@@ -609,7 +653,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     }
 
-    const newTxs = [transaction, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const newTxs = [transaction, ...transactions].sort(byNewest);
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
@@ -634,6 +678,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       const updatedTx = { ...transaction, ...updates, id: transaction.id };
       const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
+      if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
       setTransactions(newTxs);
       persistTransactions(newTxs);
 
@@ -775,7 +820,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     }
 
-    const combined = [...uniqueNew, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const combined = [...uniqueNew, ...transactions].sort(byNewest);
 
     setTransactions(combined);
     persistTransactions(combined);

@@ -7,6 +7,7 @@
  */
 
 import { Transaction, TransactionType } from '../types';
+import { parseDay } from '../utils/dates';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -118,7 +119,7 @@ export const detectRecurringCharges = (
     if (key.length < 3) continue; // too generic to group on
     let bucket = groups.get(key);
     if (!bucket) { bucket = []; groups.set(key, bucket); }
-    bucket.push({ tx: t, ts: new Date(t.date).getTime() });
+    bucket.push({ tx: t, ts: parseDay(t.date).getTime() });
   }
 
   const results: RecurringCharge[] = [];
@@ -229,7 +230,7 @@ export const analyzeIncome = (
 
   for (const t of transactions) {
     if (t.type !== TransactionType.INCOME) continue;
-    const d = new Date(t.date);
+    const d = parseDay(t.date);
     const k = monthKey(d);
     if (k >= windowStartKey && k <= nowKey) {
       monthly[k - windowStartKey] += t.amount;
@@ -356,7 +357,7 @@ export const categoryMovers = (
 
   for (const t of transactions) {
     if (t.type !== type) continue;
-    const k = monthKey(new Date(t.date));
+    const k = monthKey(parseDay(t.date));
     if (k === curKey) cur.set(t.category, (cur.get(t.category) || 0) + t.amount);
     else if (k === prevKey) prev.set(t.category, (prev.get(t.category) || 0) + t.amount);
   }
@@ -420,7 +421,7 @@ export const monthDailyStats = (
   }
 
   for (const t of expensesInMonth) {
-    const d = new Date(t.date);
+    const d = parseDay(t.date);
     const day = d.getDate();
     if (day >= 1 && day <= daysInMonth) {
       daily[day - 1] += t.amount;

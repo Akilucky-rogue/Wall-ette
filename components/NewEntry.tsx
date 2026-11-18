@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types';
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
+import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
 
@@ -49,10 +50,6 @@ const CAT_ICON = (cat: string): string => {
   return 'category';
 };
 
-// Local YYYY-MM-DD without the UTC shift toISOString causes on IST.
-const toLocalInput = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
@@ -73,11 +70,11 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   // Recent merchants for the active type (last 90 days, by frequency)
   const suggestions = useMemo(() => {
-    const cutoff = Date.now() - 90 * 86400000;
+    const since = addDays(localDay(), -90);
     const freq = new Map<string, number>();
     for (const t of transactions) {
       if (t.type !== type) continue;
-      if (Date.parse(t.date) < cutoff) continue;
+      if (t.date < since) continue;
       const name = prettyMerchant(t.merchant || '');
       if (!name || name === 'Unknown') continue;
       freq.set(name, (freq.get(name) || 0) + 1);
@@ -87,10 +84,10 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   // Today's expense total (base) for the daily-limit preview
   const todaySpend = useMemo(() => {
-    const key = new Date().toDateString();
+    const today = localDay();
     let sum = 0;
     for (const t of transactions) {
-      if (t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === key) sum += t.amount;
+      if (t.type === TransactionType.EXPENSE && t.date === today) sum += t.amount;
     }
     return sum;
   }, [transactions]);
@@ -140,7 +137,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       amount: amountInBase,
       type,
       category: category || 'Uncategorized',
-      date: selectedDate.toISOString(),
+      date: localDay(selectedDate),
+      createdAt: new Date().toISOString(),
       note,
       merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
     });
@@ -332,9 +330,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <div className="border-t border-black/5 pt-4">
                 <input
                   type="date"
-                  value={toLocalInput(selectedDate)}
-                  max={toLocalInput(new Date())}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
+                  value={localDay(selectedDate)}
+                  max={localDay()}
+                  onChange={(e) => { if (isDay(e.target.value)) setSelectedDate(parseDay(e.target.value)); }}
                   className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal font-serif"
                   title="Custom date"
                   aria-label="Custom date"

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { localDay, parseDay } from '../utils/dates';
 import { analyzeFinancialHealth } from '../services/insightsService';
 import { detectRecurringCharges, analyzeIncome } from '../services/analyticsService';
 import { exportFile } from '../utils/exportFile';
@@ -49,7 +50,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     const cats = new Map<string, number>();
 
     for (const t of transactions) {
-      if (periodStart && new Date(t.date) < periodStart) continue;
+      if (periodStart && parseDay(t.date) < periodStart) continue;
       txs.push(t);
       if (t.type === TransactionType.INCOME) income += t.amount;
       else {
@@ -78,7 +79,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     return openingBalance + net;
   }, [transactions, openingBalance]);
 
-  const stamp = new Date().toISOString().split('T')[0];
+  const stamp = localDay();
   const periodSlug = period.toLowerCase();
   const fmt = (n: number) => formatAmount(n).split('.')[0];
 
@@ -90,7 +91,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     try {
       const headers = ['Date', 'Merchant', 'Category', 'Type', 'Amount', 'Note'];
       const rows = periodTxs.map(t => [
-        new Date(t.date).toLocaleDateString('en-GB'),
+        parseDay(t.date).toLocaleDateString('en-GB'),
         csvCell(t.merchant || ''),
         csvCell(t.category),
         t.type,
@@ -131,7 +132,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       let firstDay: string | null = null, lastDay: string | null = null;
 
       for (const t of periodTxs) {
-        const d = new Date(t.date);
+        const d = parseDay(t.date);
         const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const m = byMonth.get(mk) || { inc: 0, out: 0 };
         const dayKey = t.date.slice(0, 10);
@@ -208,7 +209,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       const ml = (k: string) =>
         new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
       const dl = (s: string) =>
-        new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        parseDay(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
       const recurringAnnual = recurring.reduce((s, r) => s + r.monthlyCost * 12, 0);
       const incomeAnalysis = analyzeIncome(transactions); // 12-month view
       const BADGE: Record<string, string> = { FIXED: 'fixed', RECURRING: 'recurring', OCCASIONAL: 'occasional', ONE_OFF: 'one-off' };

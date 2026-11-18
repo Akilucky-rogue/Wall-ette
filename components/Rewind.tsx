@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { exportImage } from '../utils/exportFile';
 import { log } from '../utils/log';
@@ -46,7 +47,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
     const spendDates: string[] = [];
 
     for (const t of transactions) {
-      const d = new Date(t.date);
+      const d = parseDay(t.date);
       const y = d.getFullYear();
       let ya = years.get(y);
       if (!ya) {
@@ -76,7 +77,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
     // the record is dense. (Sparse early years would fake huge streaks.)
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - 24);
-    const cutoffKey = cutoff.toISOString().slice(0, 10);
+    const cutoffKey = localDay(cutoff);
     const uniq = [...new Set(spendDates)].filter(d => d >= cutoffKey).sort();
     let streak = 0, streakFrom = '', streakTo = '';
     for (let i = 1; i < uniq.length; i++) {
@@ -91,7 +92,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
     const now = new Date();
     const md = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const onThisDay = transactions
-      .filter(t => t.date.slice(5, 10) === md && new Date(t.date).getFullYear() < now.getFullYear())
+      .filter(t => t.date.slice(5, 10) === md && parseDay(t.date).getFullYear() < now.getFullYear())
       .sort((a, b) => (a.date < b.date ? 1 : -1))
       .slice(0, 4);
 
@@ -123,7 +124,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
     for (let i = 1; i < 12; i++) if (ya.monthsOut[i] > ya.monthsOut[busiestMonth]) busiestMonth = i;
     const isCurrent = activeWrapYear === new Date().getFullYear();
     const daysInYear = isCurrent
-      ? Math.ceil((Date.now() - Date.parse(`${activeWrapYear}-01-01`)) / 86400000)
+      ? Math.ceil((Date.now() - parseDay(`${activeWrapYear}-01-01`).getTime()) / 86400000)
       : 365;
     return {
       year: activeWrapYear,
@@ -258,7 +259,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         <div className="px-6 pt-2 space-y-4 lg:columns-2 lg:gap-x-5">
           {/* Lifetime hero */}
           <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] break-inside-avoid">
-            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Your money since {new Date(life.first).getFullYear()}</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Your money since {parseDay(life.first).getFullYear()}</p>
             <p className="text-premium-charcoal font-serif text-[26px] font-bold leading-tight">
               {life.yearsCount} {life.yearsCount === 1 ? 'year' : 'years'} · {life.txCount.toLocaleString('en-IN')} entries
             </p>
@@ -311,7 +312,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
                   </div>
                   <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0 break-words">
-                    Biggest spend ever: <b>{fmt(life.maxExp.amount)}</b> — {prettyMerchant(life.maxExp.merchant || life.maxExp.category)}, {new Date(life.maxExp.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                    Biggest spend ever: <b>{fmt(life.maxExp.amount)}</b> — {prettyMerchant(life.maxExp.merchant || life.maxExp.category)}, {parseDay(life.maxExp.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
               )}
@@ -321,7 +322,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[14px]">emoji_events</span>
                   </div>
                   <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0 break-words">
-                    Biggest credit ever: <b>{fmt(life.maxInc.amount)}</b> — {prettyMerchant(life.maxInc.merchant || life.maxInc.category)}, {new Date(life.maxInc.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                    Biggest credit ever: <b>{fmt(life.maxInc.amount)}</b> — {prettyMerchant(life.maxInc.merchant || life.maxInc.category)}, {parseDay(life.maxInc.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
               )}
@@ -331,7 +332,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[14px]">self_improvement</span>
                   </div>
                   <p className="text-[12px] text-premium-charcoal leading-relaxed pt-1 min-w-0">
-                    Longest no-spend streak: <b>{life.streak.days} days</b> ({new Date(life.streak.from).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} · last 2 yrs)
+                    Longest no-spend streak: <b>{life.streak.days} days</b> ({parseDay(life.streak.from).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} · last 2 yrs)
                   </p>
                 </div>
               )}
@@ -345,7 +346,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
               <div className="space-y-2.5">
                 {life.onThisDay.map(t => (
                   <div key={t.id} className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-bold text-muted-taupe w-9 shrink-0">{new Date(t.date).getFullYear()}</span>
+                    <span className="text-[10px] font-bold text-muted-taupe w-9 shrink-0">{parseDay(t.date).getFullYear()}</span>
                     <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>{prettyMerchant(t.merchant || t.category)}</span>
                     <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
                       {t.type === TransactionType.EXPENSE ? '-' : '+'}{formatAmountCompact(t.amount)}

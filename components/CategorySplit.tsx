@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, MandalaDots, RangoliCorner, Paisley } from './SplashScreen';
 
@@ -45,7 +46,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
     if (transactions.length === 0) return new Date();
     let maxTs = -Infinity;
     for (const t of transactions) {
-      const ts = new Date(t.date).getTime();
+      const ts = parseDay(t.date).getTime();
       if (ts > maxTs) maxTs = ts;
     }
     return new Date(maxTs);
@@ -59,7 +60,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
   const filtered = useMemo(() => {
     return transactions.filter(t => {
       if (t.type !== TransactionType.EXPENSE) return false;
-      const txDate = new Date(t.date);
+      const txDate = parseDay(t.date);
       if (timeRange === 'WEEK') {
         const startOfWeek = new Date(selectedDate);
         startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());

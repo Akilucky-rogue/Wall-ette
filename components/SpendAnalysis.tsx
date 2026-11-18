@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
 import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace, prettyMerchant } from '../services/analyticsService';
@@ -31,7 +32,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     if (transactions.length === 0) return new Date();
     let maxTs = -Infinity;
     for (const t of transactions) {
-      const ts = new Date(t.date).getTime();
+      const ts = parseDay(t.date).getTime();
       if (ts > maxTs) maxTs = ts;
     }
     return new Date(maxTs);
@@ -62,7 +63,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     let expSum = 0, incSum = 0, prevExpSum = 0, prevIncSum = 0;
 
     for (const t of transactions) {
-      const d = new Date(t.date);
+      const d = parseDay(t.date);
       const m = d.getMonth();
       const y = d.getFullYear();
       const isExpense = t.type === TransactionType.EXPENSE;
@@ -169,7 +170,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     if (chartMode === 'DAILY') {
       const daily = new Array(daysInMonth).fill(0);
       data.forEach(t => {
-        const d = new Date(t.date).getDate() - 1;
+        const d = parseDay(t.date).getDate() - 1;
         if (d >= 0 && d < daysInMonth) daily[d] += t.amount;
       });
       return daily.map((val, i) => ({ label: (i+1).toString(), val }));
@@ -177,7 +178,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       // Weekly
       const weekly = [0, 0, 0, 0, 0];
       data.forEach(t => {
-        const d = new Date(t.date).getDate();
+        const d = parseDay(t.date).getDate();
         const weekIdx = Math.min(Math.floor((d - 1) / 7), 4);
         weekly[weekIdx] += t.amount;
       });
@@ -324,7 +325,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     setLoadingInsights(true);
     try {
       const monthTransactions = transactions.filter(t => {
-        const txDate = new Date(t.date);
+        const txDate = parseDay(t.date);
         return txDate.getMonth() === selectedDate.getMonth() &&
                txDate.getFullYear() === selectedDate.getFullYear();
       }).map(t => ({
@@ -464,7 +465,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         const isExp = analysisTab === 'EXPENSE';
         const todayTxs = transactions
           .filter(t => {
-            const d = new Date(t.date);
+            const d = parseDay(t.date);
             return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() &&
               d.getDate() === now.getDate() &&
               t.type === (isExp ? TransactionType.EXPENSE : TransactionType.INCOME);
@@ -865,7 +866,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
                 const y = selectedDate.getFullYear(), mo = selectedDate.getMonth();
                 const dayTxs = transactions
                   .filter(t => {
-                    const d = new Date(t.date);
+                    const d = parseDay(t.date);
                     return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === heatDay
                       && t.type === (isExp ? TransactionType.EXPENSE : TransactionType.INCOME);
                   })

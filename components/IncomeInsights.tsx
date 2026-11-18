@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, LotusFlower, RangoliCorner, MandalaDots } from './SplashScreen';
 
@@ -73,7 +74,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const monthAgg = useMemo(() => {
     const map = new Map<string, MonthAgg>();
     for (const t of transactions) {
-      const d = new Date(t.date);
+      const d = parseDay(t.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       let m = map.get(key);
       if (!m) {
@@ -146,7 +147,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.maxExp) {
       lines.push({
         icon: 'local_fire_department', tone: 'mid',
-        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {new Date(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
+        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {parseDay(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
       });
     }
     if (prev && prev.out > 0 && m.out > 0) {

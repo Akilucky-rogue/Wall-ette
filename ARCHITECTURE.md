@@ -144,10 +144,10 @@ Firestore
 │               ├── amount: number
 │               ├── type: INCOME|EXPENSE
 │               ├── category: string
-│               ├── date: string (ISO)
+│               ├── date: string (local day, YYYY-MM-DD; utils/dates.ts)
 │               ├── note: string
 │               ├── merchant: string
-│               └── createdAt: timestamp
+│               └── createdAt: string (ISO timestamp; New Entry only)
 ```
 
 ## Component Hierarchy

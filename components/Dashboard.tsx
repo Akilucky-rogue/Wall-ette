@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { byNewest, parseDay } from '../utils/dates';
 import { huntSavings } from '../services/analyticsService';
 import CurrencySelector from './CurrencySelector';
 import { WallEEyes, WallEMascot, FloatingLeaf, LotusFlower, Sprout, RangoliCorner, Diya } from './SplashScreen';
@@ -30,7 +31,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const hunt = useMemo(() => huntSavings(transactions), [transactions]);
   // Sorted desc — the last element is the earliest transaction.
   const sinceYear = transactions.length > 0
-    ? new Date(transactions[transactions.length - 1].date).getFullYear()
+    ? parseDay(transactions[transactions.length - 1].date).getFullYear()
     : null;
   const [periodMode, setPeriodMode] = useState<'MONTH' | 'ALL'>('MONTH'); // 'MONTH' or 'ALL'
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -59,7 +60,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     let beforeWindow = 0;
 
     for (const t of transactions) {
-      const d = new Date(t.date);
+      const d = parseDay(t.date);
       const k = d.getFullYear() * 12 + d.getMonth();
       const isIncome = t.type === TransactionType.INCOME;
       if (k < firstKey) beforeWindow += isIncome ? t.amount : -t.amount;
@@ -121,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       let monthlyExpenses = 0;
 
       for (const t of transactions) {
-        const txDate = new Date(t.date);
+        const txDate = parseDay(t.date);
         const isIncome = t.type === TransactionType.INCOME;
         if (txDate < monthStart) {
           prevNet += isIncome ? t.amount : -t.amount;
@@ -169,7 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     for (const t of transactions) {
       if (!all) {
-        const txDate = new Date(t.date);
+        const txDate = parseDay(t.date);
         if (txDate.getMonth() !== month || txDate.getFullYear() !== year) continue;
       }
       count++;
@@ -201,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   // Recent transactions (latest 5)
   const recentTransactions = useMemo(() => {
     return [...transactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort(byNewest)
       .slice(0, 5);
   }, [transactions]);
 
@@ -668,7 +669,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-premium-charcoal truncate">{tx.merchant || tx.category}</p>
-                    <p className="text-[10px] text-muted-taupe">{tx.category} · {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                    <p className="text-[10px] text-muted-taupe">{tx.category} · {parseDay(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
                   </div>
                   <span className={`text-[13px] font-bold flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'text-sage' : 'text-rose'}`}>
                     {tx.type === TransactionType.INCOME ? '+' : '-'}{formatAmount(tx.amount).split('.')[0]}

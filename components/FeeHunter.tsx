@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { huntSavings, normalizeMerchant, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, RangoliCorner, MandalaDots } from './SplashScreen';
 
@@ -53,7 +54,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
   };
   const fmt = (n: number) => formatAmount(n).split('.')[0];
   const dl = (s: string) =>
-    new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+    parseDay(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
 
   const hasFindings = hunt.totalFound > 0.5;
 

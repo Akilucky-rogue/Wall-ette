@@ -8,9 +8,12 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   category: string;
-  date: string; // ISO string
+  /** Local calendar day, 'YYYY-MM-DD'. Build and read it with utils/dates.ts. */
+  date: string;
   note?: string;
   merchant?: string;
+  /** When the entry was added in New Entry (ISO timestamp). Imported rows have none. */
+  createdAt?: string;
 }
 
 export interface IncomeSource {

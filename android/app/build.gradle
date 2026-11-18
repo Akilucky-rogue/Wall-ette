@@ -13,10 +13,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.wallet.walle"
+    namespace = "com.wallette.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.wallet.walle"
+        applicationId "com.wallette.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 9

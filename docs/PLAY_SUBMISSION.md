@@ -15,7 +15,7 @@ everything else is already prepared in the repo.
 
 ## 1. Signing: a new upload key
 
-The keystore in `private/` was exposed in an old pull request (audit C2), so Google Play gets a new upload key. The website APK keeps the old key (`android/key.properties`), so phones that installed it still take updates.
+The keystore in `private/` was exposed in an old pull request (audit C2), so Google Play gets a new upload key. The website APK still signs with the old key (`android/key.properties`). Since the app ID moved to `com.wallette.app`, old installs can't update in place anyway, so that key can be retired: sign website APKs with a new key, or link to Google Play once the app is live.
 
 - [x] **[YOU]** Create the upload key outside the repo folder. keytool asks for a password: make it long, and save it in your password manager.
   ```powershell
@@ -65,7 +65,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 
 ## 6. Store listing — ready to paste
 
-**App name:** Wall-ette · **Package name:** `com.wallet.walle` (permanent; it must match the AAB)
+**App name:** Wall-ette · **Package name:** `com.wallette.app` (permanent; it must match the AAB)
 **Category:** Finance · **Tags:** personal finance, expense tracker
 **Contact email:** akshatbvora@gmail.com (shown publicly on Google Play) · **Website:** https://wall-ette.com
 
@@ -107,7 +107,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 
 A new personal account can't release to Production until a closed test has had **at least 12 testers opted in for 14 days in a row**.
 
-- [ ] **Internal testing:** upload the AAB and install it from the test link on your phone. Uninstall the website APK first: apps from Play carry Google's signature, so the two can't update each other. Your data comes back after you sign in.
+- [ ] **Internal testing:** upload the AAB and install it from the test link on your phone. It installs next to the old sideloaded Wall-ette (`com.wallet.walle`), so sign in on it, then uninstall the old one; your data comes back from the cloud. A local build of `com.wallette.app` has a different signature, so uninstall that first.
 - [ ] **Closed testing:** add the testers by email list or Google Group and send them the opt-in link. They must stay opted in for 14 days in a row (leaving restarts their count). Keep notes of their feedback.
 - [ ] Dashboard → **Apply for production**. It asks about the closed test (recruiting, engagement, feedback), the app (audience, value, expected installs) and readiness (what you changed after testing). Review usually takes up to 7 days.
 - [ ] **Production:** create the release and submit it for review (typically 1–7 days).

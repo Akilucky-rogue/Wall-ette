@@ -1,4 +1,4 @@
-package com.wallet.walle;
+package com.wallette.app;
 
 import com.getcapacitor.BridgeActivity;
 

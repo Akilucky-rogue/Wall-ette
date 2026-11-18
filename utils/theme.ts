@@ -3,7 +3,7 @@
 // Tailwind's palette (tailwind.config.cjs) reads the `--c-*` channel vars so
 // utility classes (bg-white, text-sage, …) follow the active theme, and
 // inline SVG/chart colors read the `--*` hex aliases directly.
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarsStyle, SystemBarType } from '@capacitor/core';
 import { log } from './log';
 
 export type ThemeId = 'sage' | 'midnight' | 'slate' | 'terra' | 'techie' | 'custom';
@@ -184,16 +184,44 @@ function applyPalette(palette: Palette, dark: boolean) {
   }
   meta.content = palette['bg'];
 
-  // Android status bar (native) — best-effort, never blocks the UI.
+  // Native system bars — best-effort, never blocks the UI. SystemBars sets
+  // the icon colour (Dark = light icons, for a dark bar) and keeps it on
+  // rotation. A bar is only dark if the theme is dark AND the bar shows the
+  // theme colour; the cream bars from styles.xml keep dark icons.
   if (Capacitor.isNativePlatform()) {
+    const behind = barBackgrounds();
+    const darkStatusBar = dark && behind.status !== 'cream';
+    const darkNavBar = dark && behind.navigation === 'page';
+    const icons = (darkBar: boolean) => (darkBar ? SystemBarsStyle.Dark : SystemBarsStyle.Light);
+    SystemBars.setStyle({ bar: SystemBarType.StatusBar, style: icons(darkStatusBar) }).catch(() => {});
+    SystemBars.setStyle({ bar: SystemBarType.NavigationBar, style: icons(darkNavBar) }).catch(() => {});
+    // The StatusBar plugin re-applies its own style after every rotation, so
+    // it must hold the same one or the status icons flip after a turn.
     import('@capacitor/status-bar')
       .then(({ StatusBar, Style }) => {
-        StatusBar.setBackgroundColor({ color: palette['bg'] }).catch(() => {});
-        // Style.Dark = light icons for dark backgrounds, and vice versa.
-        StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
+        StatusBar.setStyle({ style: darkStatusBar ? Style.Dark : Style.Light }).catch(() => {});
+        if (behind.status === 'tinted') StatusBar.setBackgroundColor({ color: palette['bg'] }).catch(() => {});
       })
       .catch(() => log.warn('StatusBar plugin unavailable'));
   }
+}
+
+/**
+ * What shows behind each system bar (audit H6):
+ * - 'page': the page, painted by index.html in the theme colour. iOS, and
+ *   Android 15+ (always edge to edge) when the WebView is 140 or newer, so
+ *   Capacitor hands the insets to CSS.
+ * - 'tinted': the status bar colour set here, which only Android 14 and
+ *   older apply.
+ * - 'cream': the fixed #FAF9F6 from styles.xml: the navigation bar on
+ *   Android 14 and older, and both bars when Capacitor pads an older WebView.
+ */
+function barBackgrounds(): { status: 'page' | 'tinted' | 'cream'; navigation: 'page' | 'cream' } {
+  if (Capacitor.getPlatform() !== 'android') return { status: 'page', navigation: 'page' };
+  const android = Number(/Android (\d+)/.exec(navigator.userAgent)?.[1] ?? 0);
+  const webView = Number(/Chrome\/(\d+)/.exec(navigator.userAgent)?.[1] ?? 0);
+  if (android < 15) return { status: 'tinted', navigation: 'cream' };
+  return webView >= 140 ? { status: 'page', navigation: 'page' } : { status: 'cream', navigation: 'cream' };
 }
 
 let systemListener: ((e: MediaQueryListEvent) => void) | null = null;

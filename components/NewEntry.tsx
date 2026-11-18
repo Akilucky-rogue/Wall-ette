@@ -422,7 +422,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       </div>
 
       {toast && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
+        <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
           <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
           <span className="text-[13px] font-medium font-serif">{toast}</span>
         </div>

@@ -33,7 +33,7 @@ const AndroidInstallBanner: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-32px)] max-w-[398px] animate-slide-up">
+    <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-32px)] max-w-[398px] animate-slide-up">
       <div className="bg-premium-charcoal rounded-3xl shadow-2xl p-4 flex items-center gap-3">
         {/* Mini Wall-ette mark */}
         <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shrink-0">

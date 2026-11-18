@@ -474,7 +474,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* ── 2FA modal ── */}
       {mfaModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !mfaBusy && setMfaModal(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Two-Factor Auth</h3>
               <button onClick={() => setMfaModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={mfaBusy}>
@@ -532,7 +532,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* ── Change password modal ── */}
       {pwModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change Password</h3>
               <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
@@ -611,7 +611,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* ── Delete account modal ── */}
       {delOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !delBusy && setDelOpen(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete Account</h3>
             <p className="text-[12px] text-muted-taupe leading-relaxed mb-4">
               This permanently erases your account and every transaction from the cloud. There is no undo.

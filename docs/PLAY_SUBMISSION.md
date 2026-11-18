@@ -9,20 +9,26 @@ everything else is already prepared in the repo.
 
 - [ ] **[YOU]** Google Play Console developer account — https://play.google.com/console — $25 one-time, identity verification takes 1–2 days.
 
-## 1. Signing (prepared)
+## 1. Signing: a new upload key
 
-- Gradle now signs release builds automatically when `android/key.properties` exists.
-- [ ] **[YOU]** Find your key alias: `keytool -list -keystore private/my-release-key.keystore` (from project root, prompts for store password).
-- [ ] **[YOU]** `Copy-Item android\key.properties.example android\key.properties` and fill in the password(s) + alias. The file is gitignored.
-- When Play asks about **Play App Signing** during app creation: accept it (Google holds the final signing key; your keystore becomes the *upload key*). Recommended — it makes a lost keystore recoverable.
+The keystore in `private/` was exposed in an old pull request (audit C2), so Google Play gets a new upload key. The website APK keeps the old key (`android/key.properties`), so phones that installed it still take updates.
 
-## 2. Build the AAB (prepared)
+- [ ] **[YOU]** Create the upload key outside the repo folder. keytool asks for a password: make it long, and save it in your password manager.
+  ```powershell
+  New-Item -ItemType Directory "$env:USERPROFILE\wallette-keys" -Force
+  keytool -genkeypair -v -keystore "$env:USERPROFILE\wallette-keys\wallette-upload.jks" -alias upload -keyalg RSA -keysize 2048 -validity 10000
+  ```
+- [ ] **[YOU]** `Copy-Item android\upload.properties.example android\upload.properties`, then set `storeFile` to the keystore's full path and both passwords (the same password, for keytool's default keystore type). The file is gitignored.
+- [ ] **[YOU]** Back up `wallette-upload.jks` somewhere other than this PC.
+- When Play asks about **Play App Signing** during app creation: accept it. Google holds the app signing key and your keystore is only the *upload key*, so Play support can reset it if it's ever lost.
+
+## 2. Build the AAB
 
 ```powershell
 npm run android:bundle
 ```
-Output: `android\app\build\outputs\bundle\release\app-release.aab` (signed, versionCode 2 / versionName 1.1.0).
-Each future upload must bump `versionCode` in `android/app/build.gradle`.
+Output: `android\app\build\outputs\bundle\release\app-release.aab`, signed with the upload key. The build stops with a message if `android/upload.properties` is missing.
+Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`.
 
 ## 3. Privacy policy (prepared)
 
@@ -87,6 +93,6 @@ Each future upload must bump `versionCode` in `android/app/build.gradle`.
 
 ## Done already (for the reviewer's benefit)
 
-- Target SDK 35 ✓ (meets current Play policy)
+- Target SDK 36 ✓ (Play's requirement since 31 Aug 2026)
 - No simulated security features (demo MFA/biometric removed in v1.1.0)
 - Privacy policy live and accurate ✓ · No ads SDK ✓ · Data safety answers match actual behavior ✓

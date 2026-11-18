@@ -589,7 +589,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-xs font-medium px-5 py-3 rounded-full shadow-xl z-[100] animate-slide-up max-w-[90%] text-center">
+        <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-xs font-medium px-5 py-3 rounded-full shadow-xl z-[100] animate-slide-up max-w-[90%] text-center">
           {toast}
         </div>
       )}

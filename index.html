@@ -12,12 +12,46 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@200,0..1&display=block" rel="stylesheet" />
     <style>
+        /* System bar insets (audit H6). Android 15+ draws the app edge to
+           edge; Capacitor's SystemBars sets --safe-area-inset-* there, iOS
+           gives env(), and both are 0 where nothing overlaps. Use --sat and
+           --sab for anything fixed to the top or bottom of the screen. Side
+           insets (the 3-button bar in landscape) land in the margins around
+           every screen's 430px column, so nothing pads for them. */
+        :root {
+            --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+            --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        }
         body {
-            background-color: #FAF9F6;
+            /* Shows behind the status and navigation bars, so it follows the
+               theme (theme.ts sets --c-bg). */
+            background-color: rgb(var(--c-bg, 250 249 246));
             min-height: 100vh;
-            /* iOS notch / home-indicator safe areas (env() is 0 on Android & web) */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
+            padding-top: var(--sat);
+            padding-bottom: var(--sab);
+        }
+        /* Strips of background under the status bar and the navigation bar,
+           so content scrolling past never shows behind the clock, icons or
+           buttons (styles.xml turns off Android's own nav bar scrim). Above
+           page headers (z-30/40) and the bottom bar (z-40); backdrops (z-50
+           and up) dim them. The bottom one is 0 high while the keyboard is up. */
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            left: 0;
+            right: 0;
+            background-color: rgb(var(--c-bg, 250 249 246));
+            z-index: 45;
+            pointer-events: none;
+        }
+        body::before {
+            top: 0;
+            height: var(--sat);
+        }
+        body::after {
+            bottom: 0;
+            height: var(--sab);
         }
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;

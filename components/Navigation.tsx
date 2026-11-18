@@ -27,7 +27,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
   };
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-6 py-6 z-40 bg-gradient-to-t from-zen-bg via-zen-bg to-transparent pointer-events-none">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] z-40 bg-gradient-to-t from-zen-bg via-zen-bg to-transparent pointer-events-none">
       <div className="relative bg-white/95 backdrop-blur-xl border border-black/[0.05] rounded-[32px] shadow-soft px-8 py-3 flex justify-between items-center pointer-events-auto">
         {/* Mini eco decorations */}
         <div className="absolute -top-3 left-8 opacity-60">

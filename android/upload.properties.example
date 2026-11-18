@@ -1,0 +1,14 @@
+# Copy this file to android/upload.properties and fill in the real values.
+# upload.properties is gitignored — NEVER commit it, or the keystore.
+#
+# This is the upload key for Google Play (audit C2). npm run android:bundle
+# signs the app bundle with it. Keep the keystore outside the repo folder and
+# back it up, with its password, somewhere safe (docs/PLAY_SUBMISSION.md).
+#
+# A PKCS12 keystore (keytool's default) has one password for the store and
+# the key, so storePassword and keyPassword are the same.
+
+storeFile=C:/Users/YOU/wallette-keys/wallette-upload.jks
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyAlias=upload
+keyPassword=YOUR_KEYSTORE_PASSWORD

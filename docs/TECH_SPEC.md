@@ -54,8 +54,10 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   and Custom — a user-picked accent + light/dark base, derived at runtime with color-mix math.
 - **Auto mode** follows `prefers-color-scheme` (light → Sage, dark → Midnight) with a live
   media-query listener. Choice persists per device in `localStorage`.
-- Native side: `@capacitor/status-bar` recolors the Android status bar per theme; a
-  `theme-color` meta keeps browser chrome in sync on web.
+- Native side: on Android 15+ the page draws behind both system bars, so they show the
+  theme color (see §6, Windowing); Capacitor's `SystemBars` sets their icon colors per
+  theme. On Android 14 and older `@capacitor/status-bar` tints the status bar and the
+  navigation bar stays cream. A `theme-color` meta keeps browser chrome in sync on web.
 - Deliberately theme-independent: mascot, splash art, exported statement HTML, and the
   shareable Wrapped card (brand-stable artifacts).
 
@@ -134,11 +136,11 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 | Item | Value |
 |---|---|
 | Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 |
-| SDK levels | minSdk 24 · target/compileSdk 35 |
+| SDK levels | minSdk 24 · target/compileSdk 36 (Play's minimum from 31 Aug 2026) |
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
-| Signing | PKCS12 keystore at `private/my-release-key.keystore`, wired via gitignored `android/key.properties` |
-| Windowing | `windowOptOutEdgeToEdgeEnforcement` + fixed status/nav bar colors in `styles.xml`; status bar recolored at runtime per theme |
-| Versioning | versionCode 7 · versionName 1.5.0 |
+| Signing | Website APK: PKCS12 keystore at `private/my-release-key.keystore` via gitignored `android/key.properties`. Google Play: a new upload key via gitignored `android/upload.properties`, used by `npm run android:bundle` (`-Pplay`); see `docs/PLAY_SUBMISSION.md` |
+| Windowing | Edge to edge on Android 15+ (target 36 has no opt-out). Capacitor's `SystemBars` passes the bar insets to CSS; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off (`enforceNavigationBarContrast`); the cream colors in `styles.xml` apply on Android 14 and older |
+| Versioning | versionCode 9 · versionName 1.5.2 |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger
 GitHub Actions workflow (`ios-build.yml`) produces an unsigned IPA on free macOS runners for
@@ -190,7 +192,7 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 ├── services/              # firebase, parsers (idfcParser, IDFCBankParser), analytics, insights, mfa
 ├── utils/                 # theme engine, biometric, exportFile, log, currencyUtils
 ├── public/                # favicon, terms.html, privacy.html (deployed statics)
-├── android/               # Capacitor Android project (signing via key.properties)
+├── android/               # Capacitor Android project (signing via key.properties / upload.properties)
 ├── ios/                   # Capacitor iOS project (parked)
 ├── .github/workflows/     # ios-build.yml (manual, unsigned IPA)
 ├── scripts/               # Dev tools: parser debugging, icon generation
@@ -205,9 +207,10 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 
 - **TOTP MFA** — built end-to-end, parked as "Coming Soon" (needs Firebase console MFA toggle before enabling the UI).
 - **iOS** — pipeline exists, product decision parked.
-- **Android navigation bar** — stays cream on dark themes (status bar follows the theme; the
-  bottom bar needs an extra plugin — known cosmetic niggle).
+- **Android navigation bar** — follows the theme on Android 15+; on Android 14 and older it
+  stays cream on dark themes (recoloring it there needs an extra plugin — cosmetic niggle).
 - **Bank coverage** — first-class parser for IDFC FIRST (PDF + Excel); other banks fall back
   to the generic balance-delta parser.
-- **Play Store** — submission checklist in `docs/PLAY_SUBMISSION.md`; plan is Play App Signing
-  with a fresh upload key (the historical keystore exposure makes rotation prudent).
+- **Play Store** — submission checklist in `docs/PLAY_SUBMISSION.md`: Play App Signing with
+  a new upload key (the old keystore was exposed, audit C2); the build is wired for it, the
+  key itself is created by hand.

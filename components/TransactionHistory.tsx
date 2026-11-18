@@ -410,8 +410,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {/* Filter Modal/Drawer */}
       {showFilters && (
         <>
-            <div className="fixed inset-0 bg-premium-charcoal/30 z-40 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="fixed inset-0 bg-premium-charcoal/30 z-50 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 pb-4 border-b border-black/5">
                     <div className="flex items-center gap-3">
@@ -730,7 +730,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Delete Confirmation Modal */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-premium-charcoal/20 backdrop-blur-sm" onClick={() => setDeleteId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-premium-charcoal/20 backdrop-blur-sm" onClick={() => setDeleteId(null)}>
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[320px] shadow-2xl border border-white/50 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col items-center text-center">
                     <div className="w-12 h-12 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4">
@@ -761,7 +761,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       
       {/* Clear All Confirmation Modal */}
       {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose/10 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-rose/10 backdrop-blur-md">
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[320px] shadow-2xl border-2 border-rose/20 animate-slide-up">
                 <div className="flex flex-col items-center text-center">
                     <div className="w-14 h-14 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4 animate-pulse">
@@ -803,7 +803,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Edit Transaction Modal */}
       {editingTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-premium-charcoal/20 backdrop-blur-sm" onClick={closeEditModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-premium-charcoal/20 backdrop-blur-sm" onClick={closeEditModal}>
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[380px] shadow-2xl border border-white/50 animate-slide-up max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col">
                     <div className="flex items-center justify-between mb-6">
@@ -944,7 +944,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Success Toast */}
       {showToast && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
+          <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
               <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
               <span className="text-[13px] font-medium font-serif">{toastMsg}</span>
           </div>

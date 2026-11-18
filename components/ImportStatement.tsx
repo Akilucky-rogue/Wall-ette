@@ -874,7 +874,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 {editingTx && (
                     <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-[100]" onClick={cancelEdit}>
                         <div 
-                            className="bg-white w-full max-w-[430px] rounded-t-[32px] p-6 animate-slide-up"
+                            className="bg-white w-full max-w-[430px] rounded-t-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up"
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="flex justify-between items-center mb-6">
@@ -978,7 +978,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
 
-                <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-zen-bg via-zen-bg to-transparent z-50 max-w-[430px] mx-auto">
+                <div className="fixed bottom-0 left-0 right-0 px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] bg-gradient-to-t from-zen-bg via-zen-bg to-transparent z-50 max-w-[430px] mx-auto">
                     {/* Pagination controls */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-center gap-3 mb-4">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
+import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
 
@@ -240,7 +240,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setEditForm({
       merchant: transaction.merchant || '',
       amount: transaction.amount.toString(),
-      category: transaction.category,
+      category: transaction.category || 'Uncategorized',
       date: new Date(transaction.date).toISOString().split('T')[0],
       note: transaction.note || '',
       type: transaction.type
@@ -876,7 +876,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             title="Category"
                             aria-label="Category"
                           >
-                            {CATEGORIES.map(cat => (
+                            {categoryOptions(editForm.category).map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>

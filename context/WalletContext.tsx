@@ -1,10 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
-import { Transaction, TransactionType, CurrencyCode, IgnoreRule } from '../types';
+import { Transaction, TransactionType, CurrencyCode, IgnoreRule, canonicalCategory } from '../types';
 import { db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
 import { log } from '../utils/log';
+
+// Category names from earlier versions (audit M10) are mapped once, as data
+// loads, so every screen, the Edit dialog and budgets see one name each.
+const withListCategories = (list: Transaction[]): Transaction[] =>
+  list.map(t => {
+    if (!t.category) return t;
+    const category = canonicalCategory(t.category, t.type);
+    return category === t.category ? t : { ...t, category };
+  });
+
+// A budget saved under a list name wins; budgets kept only under old names
+// (Phone and Internet, say) are added together under the list name.
+const withListBudgetNames = (budgets: Record<string, number>): Record<string, number> => {
+  const out: Record<string, number> = {};
+  const fromOldNames: Record<string, number> = {};
+  for (const [category, amount] of Object.entries(budgets)) {
+    const name = canonicalCategory(category, TransactionType.EXPENSE);
+    if (name === category) out[name] = amount;
+    else fromOldNames[name] = (fromOldNames[name] ?? 0) + amount;
+  }
+  for (const [name, amount] of Object.entries(fromOldNames)) {
+    if (!(name in out)) out[name] = amount;
+  }
+  return out;
+};
 
 interface WalletContextType {
   transactions: Transaction[];
@@ -277,7 +302,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (!isBackendReady) {
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(localData);
+        if (localData) setTransactions(withListCategories(localData));
         return;
     }
 
@@ -294,8 +319,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             snapshot.forEach((d) => {
                 txData.push(d.data() as Transaction);
             });
-            setTransactions(txData);
-            scheduleMirror(txData);
+            const listed = withListCategories(txData);
+            setTransactions(listed);
+            scheduleMirror(listed);
         }, (error) => {
             log.warn('Firestore access failed, switching to local-only mode:', error.message);
             setIsBackendReady(false);
@@ -304,14 +330,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setTransactions(prev => {
                 if (prev.length > 0) return prev;
                 const localData = loadFromLocal('transactions');
-                return localData ?? prev;
+                return localData ? withListCategories(localData) : prev;
             });
         });
     } catch (e) {
         log.warn('Firestore setup error:', e);
         setIsBackendReady(false);
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(localData);
+        if (localData) setTransactions(withListCategories(localData));
     }
 
     return () => unsubscribe();
@@ -341,7 +367,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                if (localMfa !== null) setMfaEnabledState(localMfa);
 
                const localBudgets = loadFromLocal('budgets');
-               if (localBudgets) setBudgetsState(localBudgets);
+               if (localBudgets) setBudgetsState(withListBudgetNames(localBudgets));
 
                const localGoal = loadFromLocal('savingsGoal');
                if (localGoal !== null) setSavingsGoalState(localGoal || 0);
@@ -386,8 +412,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       saveToLocal('openingBalanceAsOf', data.openingBalanceAsOf || null);
                   }
                   if (data.budgets) {
-                      setBudgetsState(data.budgets);
-                      saveToLocal('budgets', data.budgets);
+                      const budgetsByName = withListBudgetNames(data.budgets);
+                      setBudgetsState(budgetsByName);
+                      saveToLocal('budgets', budgetsByName);
                   }
                   if (data.savingsGoal !== undefined) {
                       setSavingsGoalState(data.savingsGoal || 0);

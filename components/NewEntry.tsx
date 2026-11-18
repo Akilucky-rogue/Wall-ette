@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AppScreen, TransactionType, CATEGORIES } from '../types';
+import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types';
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { prettyMerchant } from '../services/analyticsService';
@@ -10,11 +10,11 @@ interface NewEntryProps {
 }
 
 // Category quick-picks per type; "More" reveals the full list.
-const EXPENSE_QUICK = ['Food Delivery', 'Groceries', 'Dining', 'Coffee', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Rent', 'Healthcare', 'Cash', 'Subscriptions'];
-const INCOME_QUICK = ['Salary', 'Freelance', 'Bonus', 'Investment', 'Dividend', 'Interest', 'Transfer'];
+const EXPENSE_QUICK: Category[] = ['Food Delivery', 'Groceries', 'Dining', 'Coffee', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Rent', 'Healthcare', 'Cash Withdrawal', 'Subscriptions'];
+const INCOME_QUICK: Category[] = ['Salary', 'Freelance', 'Bonus', 'Investment Returns', 'Dividend', 'Interest Income', 'Transfer In'];
 
 // Merchant → category assist (only fires while category is unset).
-const AUTO_CATEGORY: [RegExp, string][] = [
+const AUTO_CATEGORY: [RegExp, Category][] = [
   [/zomato|swiggy|eatsure/i, 'Food Delivery'],
   [/blinkit|zepto|bigbasket|jiomart|grofers|instamart|dmart/i, 'Groceries'],
   [/mcdonald|kfc|domino|pizza|burger|subway|restaurant/i, 'Dining'],
@@ -23,7 +23,7 @@ const AUTO_CATEGORY: [RegExp, string][] = [
   [/netflix|hotstar|spotify|prime video|sonyliv/i, 'Streaming'],
   [/amazon|flipkart|myntra|ajio|meesho|nykaa/i, 'Shopping'],
   [/petrol|fuel|hpcl|bpcl|shell/i, 'Fuel'],
-  [/jio|airtel|recharge|postpaid/i, 'Phone'],
+  [/jio|airtel|recharge|postpaid/i, 'Phone & Internet'],
 ];
 
 const CAT_ICON = (cat: string): string => {

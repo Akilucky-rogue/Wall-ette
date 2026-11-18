@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 // XLSX is only pulled in via IDFCBankParser, which lives in this lazy chunk.
-import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
+import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
 import { getSymbol } from '../utils/currencyUtils';
@@ -946,7 +946,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                                                         title="Category"
                                                                         aria-label="Category"
                                                                 >
-                                    {CATEGORIES.map(cat => (
+                                    {categoryOptions(editingTx.category).map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
                                     ))}
                                 </select>

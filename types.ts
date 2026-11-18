@@ -54,24 +54,54 @@ export enum AppScreen {
   SELF = 'SELF' // Profile
 }
 
-// Shared category list used across NewEntry, ImportStatement, and TransactionHistory
+// The one category list: statement parsers (services/categorize.ts), New
+// Entry, the Edit dialogs and budgets all use these names (audit M10).
 export const CATEGORIES = [
   'Groceries', 'Dining', 'Food Delivery', 'Coffee',
-  'Transport', 'Fuel', 'Parking', 'Taxi', 'Metro', 'Flights',
-  'Shopping', 'Electronics', 'Clothing', 'Furniture',
-  'Entertainment', 'Movies', 'Streaming', 'Games',
-  'Utilities', 'Electricity', 'Water', 'Gas', 'Internet', 'Phone',
-  'Healthcare', 'Pharmacy', 'Doctor', 'Insurance',
+  'Transport', 'Fuel', 'Parking', 'Taxi & Cab', 'Metro', 'Train', 'Flights',
+  'Shopping', 'Online Shopping', 'Electronics', 'Clothing', 'Furniture',
+  'Entertainment', 'Movies', 'Streaming', 'Music', 'Games',
+  'Utilities', 'Electricity', 'Water', 'Gas', 'Phone & Internet',
+  'Healthcare', 'Pharmacy', 'Doctor & Hospital', 'Insurance',
   'Education', 'Books', 'Courses',
-  'Bills', 'Rent', 'EMI', 'Loan', 'Credit Card',
-  'Salary', 'Freelance', 'Bonus', 'Investment', 'Dividend', 'Interest',
-  'Transfer', 'Cash', 'ATM',
+  'Bills', 'Rent', 'Loan & EMI', 'Credit Card',
   'Subscriptions', 'Gym', 'Charity',
   'Travel', 'Hotel', 'Vacation',
   'Personal Care', 'Beauty',
   'Pets', 'Gifts',
+  'Salary', 'Freelance', 'Bonus', 'Interest Income', 'Dividend',
+  'Investment Returns', 'Rental Income', 'Refunds',
+  'Investment', 'Transfer Out', 'Transfer In', 'Cash Withdrawal', 'Adjustment',
   'Other', 'Uncategorized',
 ] as const;
+
+export type Category = typeof CATEGORIES[number];
+
+// Names earlier versions offered in New Entry and Edit, mapped once to the
+// list's name for the same thing.
+const LEGACY_CATEGORIES: Record<string, Category> = {
+  Taxi: 'Taxi & Cab',
+  Phone: 'Phone & Internet',
+  Internet: 'Phone & Internet',
+  Doctor: 'Doctor & Hospital',
+  EMI: 'Loan & EMI',
+  Loan: 'Loan & EMI',
+  Cash: 'Cash Withdrawal',
+  ATM: 'Cash Withdrawal',
+  Interest: 'Interest Income',
+};
+
+/** The list's name for a stored category; names it doesn't know pass through. */
+export function canonicalCategory(category: string, type: TransactionType): string {
+  if (category === 'Transfer') return type === TransactionType.INCOME ? 'Transfer In' : 'Transfer Out';
+  if (category === 'Investment' && type === TransactionType.INCOME) return 'Investment Returns';
+  return LEGACY_CATEGORIES[category] ?? category;
+}
+
+/** Edit dropdown options: the list, plus the current value if it isn't on it. */
+export function categoryOptions(current: string): readonly string[] {
+  return current && !(CATEGORIES as readonly string[]).includes(current) ? [current, ...CATEGORIES] : CATEGORIES;
+}
 
 export type CurrencyCode = 'INR' | 'USD' | 'EUR' | 'GBP';
 

@@ -4,7 +4,10 @@
 //
 // The PDF and Excel parsers both file rows through these two functions, so a
 // statement row lands in the same category whichever format was imported
-// (audit H2). Moved unchanged from IDFCBankParser.
+// (audit H2). Moved unchanged from IDFCBankParser. Every name returned here must
+// be on CATEGORIES in types.ts; the return type makes tsc check that (M10).
+
+import type { Category } from '../types';
 
 export type RowDirection = 'income' | 'expense';
 
@@ -23,7 +26,7 @@ export function cleanNarration(text: string): string {
  * Categorize a statement row from its cleaned narration, with comprehensive
  * Indian merchant/UPI patterns.
  */
-export function categorizeNarration(description: string, type: RowDirection): string {
+export function categorizeNarration(description: string, type: RowDirection): Category {
   const desc = description.toLowerCase();
 
   // ── INCOME categories ────────────────────────────────────────────────────

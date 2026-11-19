@@ -32,12 +32,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ========== SECURITY LOGS (append-only) ==========
+    // ========== SECURITY LOGS (never edited) ==========
     match /users/{userId}/security_logs/{logId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId;
-      // Logs are immutable — no update or delete
-      allow update, delete: if false;
+      // Owners can delete their logs, so deleting the account erases them
+      // (audit M3); no one can change an entry.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if false;
     }
 
     // ========== APP CONFIG (read-only) ==========

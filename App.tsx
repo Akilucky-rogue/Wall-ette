@@ -10,7 +10,7 @@ import SplashScreen, { SplashVariant } from './components/SplashScreen';
 import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { auth } from './services/firebase';
+import { consumeQuietStart, signOutOfDevice } from './services/session';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -42,6 +42,11 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
 };
 
+// Sign-out and account deletion clear this device's data and reload the app;
+// that start-up skips the launch splash (services/session.ts). Read once per
+// page load, outside React.
+const QUIET_START = consumeQuietStart();
+
 function AppContent() {
   const { user, loading } = useAuth();
   // Native cold start opens LOCKED: a signed-in session resumes behind the
@@ -49,10 +54,11 @@ function AppContent() {
   // what makes "biometric login" real — open app → fingerprint → in.
   const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(!QUIET_START);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   // Signed in during this run (a new install or a fresh login) rather than
   // resuming a saved session. AppUpdates uses it to tell a new install from
   // an update.
@@ -205,11 +211,14 @@ function AppContent() {
   const handleSplashComplete = () => {
     setShowSplash(false);
     setAuthSplashPending(null);
-    // If logging out, actually sign out after splash completes
+    // If logging out, actually sign out after splash completes. That can take
+    // a few seconds (unsynced changes get a chance to reach the cloud first)
+    // and usually ends in a reload; the spinner covers it.
     if (isLoggingOut) {
-      auth.signOut();
       setIsLoggingOut(false);
+      setSigningOut(true);
       setCurrentScreen(AppScreen.DASHBOARD); // Reset to dashboard for next login
+      void signOutOfDevice().finally(() => setSigningOut(false));
     }
   };
 
@@ -225,7 +234,7 @@ function AppContent() {
     return <SplashScreen variant={splashVariant} onComplete={handleSplashComplete} />;
   }
 
-  if (loading) {
+  if (loading || signingOut) {
       return <LoadingFallback />;
   }
 

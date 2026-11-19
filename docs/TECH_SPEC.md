@@ -63,7 +63,11 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
 
 ### 2.3 State management
 Plain React context — no Redux/Zustand.
-- **`AuthContext`** — Firebase Auth session state.
+- **`AuthContext`** — Firebase Auth session state. Signing out and account deletion go
+  through `services/session.ts`, which also removes the user's data from the device: the
+  `localStorage` mirror (keys ending in `_<uid>`) and Firestore's offline cache, then
+  reloads. On sign-out the cache is only cleared once unsynced changes reach the cloud
+  (up to 4 s); offline, it stays so they sync at the next sign-in.
 - **`WalletContext`** — transactions, opening balance (+ `openingBalanceAsOf` anchor),
   budgets, savings goal, daily spend limit, currency. Includes batched bulk ops
   (`deleteTransactions` via Firestore `writeBatch` chunks) and an instant, optimistic
@@ -79,8 +83,8 @@ Plain React context — no Redux/Zustand.
 |---|---|
 | **Authentication** | Email/password sign-in. TOTP MFA (authenticator apps) is fully implemented via `TotpMultiFactorGenerator` + QR enrollment but parked behind a "Coming Soon" UI. |
 | **Firestore** | Per-user data under `users/{uid}` (transactions, settings, security log, consent record). `persistentLocalCache` gives offline-first behavior with automatic sync. |
-| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
-| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite) plus the self-hosted APK at `/downloads/wall-ette.apk`. |
+| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
+| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` is retired; the next deploy drops it. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
 (public FX rates for the currency selector) and, on Android, Google Play's update check.
@@ -152,17 +156,18 @@ sideloading. Dormant by decision — Android + web are the active targets.
 
 ## 7. Build, deploy & distribution
 
-`ship.ps1` — the one-command release pipeline:
-
-1. `tsc` typecheck (aborts the ship on any error)
-2. `npm run android:release` → Vite build → `cap sync android` → Gradle `assembleRelease` (auto-signed)
-3. Stage APK into `dist/downloads/wall-ette.apk`
-4. `firebase deploy` (web + hosted APK)
-5. `adb install` to the connected phone (non-fatal if absent)
-6. `git commit` + push
+- **Android:** Google Play only. `npm run android:bundle` builds the signed AAB, uploaded in
+  Play Console; `docs/PLAY_SUBMISSION.md` §9 is the per-release checklist. The website APK
+  is retired: any new one would be `com.wallette.app` signed with the old key, which
+  blocks installing the Play version.
+- **Website and Firestore rules:** `npm run build`, then
+  `npx firebase-tools deploy --only hosting,firestore:rules`.
+- **`ship.ps1` is retired** (it exits at once) until audit item 14 reworks it; it used to
+  build and host the APK, deploy, install on the phone and `git add -A` + push.
 
 Web visitors on Android get an install banner (`AndroidInstallBanner`, UA-gated, dismissal
-remembered) pointing at the hosted APK. iOS/desktop visitors see nothing.
+remembered) that opens Google Play, shown only once `PLAY_LISTING_PUBLIC` in
+`utils/site.ts` is true. iOS/desktop visitors see nothing.
 
 Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run android:build` (debug APK).
 
@@ -200,7 +205,7 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 ├── scripts/               # Dev tools: parser debugging, icon generation
 ├── docs/                  # Living docs (this file) + docs/archive/ for historical reports
 ├── private/               # NEVER committed: statements, keystore, old builds
-└── ship.ps1               # One-command release pipeline
+└── ship.ps1               # Old release pipeline, retired for now (§7)
 ```
 
 ---

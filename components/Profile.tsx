@@ -5,7 +5,7 @@ import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firest
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
-import { auth, db } from '../services/firebase';
+import { db } from '../services/firebase';
 import {
   isTotpEnrolled, startTotpEnrollment, finishTotpEnrollment, unenrollTotp,
   isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage,
@@ -18,6 +18,7 @@ import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, Rangoli
 import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
+import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
@@ -255,10 +256,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           throw e;
         }
       }
-      await wipeCloudData(user.uid);
-      setBiometricEnabled(user.uid, false);
+      const uid = user.uid;
+      await wipeCloudData(uid);
       await user.delete();
-      // onAuthStateChanged fires with null → app returns to the Auth screen
+      // Then this device's copy (audit M2); the app reloads to the Auth screen.
+      await forgetDeletedAccount(uid);
     } catch (e: any) {
       log.warn('Account deletion failed:', e?.code);
       setDelError(e?.code === 'auth/wrong-password' || e?.code === 'auth/invalid-credential'
@@ -456,7 +458,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Account</h4>
               <div className="space-y-3">
                   <button
-                    onClick={() => onLogout ? onLogout() : auth.signOut()}
+                    onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
                     className="w-full bg-white border border-rose/20 text-rose py-4 rounded-3xl font-serif font-medium shadow-sm hover:bg-rose-light/20 transition-all flex items-center justify-center gap-2"
                   >
                       <span className="material-symbols-outlined">logout</span>

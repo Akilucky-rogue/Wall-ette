@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, canonicalCategory } from '../types';
-import { db } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
@@ -257,7 +257,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Local Storage Fallback Helpers
   const saveToLocal = useCallback((key: string, data: any) => {
-      if (!user) return;
+      // Also skipped once this user has signed out or deleted the account, so
+      // a late mirror write can't put back a key services/session.ts removed.
+      if (!user || auth.currentUser?.uid !== user.uid) return;
       try {
         localStorage.setItem(`${key}_${user.uid}`, JSON.stringify(data));
       } catch (e) { log.error('Local storage save error'); }

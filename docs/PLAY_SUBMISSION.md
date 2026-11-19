@@ -48,7 +48,8 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
-- The live pages are the June version until the next hosting deploy; the new deletion section goes live with it.
+- [ ] **Deploy the website and the Firestore rules** before the closed test goes to review: `npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`. Until then the live policy is the June version (deletion by email only), and account deletion can't erase the security log (audit M3). Don't use `ship.ps1`; it's retired.
+- That deploy also drops the old APK at `/downloads/wall-ette.apk`. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app
 
@@ -112,6 +113,7 @@ A new personal account can't release to Production until a closed test has had *
 - [ ] **Closed testing:** add the testers by email list or Google Group and send them the opt-in link. They must stay opted in for 14 days in a row (leaving restarts their count). Keep notes of their feedback.
 - [ ] Dashboard → **Apply for production**. It asks about the closed test (recruiting, engagement, feedback), the app (audience, value, expected installs) and readiness (what you changed after testing). Review usually takes up to 7 days.
 - [ ] **Production:** create the release and submit it for review (typically 1–7 days).
+- [ ] Once Production is live: set `PLAY_LISTING_PUBLIC = true` in `utils/site.ts` and deploy the website, so wall-ette.com shows Android visitors a banner that opens Google Play.
 
 Later, paid memberships go through Google Play's billing: set up a merchant payments profile in Play Console before adding them as subscriptions.
 
@@ -137,4 +139,4 @@ Play installs updates by itself. From 1.5.3 the app also offers them (Google's p
 
 - Target SDK 36 ✓ (Play's requirement since 31 Aug 2026)
 - No simulated security features (demo MFA/biometric removed in v1.1.0)
-- Privacy policy live and accurate ✓ · No ads SDK ✓ · Data safety answers match actual behavior ✓
+- Privacy policy accurate ✓ (online after the deploy in section 4) · Account deletion erases cloud data and the copy on the device ✓ · No ads SDK ✓ · Data safety answers match actual behavior ✓

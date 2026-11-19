@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { parseIDFCStatement } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
+import { findDuplicates, fromExcel, toTransactions, type StatementRow } from '../services/statementImport';
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
@@ -24,99 +25,6 @@ interface EditingTransaction {
     type: TransactionType;
     date: string;
 }
-
-// Normalize merchant name for comparison
-const normalizeMerchant = (merchant: string): string => {
-    return merchant
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '') // Remove special chars
-        .replace(/\d+/g, '')       // Remove numbers (transaction IDs, etc.)
-        .trim();
-};
-
-// Fuzzy merchant equivalence (same rules as before: containment, shared
-// 6-char prefix for UPI ids, or exact normalized match).
-const merchantsMatch = (a: string, b: string): boolean => {
-    if (a.length > 3 && b.length > 3) {
-        if (a.includes(b) || b.includes(a)) return true;
-        if (a.substring(0, 6) === b.substring(0, 6)) return true;
-    }
-    return a === b;
-};
-
-interface DupCandidate { amount: number; merchant: string | null; used: boolean } // merchant pre-normalized
-
-// Index existing transactions by `date|type` so duplicate detection is
-// O(new × bucket) instead of O(new × all existing), with each merchant
-// normalized exactly once (audit Phase 2.7).
-const buildDuplicateIndex = (existing: Transaction[]): Map<string, DupCandidate[]> => {
-    const index = new Map<string, DupCandidate[]>();
-    for (const t of existing) {
-        const key = `${t.date}|${t.type}`;
-        let bucket = index.get(key);
-        if (!bucket) { bucket = []; index.set(key, bucket); }
-        bucket.push({ amount: t.amount, merchant: t.merchant ? normalizeMerchant(t.merchant) : null, used: false });
-    }
-    return index;
-};
-
-// COUNT-AWARE matching: each existing transaction can absorb exactly ONE
-// incoming duplicate. If a statement has two legit ₹249 payments and the
-// wallet only has one, the second stays selected instead of being lost.
-// Exact-merchant matches are claimed before fuzzy ones.
-const claimDuplicate = (tx: Transaction, index: Map<string, DupCandidate[]>): boolean => {
-    const bucket = index.get(`${tx.date}|${tx.type}`);
-    if (!bucket) return false;
-    const txMerchant = normalizeMerchant(tx.merchant || '');
-    // Pass 1: exact normalized-merchant match
-    for (const cand of bucket) {
-        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
-        if (cand.merchant !== null && cand.merchant === txMerchant) {
-            cand.used = true;
-            return true;
-        }
-    }
-    // Pass 2: fuzzy (containment / shared prefix) or merchant-less existing rows
-    for (const cand of bucket) {
-        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
-        if (cand.merchant === null || merchantsMatch(txMerchant, cand.merchant)) {
-            cand.used = true;
-            return true;
-        }
-    }
-    return false;
-};
-
-// Validate raw parser output and map to the app's Transaction shape with a
-// stable content hash id. Shared by the Excel and PDF paths (was duplicated 3x).
-const mapRawToTransactions = (rawTransactions: any[]): Transaction[] => {
-    const valid: Transaction[] = [];
-    rawTransactions.forEach((t: any, index: number) => {
-        if (!t.date || !t.amount || !t.type || !t.merchant) return;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return;
-        if (typeof t.amount !== 'number' || t.amount <= 0) return;
-        if (t.type !== 'INCOME' && t.type !== 'EXPENSE') return;
-
-        const cleanMerchant = (t.merchant || 'unknown').replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
-        const idString = `${t.date}-${t.amount}-${cleanMerchant}-${t.type}-${index}`;
-        let hash = 0;
-        for (let i = 0; i < idString.length; i++) {
-            const char = idString.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        valid.push({
-            id: `import-${Math.abs(hash)}`,
-            date: t.date,
-            merchant: t.merchant.trim(),
-            amount: Math.abs(t.amount),
-            type: t.type === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE,
-            category: t.category?.trim() || 'Uncategorized',
-            note: t.note?.trim() || ''
-        });
-    });
-    return valid;
-};
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
@@ -320,17 +228,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Shared staging: map raw parser output -> validate -> detect duplicates ->
   // populate the review screen. Used by both Excel and PDF paths
   // (audit Phases 1.5 + 2.7 — was duplicated inline three times).
-  const stageForReview = (raw: any[], parserLabel: string) => {
-      const mappedTransactions = mapRawToTransactions(raw);
+  const stageForReview = async (raw: StatementRow[], parserLabel: string) => {
+      const mappedTransactions = await toTransactions(raw);
       if (mappedTransactions.length === 0) {
           throw new Error('No valid transactions found. Please ensure the file is a clear IDFC bank statement.');
       }
 
-      const dupIndex = buildDuplicateIndex(existingTransactions);
-      const foundDuplicates = new Set<string>();
-      for (const tx of mappedTransactions) {
-          if (claimDuplicate(tx, dupIndex)) foundDuplicates.add(tx.id);
-      }
+      const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions);
 
       log.debug(`Import staged: ${mappedTransactions.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
 
@@ -370,7 +274,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
             : `Found ${result.transactions.length} transactions`);
 
-        stageForReview(result.transactions,
+        await stageForReview(result.transactions,
             result.header.bankName === 'Generic (auto-detected)'
                 ? 'Generic PDF parser (verify amounts)'
                 : 'Rule-based PDF parser');
@@ -393,18 +297,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         }
 
         storeStatementMeta(result.summary.openingBalance, result.summary.closingBalance || undefined);
-
-        // Convert parser output to the shared raw shape
-        const raw = result.transactions.map((t: any) => ({
-            date: t.date,
-            merchant: (t.description || 'Unknown').substring(0, 100),
-            amount: t.amount,
-            type: t.type?.toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE',
-            category: t.category,
-            note: t.notes || t.description
-        }));
-
-        stageForReview(raw, 'Enhanced IDFC parser (Excel)');
+        await stageForReview(fromExcel(result.transactions), 'Enhanced IDFC parser (Excel)');
     } catch (err: any) {
         log.warn('Excel import failed:', err?.message);
         setError('Failed to parse Excel file: ' + (err.message || 'Unknown error'));
@@ -652,7 +545,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     {duplicateIds.size} Duplicate{duplicateIds.size > 1 ? 's' : ''} Detected
                                 </p>
                                 <p className="text-xs text-blue-700 leading-relaxed">
-                                    These transactions already exist in your wallet (same date, amount & merchant). They've been auto-deselected to prevent double-counting.
+                                    These are already in your wallet: same date and amount, and the same bank reference (or payee, where the bank gives none). They've been deselected so nothing counts twice.
                                 </p>
                                 <div className="flex items-center gap-3 mt-3">
                                     <button

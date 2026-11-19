@@ -94,7 +94,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`
 - [x] Feature graphic 1024×500 — `store-assets/feature-graphic-1024x500.png`
-- [ ] **[YOU]** 2–8 phone screenshots (just screenshot the installed app: Dashboard, Pulse, Flow, Import).
+- [ ] **[YOU]** 2–8 phone screenshots (Dashboard, Pulse, Flow, Import). From 1.5.4 the Play build blocks screenshots (audit M11), so take new ones from a debug build (`npm run android:build`) with sample data.
 
 ## 7. Remaining Play Console forms (~20 min, all simple)
 

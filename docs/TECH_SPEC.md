@@ -1,6 +1,6 @@
 # Wall-ette — Technical Specification
 
-**Version:** 1.5.3 (versionCode 11) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
+**Version:** 1.5.4 (versionCode 12) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
 **Live web:** https://wall-ette.com · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
@@ -79,6 +79,17 @@ Plain React context — no Redux/Zustand.
   (`deleteTransactions` via Firestore `writeBatch` chunks) and an instant, optimistic
   `clearAllTransactions` (local state clears immediately; cloud deletion continues in the
   background).
+- **Cloud writes** (audit M4) — every change, settings included, goes to Firestore whether
+  online or not (settings used to skip the cloud offline and lose the change at the next
+  sync), and also while the listeners have fallen back to the `localStorage` mirror. An
+  import hands Firestore all its 500-row batches at once, so its offline queue holds the
+  whole statement across restarts. Writes go through `services/cloudSaves.ts`, which keeps
+  each one the server refuses (rules, daily quota) for `CloudSaveBanner`: "N changes didn't
+  save", with Try again and Dismiss. Firestore has already undone a refused change on the
+  device. A refusal of a write queued in an earlier session has no promise left to catch,
+  so it's undone without the banner. Edits write the whole entry, so a retry also works
+  for an entry the cloud never had. No crash reporting: Crashlytics would change the Data
+  safety answers. Tests: `scripts/check-cloud-saves.mjs`.
 - Device-local prefs (theme, biometric opt-in, banner dismissals) live in `localStorage`.
 
 ---
@@ -112,9 +123,21 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 - **Excel path** (`services/IDFCBankParser.ts`) — SheetJS row parsing with IST-safe local
   date handling (`toLocalISO`, avoiding the UTC date-shift bug class).
 - **Order-independent correctness** — statements can be imported in *any* order:
-  - stable content-hash transaction IDs;
-  - count-aware duplicate claiming (each existing row absorbs at most one incoming duplicate;
-    exact-merchant matches claim before fuzzy);
+  - one key per transaction (`services/statementImport.ts`, audit L1–L3): the bank's
+    reference from the narration (the 12-digit RRN on UPI and IMPS, the UTR on NEFT and
+    RTGS; spaces from PDF line wraps ignored), or the narration's first 48 letters and digits
+    where there's none, plus date, direction and amount. The same in the PDF and the Excel
+    export;
+  - stable ids: `import-` + the first 32 hex digits of the key's SHA-256, with identical rows
+    in one statement numbered in order, so a row keeps its id in every statement and format
+    and an import skips rows the wallet already has under that id;
+  - count-aware duplicate claiming across the whole statement, strongest first: same bank
+    reference, then same narration, then one narration containing the other (or a wallet
+    entry with no payee). Rows whose references differ never match, so same-day payments of
+    the same amount to different payees aren't swapped;
+  - Fee Hunter's duplicate cleaner groups imported rows by the same key and never removes rows
+    with stable ids (they're all real); typed entries are left alone. Tests and a before/after
+    replay over real statements: `scripts/check-duplicates.mjs`;
   - opening-balance anchoring to the earliest statement (`openingBalanceAsOf`);
   - forward/backward coverage-gap detection with optional single bridge adjustment
     (auto-deleted when a later import fills the window);
@@ -151,7 +174,8 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
 | Signing | Website APK: PKCS12 keystore at `private/my-release-key.keystore` via gitignored `android/key.properties` (exposed in audit C2; due to be retired). Google Play: a new upload key via gitignored `android/upload.properties`, used by `npm run android:bundle` (`-Pplay`); see `docs/PLAY_SUBMISSION.md` |
 | Windowing | Edge to edge on Android 15+ (target 36 has no opt-out). Capacitor's `SystemBars` passes the bar insets to CSS; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off (`enforceNavigationBarContrast`); the cream colors in `styles.xml` apply on Android 14 and older |
-| Versioning | versionCode 11 · versionName 1.5.3, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Backups & screen | `allowBackup="false"`, plus `res/xml/data_extraction_rules.xml` (Android 12+) and `backup_rules.xml` (11 and earlier) excluding every domain, so neither Google backups nor phone-to-phone transfers copy the WebView's data (mirror, Firestore cache, sign-in). `MainActivity` sets `FLAG_SECURE` in release builds: no screenshots, recordings or recent-apps preview. Debug builds leave capture on for store screenshots (audit M11) |
+| Versioning | versionCode 12 · versionName 1.5.4, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
 | Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger
@@ -181,7 +205,8 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 
 ## 8. Security posture
 
-- Per-UID Firestore rules; offline cache cleared on uninstall.
+- Per-UID Firestore rules; offline cache cleared on uninstall, sign-out and account deletion,
+  and kept out of Android backups and device transfers. Release builds block screen capture.
 - Biometric unlock (fingerprint/face, PIN/pattern fallback) at cold start and session re-lock;
   unlock attempts recorded to a per-user security log.
 - Account recovery: anti-enumeration password-reset flow on the login screen (dedicated panel,

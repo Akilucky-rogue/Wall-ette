@@ -36,6 +36,12 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
 - **Single-shell state machine** — `App.tsx` switches screens via an `AppScreen` enum; no router
   library. Every screen is a `React.lazy` chunk, so the initial bundle stays lean
   (largest lazy chunks: ImportStatement ~412 kB incl. parsers, pdf.js ~404 kB, SpendAnalysis ~47 kB).
+- **Product page (web only)** — visitors who aren't signed in see `components/Landing.tsx`
+  (hero demo in `components/landing/StatementDemo.tsx`, screenshots in `public/landing/`, all
+  sample data). "Sign in" sets `#signin` and shows the Auth screen, so Back returns to the page;
+  Auth gets an "About Wall·ette" link back. The Android app never shows it, and only the
+  Android app plays the launch splash. Search and link-preview tags live in `index.html`
+  (`public/og-image.png` is the store feature graphic).
 - **Gesture navigation** — app-wide swipe handling on the shell div: horizontal swipes move
   through `TAB_ORDER` (Home → History → Analysis → Self); sub-screens swipe back to their
   `BACK_TARGET` parent. Scrollable/interactive elements (`.overflow-x-auto`, inputs, svg,

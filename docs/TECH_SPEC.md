@@ -1,6 +1,6 @@
 # Wall-ette — Technical Specification
 
-**Version:** 1.5.2 (versionCode 9) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
+**Version:** 1.5.3 (versionCode 10) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
 **Live web:** https://wall-ette.com · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
@@ -79,11 +79,12 @@ Plain React context — no Redux/Zustand.
 |---|---|
 | **Authentication** | Email/password sign-in. TOTP MFA (authenticator apps) is fully implemented via `TotpMultiFactorGenerator` + QR enrollment but parked behind a "Coming Soon" UI. |
 | **Firestore** | Per-user data under `users/{uid}` (transactions, settings, security log, consent record). `persistentLocalCache` gives offline-first behavior with automatic sync. |
-| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. |
+| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
 | **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite) plus the self-hosted APK at `/downloads/wall-ette.apk`. |
 
-External network calls are limited to: Firebase, Google Fonts, and `exchangerate-api.com`
-(public FX rates for the currency selector). Statement files never leave the device.
+External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
+(public FX rates for the currency selector) and, on Android, Google Play's update check.
+Statement files never leave the device.
 
 **Consent gate** — new registrations must accept Terms & Privacy (version `2026-06-11`);
 acceptance is recorded with a server timestamp for auditability. Existing logins are unaffected.
@@ -135,12 +136,13 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 
 | Item | Value |
 |---|---|
-| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 |
+| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) |
 | SDK levels | minSdk 24 · target/compileSdk 36 (Play's minimum from 31 Aug 2026) |
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
 | Signing | Website APK: PKCS12 keystore at `private/my-release-key.keystore` via gitignored `android/key.properties` (exposed in audit C2; due to be retired). Google Play: a new upload key via gitignored `android/upload.properties`, used by `npm run android:bundle` (`-Pplay`); see `docs/PLAY_SUBMISSION.md` |
 | Windowing | Edge to edge on Android 15+ (target 36 has no opt-out). Capacitor's `SystemBars` passes the bar insets to CSS; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off (`enforceNavigationBarContrast`); the cream colors in `styles.xml` apply on Android 14 and older |
-| Versioning | versionCode 9 · versionName 1.5.2 |
+| Versioning | versionCode 10 · versionName 1.5.3, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger
 GitHub Actions workflow (`ios-build.yml`) produces an unsigned IPA on free macOS runners for

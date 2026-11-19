@@ -32,7 +32,7 @@ The keystore in `private/` was exposed in an old pull request (audit C2), so Goo
 npm run android:bundle
 ```
 Output: `android\app\build\outputs\bundle\release\app-release.aab`, signed with the upload key. The build stops with a message if `android/upload.properties` is missing.
-Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`.
+Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`. Section 9 has the checklist for every update.
 
 ## 3. Web address
 
@@ -58,6 +58,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 | Email address | Collected · App functionality (account management) · Not shared |
 | Financial info → "Other financial info" | Collected (user-entered/imported transactions) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
+| App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
 | Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |
@@ -113,6 +114,24 @@ A new personal account can't release to Production until a closed test has had *
 - [ ] **Production:** create the release and submit it for review (typically 1–7 days).
 
 Later, paid memberships go through Google Play's billing: set up a merchant payments profile in Play Console before adding them as subscriptions.
+
+## 9. Shipping an update
+
+Play installs updates by itself. From 1.5.3 the app also offers them (Google's prompt, then an **Update ready · Restart** banner) and shows **What's new** once after an update (also under Profile → What's new). For each release:
+
+1. Bump `versionCode` (+1) and `versionName` in `android/app/build.gradle`. The web code reads both from there (Profile, splash screen, What's new).
+2. Add an entry at the top of `RELEASE_NOTES` in `services/releaseNotes.ts`: the new versionCode and versionName, one short sentence per change. Leave it out if there's nothing to announce; the card then stays hidden.
+3. `node scripts/check-app-updates.mjs` checks the notes against `build.gradle`.
+4. `npm run android:bundle`, upload the AAB to the track, and paste the same lines into **Release notes** (500 characters at most).
+5. Production: roll out to a percentage first if you like, then 100%.
+
+**Requiring an update** (a bug that damages data, or a Firestore change old versions can't handle):
+
+- [ ] One time: deploy the rules (`firebase deploy --only firestore:rules`) so signed-in users can read `config/app`. Until then the app treats the minimum as 0.
+- When the fixed release is at 100%: Firebase console → Firestore → collection `config`, document `app`, number field `androidMinVersionCode` = that release's versionCode. Older builds open Google's full-screen update, and a **Time to update** screen if the user backs out.
+- The app only blocks when Google Play offers it an update, so setting the minimum too early locks nobody out; it waits until Play has the release for them. Set it to 0 to switch it off. Builds before 1.5.3 don't read it.
+
+**Testing the update prompt:** it only works for an app installed from Google Play with the Play signing key, never a local build. With internal app sharing (Play Console → Internal app sharing): install build N from its link; upload build N+1 (higher versionCode), open its link but don't install it from the Play page; then open Wall-ette from the home screen and Google's prompt appears. The Google account must have installed the app from Play at least once. Steps: [Test in-app updates](https://developer.android.com/guide/playcore/in-app-updates/test).
 
 ## Done already (for the reviewer's benefit)
 

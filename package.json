@@ -27,6 +27,7 @@
     "@capacitor/ios": "^8.4.3",
     "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "^8.0.0",
+    "@capawesome/capacitor-app-update": "^8.1.1",
     "firebase": "^11.10.0",
     "pdfjs-dist": "^5.4.624",
     "qrcode": "^1.5.4",

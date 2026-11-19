@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 
 import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
+import AppUpdates from './components/AppUpdates';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -52,6 +53,10 @@ function AppContent() {
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Signed in during this run (a new install or a fresh login) rather than
+  // resuming a saved session. AppUpdates uses it to tell a new install from
+  // an update.
+  const [signedInThisRun, setSignedInThisRun] = useState(false);
 
   // Ref mirror so long-lived native listeners read the current screen without
   // re-registering on every navigation (audit Phase 6.2).
@@ -191,6 +196,7 @@ function AppContent() {
     // The user JUST authenticated with their password — don't bounce them
     // into the session lock on top of it.
     setIsLocked(false);
+    setSignedInThisRun(true);
     setAuthSplashPending(type);
     setSplashVariant(type);
     setShowSplash(true);
@@ -292,6 +298,8 @@ function AppContent() {
         )}
         <AndroidInstallBanner />
       </div>
+      {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}
+      <AppUpdates signedInThisRun={signedInThisRun} />
     </WalletProvider>
   );
 }

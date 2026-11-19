@@ -16,6 +16,8 @@ import { log } from '../utils/log';
 import { PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
+import WhatsNewSheet from './WhatsNewSheet';
+import { latestNotes } from '../services/releaseNotes';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
@@ -58,6 +60,8 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
 const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
   const { user } = useAuth();
   const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions } = useWallet();
+
+  const [notesOpen, setNotesOpen] = useState(false);
 
   // ── Daily limit (unchanged behavior) ──
   const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? dailyLimit.toString() : '');
@@ -469,8 +473,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
 
       <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.2</p>
+        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v{__APP_VERSION__} ({__APP_BUILD__})</p>
+        {isNative() && (
+          <button onClick={() => setNotesOpen(true)} className="mt-2 px-3 py-1 text-[11px] font-medium text-sage hover:text-sage/80 transition-colors">
+            What's new
+          </button>
+        )}
       </div>
+
+      {notesOpen && <WhatsNewSheet notes={latestNotes(__APP_BUILD__)} onClose={() => setNotesOpen(false)} />}
 
       {/* ── 2FA modal ── */}
       {mfaModal && (

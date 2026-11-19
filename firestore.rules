@@ -40,6 +40,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ========== APP CONFIG (read-only) ==========
+    // config/app holds non-secret switches the app reads, such as
+    // androidMinVersionCode: Android builds below it must update before use
+    // (services/appUpdates.ts). Edited in the Firebase console only.
+    match /config/app {
+      allow get: if request.auth != null;
+    }
+
     // ========== DENY BY DEFAULT ==========
     // Anything not explicitly matched above is rejected.
   }

@@ -49,7 +49,7 @@ const AndroidInstallBanner: React.FC = () => {
 
         <div className="flex-1 min-w-0">
           <p className="text-white text-[13px] font-semibold leading-tight">Get the Android app</p>
-          <p className="text-white/55 text-[10px] leading-tight mt-0.5 truncate">
+          <p className="text-white/60 text-[10px] leading-tight mt-0.5 truncate">
             Faster · offline · fingerprint unlock
           </p>
         </div>

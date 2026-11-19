@@ -80,7 +80,7 @@ export const UpdateReadyBanner: React.FC<UpdateReadyBannerProps> = ({ installing
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-white text-[13px] font-semibold leading-tight">Update ready</p>
-        <p className={`text-[10px] leading-snug mt-0.5 ${error ? 'text-rose' : 'text-white/55'}`}>
+        <p className={`text-[10px] leading-snug mt-0.5 ${error ? 'text-rose' : 'text-white/60'}`}>
           {error ?? 'Restart Wall-ette to finish installing'}
         </p>
       </div>

@@ -158,6 +158,8 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
     const rows: TableRow[] = [];
     let summary: TableResult['summary'] = null;
     let bounds: { chqD: number; dc: number; cb: number; partX: number } | null = null;
+    // Set at IDFC's closing line, "------- End of the statement -------".
+    let tableEnded = false;
 
     for (const items of pages) {
         // Bucket into visual lines (~4pt tolerance); pdf.js y grows upward,
@@ -207,6 +209,15 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
                 continue;
             }
             if (!bounds) continue;
+
+            // The closing line sits in the Particulars column, so it used to be
+            // glued onto the last row's narration, which then no longer
+            // matched the Excel export's (audit L3). No rows follow it.
+            if (/end\s+of\s+(the\s+)?statement/i.test(joined)) {
+                tableEnded = true;
+                continue;
+            }
+            if (tableEnded) continue;
 
             const m = DATE_TOKEN.exec(texts[0]);
             const month = m ? MONTH_NUM[m[2].toLowerCase()] : undefined;

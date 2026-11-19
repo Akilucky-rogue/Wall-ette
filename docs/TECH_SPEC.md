@@ -84,7 +84,7 @@ Plain React context — no Redux/Zustand.
 | **Authentication** | Email/password sign-in. TOTP MFA (authenticator apps) is fully implemented via `TotpMultiFactorGenerator` + QR enrollment but parked behind a "Coming Soon" UI. |
 | **Firestore** | Per-user data under `users/{uid}` (transactions, settings, security log, consent record). `persistentLocalCache` gives offline-first behavior with automatic sync. |
 | **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
-| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` is retired; the next deploy drops it. |
+| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
 (public FX rates for the currency selector) and, on Android, Google Play's update check.

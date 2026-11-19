@@ -48,8 +48,8 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
-- [ ] **Deploy the website and the Firestore rules** before the closed test goes to review: `npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`. Until then the live policy is the June version (deletion by email only), and account deletion can't erase the security log (audit M3). Don't use `ship.ps1`; it's retired.
-- That deploy also drops the old APK at `/downloads/wall-ette.apk`. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
+- [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
+- The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app
 
@@ -139,4 +139,4 @@ Play installs updates by itself. From 1.5.3 the app also offers them (Google's p
 
 - Target SDK 36 ✓ (Play's requirement since 31 Aug 2026)
 - No simulated security features (demo MFA/biometric removed in v1.1.0)
-- Privacy policy accurate ✓ (online after the deploy in section 4) · Account deletion erases cloud data and the copy on the device ✓ · No ads SDK ✓ · Data safety answers match actual behavior ✓
+- Privacy policy live and accurate ✓ · Account deletion erases cloud data and the copy on the device ✓ · No ads SDK ✓ · Data safety answers match actual behavior ✓

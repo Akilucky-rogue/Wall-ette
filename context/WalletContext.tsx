@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, canonicalCategory } from '../types';
 import { auth, db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
 import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
+import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
+
+// Firestore refuses fields set to undefined; leave them out.
+const forCloud = <T extends object,>(t: T): T =>
+  Object.fromEntries(Object.entries(t).filter(([, v]) => v !== undefined)) as T;
 
 // Category names from earlier versions (audit M10) are mapped once, as data
 // loads, so every screen, the Edit dialog and budgets see one name each.
@@ -519,6 +524,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setIsBackendReady(true);
   }, []);
 
+  // ── Cloud writes (audit M4) ───────────────────────────────────────────────
+  // Every change goes to Firestore, which shows it here at once and queues it
+  // until the server has it, also offline, and also when the listeners have
+  // fallen back to this device's copy. Refused changes are kept by
+  // services/cloudSaves.ts for the "didn't save" banner.
+  useEffect(() => { setCloudOwner(user?.uid ?? null); }, [user]);
+
+  const saveSetting = useCallback((field: string, fields: Record<string, unknown>) => {
+      if (!user) return;
+      const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+      void sendToCloud(`settings:${field}`, 1, () => setDoc(settingsRef, fields, { merge: true }));
+  }, [user]);
+
   // Manual refresh: re-arm backend mode and force both listeners to
   // re-subscribe (fresh server snapshot). Safe to spam.
   const refresh = useCallback(() => {
@@ -526,79 +544,49 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setRefreshNonce(n => n + 1);
   }, []);
 
-  const setCurrency = useCallback(async (code: CurrencyCode) => {
+  // Settings used to skip the cloud while offline, so the next sync put the
+  // old value back; Firestore's queue now holds them until it reconnects.
+  const setCurrency = useCallback((code: CurrencyCode) => {
     setCurrencyState(code);
     saveToLocal('currency', code);
-    if (user && isOnline && isBackendReady) {
-        try {
-            const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-            await setDoc(settingsRef, { currency: code }, { merge: true });
-        } catch (e) { log.warn('Backend update failed, using local state'); }
-    }
-  }, [user, isOnline, isBackendReady, saveToLocal]);
+    saveSetting('currency', { currency: code });
+  }, [saveToLocal, saveSetting]);
 
-  const setDailyLimit = useCallback(async (limit: number) => {
+  const setDailyLimit = useCallback((limit: number) => {
       setDailyLimitState(limit);
       saveToLocal('dailyLimit', limit);
-      if (user && isOnline && isBackendReady) {
-          try {
-              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { dailyLimit: limit }, { merge: true });
-          } catch (e) { log.warn('Backend update failed'); }
-      }
-  }, [user, isOnline, isBackendReady, saveToLocal]);
+      saveSetting('dailyLimit', { dailyLimit: limit });
+  }, [saveToLocal, saveSetting]);
 
-  const setMfaEnabled = useCallback(async (enabled: boolean) => {
+  const setMfaEnabled = useCallback((enabled: boolean) => {
       setMfaEnabledState(enabled);
       saveToLocal('mfaEnabled', enabled);
-      if (user && isOnline && isBackendReady) {
-          try {
-              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { mfaEnabled: enabled }, { merge: true });
-          } catch (e) { log.warn('Backend update failed'); }
-      }
-  }, [user, isOnline, isBackendReady, saveToLocal]);
+      saveSetting('mfaEnabled', { mfaEnabled: enabled });
+  }, [saveToLocal, saveSetting]);
 
-  const setBudget = useCallback(async (category: string, amount: number) => {
+  const setBudget = useCallback((category: string, amount: number) => {
       const next = { ...budgets };
       if (amount > 0) next[category] = amount;
       else delete next[category];
       setBudgetsState(next);
       saveToLocal('budgets', next);
-      if (user && isOnline && isBackendReady) {
-          try {
-              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { budgets: next }, { merge: true });
-          } catch (e) { log.warn('Backend update failed'); }
-      }
-  }, [budgets, user, isOnline, isBackendReady, saveToLocal]);
+      saveSetting('budgets', { budgets: next });
+  }, [budgets, saveToLocal, saveSetting]);
 
-  const setSavingsGoal = useCallback(async (amount: number) => {
+  const setSavingsGoal = useCallback((amount: number) => {
       const value = Math.max(0, amount || 0);
       setSavingsGoalState(value);
       saveToLocal('savingsGoal', value);
-      if (user && isOnline && isBackendReady) {
-          try {
-              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { savingsGoal: value }, { merge: true });
-          } catch (e) { log.warn('Backend update failed'); }
-      }
-  }, [user, isOnline, isBackendReady, saveToLocal]);
+      saveSetting('savingsGoal', { savingsGoal: value });
+  }, [saveToLocal, saveSetting]);
 
-  const setOpeningBalance = useCallback(async (balance: number, asOf: string | null = null) => {
+  const setOpeningBalance = useCallback((balance: number, asOf: string | null = null) => {
       setOpeningBalanceState(balance);
       setOpeningBalanceAsOfState(asOf);
       saveToLocal('openingBalance', balance);
       saveToLocal('openingBalanceAsOf', asOf);
-      if (user && isOnline && isBackendReady) {
-          try {
-              const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-              await setDoc(settingsRef, { openingBalance: balance, openingBalanceAsOf: asOf }, { merge: true });
-          } catch (e) {
-              log.warn('Backend update failed for opening balance');
-          }
-      }
-  }, [user, isOnline, isBackendReady, saveToLocal]);
+      saveSetting('openingBalance', { openingBalance: balance, openingBalanceAsOf: asOf });
+  }, [saveToLocal, saveSetting]);
 
   // ── Spending, income and money moved (audit H3) ───────────────────────────
   // One classifier per rule set. counted leaves money moved out, so totals,
@@ -678,59 +666,54 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
-    if (user && isBackendReady) {
+    if (user) {
         const txRef = doc(db, `users/${user.uid}/transactions/${transaction.id}`);
-        setDoc(txRef, transaction)
-            .catch(e => {
-                log.warn('Backend write queued/failed:', e?.code || e?.message);
-                if (e.message?.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
-            });
+        void sendToCloud(`tx:${transaction.id}`, 1, () => setDoc(txRef, forCloud(transaction)));
     }
     return true;
-  }, [transactions, counted, flowOf, dailyLimit, aggregates, formatAmount, persistTransactions, user, isBackendReady]);
+  }, [transactions, counted, flowOf, dailyLimit, aggregates, formatAmount, persistTransactions, user]);
 
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
-    try {
-      const transaction = transactions.find(t => t.id === id);
-      if (!transaction) {
-        log.error('Edit failed: transaction not found');
-        return false;
-      }
-
-      const updatedTx = { ...transaction, ...updates, id: transaction.id };
-      const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
-      if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
-      setTransactions(newTxs);
-      persistTransactions(newTxs);
-
-      if (user && isBackendReady) {
-        const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
-        await updateDoc(txRef, updates)
-          .catch(e => {
-            log.warn('Backend update queued/failed:', e?.code || e?.message);
-            if (e.message?.includes('not-found') || e.code === 'permission-denied') setIsBackendReady(false);
-          });
-      }
-      return true;
-    } catch (error) {
-      log.error('Edit transaction error');
+    const transaction = transactions.find(t => t.id === id);
+    if (!transaction) {
+      log.error('Edit failed: transaction not found');
       return false;
     }
-  }, [transactions, persistTransactions, user, isBackendReady]);
 
-  const deleteTransaction = useCallback(async (id: string) => {
-    try {
-      const newTxs = transactions.filter(t => t.id !== id);
-      setTransactions(newTxs);
-      persistTransactions(newTxs);
+    const updatedTx = { ...transaction, ...updates, id: transaction.id };
+    const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
+    if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
+    setTransactions(newTxs);
+    persistTransactions(newTxs);
 
-      if (user && isBackendReady) {
-        deleteDoc(doc(db, `users/${user.uid}/transactions/${id}`)).catch(e => log.warn('Backend delete queued/failed:', e?.code));
-      }
-    } catch (error) {
-      log.error('Delete transaction error');
+    if (user) {
+      // The whole entry, so sending it again after a refusal, or for an entry
+      // only this device had, still works.
+      const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
+      void sendToCloud(`tx:${id}`, 1, () => setDoc(txRef, forCloud(updatedTx)));
     }
-  }, [transactions, persistTransactions, user, isBackendReady]);
+    return true;
+  }, [transactions, persistTransactions, user]);
+
+  const deleteTransaction = useCallback((id: string) => {
+    const newTxs = transactions.filter(t => t.id !== id);
+    setTransactions(newTxs);
+    persistTransactions(newTxs);
+
+    if (user) {
+      const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
+      void sendToCloud(`tx:${id}`, 1, () => deleteDoc(txRef));
+    }
+  }, [transactions, persistTransactions, user]);
+
+  // Deletes in batches of 500, Firestore's limit, all handed over at once.
+  const deleteInBatches = useCallback((uid: string, ids: string[]): Promise<boolean>[] =>
+    chunkArray(ids, 500).map(chunk =>
+      sendToCloud(`delete:${chunk[0]}`, chunk.length, () => {
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
+        return batch.commit();
+      })), []);
 
   const deleteTransactions = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
@@ -738,21 +721,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const newTxs = transactions.filter(t => !idSet.has(t.id));
     setTransactions(newTxs);
     persistTransactions(newTxs);
-
-    if (user && isBackendReady) {
-        const uid = user.uid;
-        (async () => {
-            try {
-                const chunks = chunkArray(ids, 500);
-                await Promise.all(chunks.map(chunk => {
-                    const batch = writeBatch(db);
-                    chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
-                    return batch.commit();
-                }));
-            } catch { log.warn('Bulk delete: backend cleanup failed'); }
-        })();
-    }
-  }, [transactions, persistTransactions, user, isBackendReady]);
+    if (user) deleteInBatches(user.uid, ids);
+  }, [transactions, persistTransactions, user, deleteInBatches]);
 
   const clearAllTransactions = useCallback(async (waitForCloud = false) => {
     // Capture ids BEFORE wiping state — deleting by known ids skips the
@@ -767,51 +737,59 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     saveToLocal('openingBalance', 0);
     saveToLocal('openingBalanceAsOf', null);
 
-    if (!user || !isBackendReady) {
+    if (!user) {
         clearingRef.current = false;
         return;
     }
 
-    // Cloud cleanup runs in the background — the UI is already cleared.
-    // Account deletion passes waitForCloud so nothing is orphaned.
     const uid = user.uid;
-    const cloudWork = (async () => {
-        try {
-            const settingsRef = doc(db, `users/${uid}/settings/preferences`);
-            setDoc(settingsRef, { openingBalance: 0, openingBalanceAsOf: null }, { merge: true })
-                .catch(() => log.warn('Failed to reset opening balance on backend'));
+    const settingsRef = doc(db, `users/${uid}/settings/preferences`);
+    const resetOpening = { openingBalance: 0, openingBalanceAsOf: null };
 
-            if (idsToDelete.length > 0) {
-                // Parallel batch deletes (500/batch, Firestore limit).
-                const chunks = chunkArray(idsToDelete, 500);
-                await Promise.all(chunks.map(chunk => {
-                    const batch = writeBatch(db);
-                    chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
-                    return batch.commit();
-                }));
-            } else {
-                // Local state was empty but the cloud may not be (e.g. clear
-                // before first sync) — fall back to a full sweep. Skipped in
-                // the normal case so a fresh import can't race the sweep.
-                const snapshot = await getDocs(query(collection(db, `users/${uid}/transactions`)));
-                const chunks = chunkArray(snapshot.docs, 500);
-                await Promise.all(chunks.map(chunk => {
-                    const batch = writeBatch(db);
-                    chunk.forEach(d => batch.delete(d.ref));
-                    return batch.commit();
-                }));
-            }
-        } catch (e) {
-            log.warn('Failed to clear backend transactions');
+    if (waitForCloud) {
+        // Account deletion: every delete must reach the server before the
+        // account goes, or the rules leave the rest orphaned. A failure stops
+        // the deletion.
+        try {
+            await setDoc(settingsRef, resetOpening, { merge: true });
+            const ids = idsToDelete.length > 0
+                ? idsToDelete
+                : (await getDocs(query(collection(db, `users/${uid}/transactions`)))).docs.map(d => d.id);
+            await Promise.all(chunkArray(ids, 500).map(chunk => {
+                const batch = writeBatch(db);
+                chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
+                return batch.commit();
+            }));
         } finally {
-            // Snapshot listener resumes only after the deletes are committed.
             clearingRef.current = false;
         }
-    })();
-    if (waitForCloud) await cloudWork;
-  }, [transactions, user, isBackendReady, saveToLocal]);
+        return;
+    }
 
-  const importTransactions = useCallback(async (newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string) => {
+    // In the background: the screen is already clear, and refusals go to the
+    // "didn't save" banner. The listener resumes once every delete settles.
+    const work: Promise<boolean>[] = [
+        sendToCloud('settings:openingBalance', 1, () => setDoc(settingsRef, resetOpening, { merge: true })),
+    ];
+    if (idsToDelete.length > 0) {
+        work.push(...deleteInBatches(uid, idsToDelete));
+    } else {
+        // Local state was empty but the cloud may not be (e.g. clear before
+        // first sync), so sweep it. Skipped in the normal case so a fresh
+        // import can't race the sweep.
+        work.push(sendToCloud('clear:sweep', 1, async () => {
+            const snapshot = await getDocs(query(collection(db, `users/${uid}/transactions`)));
+            await Promise.all(chunkArray(snapshot.docs, 500).map(chunk => {
+                const batch = writeBatch(db);
+                chunk.forEach(d => batch.delete(d.ref));
+                return batch.commit();
+            }));
+        }));
+    }
+    void Promise.all(work).finally(() => { clearingRef.current = false; });
+  }, [transactions, user, saveToLocal, deleteInBatches]);
+
+  const importTransactions = useCallback((newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string) => {
     const existingIds = new Set(transactions.map(t => t.id));
     const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
 
@@ -837,7 +815,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             shouldApply = statementStart <= earliest;
         }
         if (shouldApply) {
-            await setOpeningBalance(importedOpeningBalance, statementStart ?? null);
+            setOpeningBalance(importedOpeningBalance, statementStart ?? null);
         }
     }
 
@@ -846,35 +824,29 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setTransactions(combined);
     persistTransactions(combined);
 
-    if (user && isBackendReady) {
-        try {
-            const chunks = chunkArray(uniqueNew, 500);
-            for (const chunk of chunks) {
-                 const batch = writeBatch(db);
-                 chunk.forEach(tx => {
-                    const ref = doc(db, `users/${user.uid}/transactions/${tx.id}`);
-                    batch.set(ref, tx);
-                 });
-                 await batch.commit();
-            }
-            log.debug(`Imported ${uniqueNew.length} transactions via batch write`);
-        } catch (e) {
-            log.warn('Firestore import failed');
+    if (user) {
+        // Every batch is handed to Firestore at once. Awaiting each in turn
+        // meant an import made offline, with the app closed before it
+        // reconnected, kept only its first 500 rows (audit M4).
+        const uid = user.uid;
+        for (const chunk of chunkArray(uniqueNew, 500)) {
+            void sendToCloud(`import:${chunk[0].id}`, chunk.length, () => {
+                const batch = writeBatch(db);
+                chunk.forEach(tx => batch.set(doc(db, `users/${uid}/transactions/${tx.id}`), forCloud(tx)));
+                return batch.commit();
+            });
         }
+        log.debug(`Importing ${uniqueNew.length} transactions`);
     }
-  }, [transactions, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, isBackendReady]);
+  }, [transactions, openingBalanceAsOf, setOpeningBalance, persistTransactions, user]);
 
   // Payee rules save on this device at once and to the cloud through
   // Firestore's queue, which also holds the write while offline.
   const persistPayeeRules = useCallback((rules: PayeeRule[]) => {
     setPayeeRules(rules);
     saveToLocal('payeeRules', rules);
-    if (user && isBackendReady) {
-        const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-        setDoc(settingsRef, { payeeRules: rules }, { merge: true })
-            .catch(e => log.warn('Saving payee rules failed:', e?.code || e?.message));
-    }
-  }, [user, isBackendReady, saveToLocal]);
+    saveSetting('payeeRules', { payeeRules: rules });
+  }, [saveToLocal, saveSetting]);
 
   const savePayeeRule = useCallback((match: string, kind: PayeeKind) => {
     const key = matchText(match);

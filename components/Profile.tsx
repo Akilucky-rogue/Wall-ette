@@ -257,7 +257,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
         }
       }
       const uid = user.uid;
-      await wipeCloudData(uid);
+      try {
+        await wipeCloudData(uid);
+      } catch {
+        throw new Error("Couldn't erase your data from the cloud, so the account wasn't deleted. Check your connection and try again.");
+      }
       await user.delete();
       // Then this device's copy (audit M2); the app reloads to the Auth screen.
       await forgetDeletedAccount(uid);

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
 import AppUpdates from './components/AppUpdates';
+import CloudSaveBanner from './components/CloudSaveBanner';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -353,6 +354,7 @@ function AppContent() {
       </div>
       {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}
       <AppUpdates signedInThisRun={signedInThisRun} />
+      <CloudSaveBanner />
     </WalletProvider>
   );
 }

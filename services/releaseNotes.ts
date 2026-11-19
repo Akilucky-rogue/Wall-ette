@@ -19,7 +19,7 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    versionCode: 10,
+    versionCode: 11,
     version: '1.5.3',
     items: [
       'Wall-ette now tells you when an update is ready, so you can install it without leaving the app.',

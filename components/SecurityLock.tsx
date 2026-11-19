@@ -4,6 +4,7 @@ import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
+import { signOutOfDevice } from '../services/session';
 import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
 
 interface SecurityLockProps {
@@ -15,6 +16,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Real TOTP second factor: set when reauth reports the account has 2FA
   const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
@@ -247,11 +249,12 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         )}
 
         <div className="mt-6 text-center border-t border-black/5 pt-4">
-            <button 
-                onClick={() => auth.signOut()}
-                className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors"
+            <button
+                onClick={() => { setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false)); }}
+                disabled={signingOut}
+                className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
-                Sign Out
+                {signingOut ? 'Signing out…' : 'Sign Out'}
             </button>
         </div>
       </div>

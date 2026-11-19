@@ -7,6 +7,8 @@
  */
 
 import { Transaction, TransactionType } from '../types';
+import { parseDay } from '../utils/dates';
+import { payeeName } from './spend';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -104,7 +106,9 @@ const CADENCES: CadenceRule[] = [
 /**
  * Detect recurring charges: same merchant, similar amount (±30% of median),
  * consistent gap matching a known cadence, and still "alive"
- * (last charge within 2 cadence periods of `now`).
+ * (last charge within 2 cadence periods of `now`). Pass only counted
+ * transactions, so monthly transfers to family or a broker aren't listed as
+ * charges (audit M8).
  */
 export const detectRecurringCharges = (
   transactions: Transaction[],
@@ -118,7 +122,7 @@ export const detectRecurringCharges = (
     if (key.length < 3) continue; // too generic to group on
     let bucket = groups.get(key);
     if (!bucket) { bucket = []; groups.set(key, bucket); }
-    bucket.push({ tx: t, ts: new Date(t.date).getTime() });
+    bucket.push({ tx: t, ts: parseDay(t.date).getTime() });
   }
 
   const results: RecurringCharge[] = [];
@@ -176,6 +180,8 @@ export type StreamBadge = 'FIXED' | 'RECURRING' | 'OCCASIONAL' | 'ONE_OFF';
 
 export interface IncomeStream {
   name: string;
+  /** true when you said this is your pay (or the bank calls it salary), false when you said it isn't */
+  isPay: boolean | null;
   category: string;
   badge: StreamBadge;
   /** Typical credit amount (median) */
@@ -202,6 +208,10 @@ export interface IncomeStability {
 
 export interface SalaryInfo {
   streamName: string;
+  /** false: a guess to confirm before calling it your pay (audit M8) */
+  confirmed: boolean;
+  /** The payee to save a rule for when you answer, if the narration names one */
+  payee: string | null;
   typicalAmount: number;
   typicalDay: number;
   lastDate: Date;
@@ -216,9 +226,15 @@ export interface IncomeAnalysis {
   totalIncome12m: number;
 }
 
+/**
+ * Income over the trailing 12 months. Pass only counted transactions (money
+ * moved left out), and `isPay` to say which credits you confirmed as pay
+ * (true), ruled out (false) or haven't said (null).
+ */
 export const analyzeIncome = (
   transactions: Transaction[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  isPay: (t: Transaction) => boolean | null = t => (t.category === 'Salary' ? true : null)
 ): IncomeAnalysis => {
   const nowKey = monthKey(now);
   const windowStartKey = nowKey - 11;
@@ -229,7 +245,7 @@ export const analyzeIncome = (
 
   for (const t of transactions) {
     if (t.type !== TransactionType.INCOME) continue;
-    const d = new Date(t.date);
+    const d = parseDay(t.date);
     const k = monthKey(d);
     if (k >= windowStartKey && k <= nowKey) {
       monthly[k - windowStartKey] += t.amount;
@@ -276,6 +292,8 @@ export const analyzeIncome = (
     const amountVariation = cv(bucket.map(b => b.tx.amount));
     const total = bucket.reduce((s, b) => s + b.tx.amount, 0);
     const last = bucket[bucket.length - 1];
+    const answers = bucket.map(b => isPay(b.tx));
+    const pay = answers.includes(true) ? true : answers.includes(false) ? false : null;
 
     let badge: StreamBadge;
     if (months >= 3 && amountVariation <= 0.1 && daySpread <= 7) badge = 'FIXED';
@@ -285,6 +303,7 @@ export const analyzeIncome = (
 
     streams.push({
       name: last.tx.merchant || last.tx.category,
+      isPay: pay,
       category: last.tx.category,
       badge,
       typicalAmount,
@@ -298,11 +317,15 @@ export const analyzeIncome = (
   }
   streams.sort((a, b) => b.total12m - a.total12m);
 
-  // ── Salary detection: the dominant FIXED/RECURRING stream ──
+  // ── Salary: a stream you confirmed, else the dominant FIXED/RECURRING
+  //    stream as a guess to confirm (audit M8: it used to pick a broker payout) ──
   let salary: SalaryInfo | null = null;
   const avgMonthlyIncome = stability?.avgMonthly ?? 0;
-  const candidate = streams.find(s =>
-    (s.badge === 'FIXED' || (s.badge === 'RECURRING' && avgMonthlyIncome > 0 && s.typicalAmount >= avgMonthlyIncome * 0.4))
+  const confirmed = streams.find(s => s.isPay === true);
+  const candidate = confirmed ?? streams.find(s =>
+    s.isPay === null &&
+    (s.badge === 'FIXED' || s.badge === 'RECURRING') &&
+    avgMonthlyIncome > 0 && s.typicalAmount >= avgMonthlyIncome * 0.4
   );
   if (candidate) {
     // Next expected: candidate.typicalDay of this month if still ahead, else next month
@@ -314,6 +337,8 @@ export const analyzeIncome = (
     const next = new Date(y, m, clampDay(y, m, candidate.typicalDay));
     salary = {
       streamName: candidate.name,
+      confirmed: candidate === confirmed,
+      payee: payeeName(candidate.name) ?? (candidate.name.includes('/') ? null : candidate.name),
       typicalAmount: candidate.typicalAmount,
       typicalDay: candidate.typicalDay,
       lastDate: candidate.lastDate,
@@ -356,7 +381,7 @@ export const categoryMovers = (
 
   for (const t of transactions) {
     if (t.type !== type) continue;
-    const k = monthKey(new Date(t.date));
+    const k = monthKey(parseDay(t.date));
     if (k === curKey) cur.set(t.category, (cur.get(t.category) || 0) + t.amount);
     else if (k === prevKey) prev.set(t.category, (prev.get(t.category) || 0) + t.amount);
   }
@@ -420,7 +445,7 @@ export const monthDailyStats = (
   }
 
   for (const t of expensesInMonth) {
-    const d = new Date(t.date);
+    const d = parseDay(t.date);
     const day = d.getDate();
     if (day >= 1 && day <= daysInMonth) {
       daily[day - 1] += t.amount;

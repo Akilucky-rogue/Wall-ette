@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 
 import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
+import AppUpdates from './components/AppUpdates';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -9,7 +10,7 @@ import SplashScreen, { SplashVariant } from './components/SplashScreen';
 import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { auth } from './services/firebase';
+import { consumeQuietStart, signOutOfDevice } from './services/session';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -19,7 +20,7 @@ const NewEntry = React.lazy(() => import('./components/NewEntry'));
 const SpendAnalysis = React.lazy(() => import('./components/SpendAnalysis'));
 const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
-const IgnoreRules = React.lazy(() => import('./components/IgnoreRules'));
+const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
@@ -36,10 +37,15 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.EXPORT]: AppScreen.DASHBOARD,
   [AppScreen.INCOME_INSIGHTS]: AppScreen.DASHBOARD,
   [AppScreen.CATEGORY_SPLIT]: AppScreen.ANALYSIS,
-  [AppScreen.IGNORE_RULES]: AppScreen.SELF,
+  [AppScreen.MONEY_MOVED]: AppScreen.SELF,
   [AppScreen.HUNTER]: AppScreen.DASHBOARD,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
 };
+
+// Sign-out and account deletion clear this device's data and reload the app;
+// that start-up skips the launch splash (services/session.ts). Read once per
+// page load, outside React.
+const QUIET_START = consumeQuietStart();
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -48,10 +54,15 @@ function AppContent() {
   // what makes "biometric login" real — open app → fingerprint → in.
   const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(!QUIET_START);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  // Signed in during this run (a new install or a fresh login) rather than
+  // resuming a saved session. AppUpdates uses it to tell a new install from
+  // an update.
+  const [signedInThisRun, setSignedInThisRun] = useState(false);
 
   // Ref mirror so long-lived native listeners read the current screen without
   // re-registering on every navigation (audit Phase 6.2).
@@ -191,6 +202,7 @@ function AppContent() {
     // The user JUST authenticated with their password — don't bounce them
     // into the session lock on top of it.
     setIsLocked(false);
+    setSignedInThisRun(true);
     setAuthSplashPending(type);
     setSplashVariant(type);
     setShowSplash(true);
@@ -199,11 +211,14 @@ function AppContent() {
   const handleSplashComplete = () => {
     setShowSplash(false);
     setAuthSplashPending(null);
-    // If logging out, actually sign out after splash completes
+    // If logging out, actually sign out after splash completes. That can take
+    // a few seconds (unsynced changes get a chance to reach the cloud first)
+    // and usually ends in a reload; the spinner covers it.
     if (isLoggingOut) {
-      auth.signOut();
       setIsLoggingOut(false);
+      setSigningOut(true);
       setCurrentScreen(AppScreen.DASHBOARD); // Reset to dashboard for next login
+      void signOutOfDevice().finally(() => setSigningOut(false));
     }
   };
 
@@ -219,7 +234,7 @@ function AppContent() {
     return <SplashScreen variant={splashVariant} onComplete={handleSplashComplete} />;
   }
 
-  if (loading) {
+  if (loading || signingOut) {
       return <LoadingFallback />;
   }
 
@@ -250,8 +265,8 @@ function AppContent() {
         return <IncomeInsights onNavigate={handleNavigate} />;
       case AppScreen.CATEGORY_SPLIT:
         return <CategorySplit onNavigate={handleNavigate} />;
-      case AppScreen.IGNORE_RULES:
-        return <IgnoreRules onNavigate={handleNavigate} />;
+      case AppScreen.MONEY_MOVED:
+        return <MoneyMoved onNavigate={handleNavigate} />;
       case AppScreen.IMPORT:
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:
@@ -286,12 +301,14 @@ function AppContent() {
           currentScreen === AppScreen.EXPORT ||
           currentScreen === AppScreen.HUNTER ||
           currentScreen === AppScreen.REWIND ||
-          currentScreen === AppScreen.IGNORE_RULES
+          currentScreen === AppScreen.MONEY_MOVED
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
         )}
         <AndroidInstallBanner />
       </div>
+      {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}
+      <AppUpdates signedInThisRun={signedInThisRun} />
     </WalletProvider>
   );
 }

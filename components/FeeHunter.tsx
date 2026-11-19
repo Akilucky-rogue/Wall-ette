@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { huntSavings, normalizeMerchant, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, RangoliCorner, MandalaDots } from './SplashScreen';
 
@@ -9,11 +10,13 @@ interface FeeHunterProps {
 }
 
 const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact, deleteTransactions } = useWallet();
+  const { transactions, counted, formatAmount, formatAmountCompact, deleteTransactions } = useWallet();
   const [cleaning, setCleaning] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const hunt = useMemo(() => huntSavings(transactions), [transactions]);
+  // Fees, double charges and creep among real spending; money moved to your
+  // own accounts or family repeats by design (audit H3).
+  const hunt = useMemo(() => huntSavings(counted), [counted]);
 
   // Exact duplicates INSIDE the wallet (same date + type + amount + merchant,
   // both imported) — usually the result of "Include Anyway" on an overlap.
@@ -53,7 +56,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
   };
   const fmt = (n: number) => formatAmount(n).split('.')[0];
   const dl = (s: string) =>
-    new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+    parseDay(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
 
   const hasFindings = hunt.totalFound > 0.5;
 
@@ -229,7 +232,7 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
       </div>
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
+        <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
           <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
           <span className="text-[13px] font-medium font-serif">{toast}</span>
         </div>

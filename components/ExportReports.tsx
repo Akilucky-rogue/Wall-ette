@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { localDay, parseDay } from '../utils/dates';
 import { analyzeFinancialHealth } from '../services/insightsService';
 import { detectRecurringCharges, analyzeIncome } from '../services/analyticsService';
 import { exportFile } from '../utils/exportFile';
@@ -25,7 +26,7 @@ const escapeHtml = (s: string): string =>
 const csvCell = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 
 const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
-  const { transactions, openingBalance, formatAmount } = useWallet();
+  const { transactions, counted, flowOf, openingBalance, formatAmount } = useWallet();
   const [period, setPeriod] = useState<Period>('MONTH');
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -43,34 +44,41 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     return null; // ALL
   }, [period]);
 
+  // Money in and out of the account, and within it what is real income and
+  // spending; money moved to your own accounts, family or investments is
+  // neither (audit H3), so the savings rate uses earned and spent.
   const { periodTxs, stats } = useMemo(() => {
     const txs: Transaction[] = [];
-    let income = 0, expense = 0;
-    const cats = new Map<string, number>();
+    let income = 0, expense = 0, earned = 0, spent = 0, movedIn = 0, movedOut = 0;
 
     for (const t of transactions) {
-      if (periodStart && new Date(t.date) < periodStart) continue;
+      if (periodStart && parseDay(t.date) < periodStart) continue;
       txs.push(t);
-      if (t.type === TransactionType.INCOME) income += t.amount;
-      else {
+      const counts = flowOf(t).flow !== 'moved';
+      if (t.type === TransactionType.INCOME) {
+        income += t.amount;
+        if (counts) earned += t.amount; else movedIn += t.amount;
+      } else {
         expense += t.amount;
-        cats.set(t.category, (cats.get(t.category) || 0) + t.amount);
+        if (counts) spent += t.amount; else movedOut += t.amount;
       }
     }
 
-    const topCategories = [...cats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
     return {
       periodTxs: txs,
       stats: {
         income,
         expense,
         net: income - expense,
-        savingsRate: income > 0 ? Math.round(((income - expense) / income) * 100) : null,
-        topCategories,
+        earned,
+        spent,
+        movedIn,
+        movedOut,
+        savingsRate: earned > 0 ? Math.round(((earned - spent) / earned) * 100) : null,
         count: txs.length,
       },
     };
-  }, [transactions, periodStart]);
+  }, [transactions, flowOf, periodStart]);
 
   const currentBalance = useMemo(() => {
     let net = 0;
@@ -78,7 +86,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     return openingBalance + net;
   }, [transactions, openingBalance]);
 
-  const stamp = new Date().toISOString().split('T')[0];
+  const stamp = localDay();
   const periodSlug = period.toLowerCase();
   const fmt = (n: number) => formatAmount(n).split('.')[0];
 
@@ -90,7 +98,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     try {
       const headers = ['Date', 'Merchant', 'Category', 'Type', 'Amount', 'Note'];
       const rows = periodTxs.map(t => [
-        new Date(t.date).toLocaleDateString('en-GB'),
+        parseDay(t.date).toLocaleDateString('en-GB'),
         csvCell(t.merchant || ''),
         csvCell(t.category),
         t.type,
@@ -113,10 +121,9 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     setBusy('statement');
     try {
       const insights = await analyzeFinancialHealth(
-        periodTxs.map(t => ({ ...t, merchant: t.merchant || '' }))
+        periodTxs.filter(t => flowOf(t).flow !== 'moved').map(t => ({ ...t, merchant: t.merchant || '' }))
       );
-      const recurring = detectRecurringCharges(transactions).slice(0, 8);
-      const maxCat = stats.topCategories[0]?.[1] || 1;
+      const recurring = detectRecurringCharges(counted).slice(0, 8);
       const periodLabel = PERIOD_LABELS[period];
       const generated = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -131,25 +138,26 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       let firstDay: string | null = null, lastDay: string | null = null;
 
       for (const t of periodTxs) {
-        const d = new Date(t.date);
+        const d = parseDay(t.date);
         const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const m = byMonth.get(mk) || { inc: 0, out: 0 };
         const dayKey = t.date.slice(0, 10);
         if (!firstDay || dayKey < firstDay) firstDay = dayKey;
         if (!lastDay || dayKey > lastDay) lastDay = dayKey;
+        // Money moved (own accounts, family, investments) stays in the
+        // cash-flow totals but out of the income and spending analysis.
+        const counts = flowOf(t).flow !== 'moved';
         if (t.type === TransactionType.INCOME) {
-          m.inc += t.amount; incomesArr.push(t);
+          m.inc += t.amount;
+          if (counts) incomesArr.push(t);
         } else {
           m.out += t.amount;
-          const c = byCat.get(t.category) || { total: 0, count: 0, merchants: new Map<string, number>() };
-          c.total += t.amount; c.count++;
-          const mer = t.merchant || 'Unknown';
-          c.merchants.set(mer, (c.merchants.get(mer) || 0) + t.amount);
-          byCat.set(t.category, c);
-          // Transfers/adjustments/investments are money MOVED, not money
-          // SPENT — kept in cash-flow totals, out of spending analysis.
-          const isTransferCat = t.category === 'Transfer Out' || t.category === 'Adjustment' || t.category === 'Investment';
-          if (!isTransferCat) {
+          if (counts) {
+            const c = byCat.get(t.category) || { total: 0, count: 0, merchants: new Map<string, number>() };
+            c.total += t.amount; c.count++;
+            const mer = t.merchant || 'Unknown';
+            c.merchants.set(mer, (c.merchants.get(mer) || 0) + t.amount);
+            byCat.set(t.category, c);
             expensesArr.push(t);
             const bm = byMerchant.get(mer) || { total: 0, count: 0 };
             bm.total += t.amount; bm.count++; byMerchant.set(mer, bm);
@@ -160,10 +168,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
         }
         byMonth.set(mk, m);
       }
-      const transfersOut = (byCat.get('Transfer Out')?.total || 0)
-        + (byCat.get('Adjustment')?.total || 0)
-        + (byCat.get('Investment')?.total || 0);
-      const spendExpense = Math.max(0, stats.expense - transfersOut);
+      const spendExpense = stats.spent;
 
       const months = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
       // Charts/tables stay readable on long periods: monthly view caps at the
@@ -178,16 +183,13 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       }
       const yearRows = [...yearAgg.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 
-      const SPEND_EXCLUDE = new Set(['Transfer Out', 'Adjustment', 'Investment']);
       const topSpendCats: [string, number][] = [...byCat.entries()]
-        .filter(([name]) => !SPEND_EXCLUDE.has(name))
         .sort((a, b) => b[1].total - a[1].total)
         .slice(0, 6)
         .map(([name, c]) => [name, c.total]);
       const maxSpendCat = topSpendCats[0]?.[1] || 1;
 
       const catRows = [...byCat.entries()]
-        .filter(([name]) => !SPEND_EXCLUDE.has(name))
         .sort((a, b) => b[1].total - a[1].total).slice(0, 6)
         .map(([name, c]) => ({
           name, total: c.total, count: c.count, avg: c.total / c.count,
@@ -208,9 +210,9 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       const ml = (k: string) =>
         new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
       const dl = (s: string) =>
-        new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        parseDay(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
       const recurringAnnual = recurring.reduce((s, r) => s + r.monthlyCost * 12, 0);
-      const incomeAnalysis = analyzeIncome(transactions); // 12-month view
+      const incomeAnalysis = analyzeIncome(counted); // 12-month view
       const BADGE: Record<string, string> = { FIXED: 'fixed', RECURRING: 'recurring', OCCASIONAL: 'occasional', ONE_OFF: 'one-off' };
 
       // ── Chart data (pure CSS/SVG — the export stays self-contained) ────
@@ -283,14 +285,14 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   <div class="sub">${escapeHtml(periodLabel)} · generated ${generated} · ${stats.count} transactions</div>
 
   <div class="grid">
-    <div class="card"><div class="l">Income</div><div class="v pos">+${fmt(stats.income)}</div></div>
-    <div class="card"><div class="l">Expenses</div><div class="v neg">−${fmt(stats.expense)}</div></div>
+    <div class="card"><div class="l">Money in</div><div class="v pos">+${fmt(stats.income)}</div></div>
+    <div class="card"><div class="l">Money out</div><div class="v neg">−${fmt(stats.expense)}</div></div>
     <div class="card"><div class="l">Net</div><div class="v ${stats.net >= 0 ? 'pos' : 'neg'}">${stats.net >= 0 ? '+' : '−'}${fmt(Math.abs(stats.net))}</div></div>
     <div class="card"><div class="l">Current Balance</div><div class="v">${fmt(currentBalance)}</div></div>
   </div>
-  ${stats.savingsRate !== null ? `<div class="sub">Savings rate this period: <b>${stats.savingsRate}%</b></div>` : ''}
+  <div class="sub">Earned <b>${fmt(stats.earned)}</b> · spent <b>${fmt(stats.spent)}</b>${stats.savingsRate !== null ? ` · savings rate <b>${stats.savingsRate}%</b>` : ''}</div>
 
-  ${transfersOut > 0 ? `<div class="sub" style="margin-top:8px">Transfers &amp; investments moved: <b>${fmt(transfersOut)}</b> — money moved, not spent, so it's excluded from the spending analysis below.</div>` : ''}
+  ${stats.movedOut + stats.movedIn > 0 ? `<div class="sub" style="margin-top:8px">Money moved: <b>${fmt(stats.movedOut)}</b> out, <b>${fmt(stats.movedIn)}</b> in, between your own accounts, family and investments. It's neither spending nor income, so it's left out of the analysis below.</div>` : ''}
 
   ${topSpendCats.length > 0 ? `<h2>Spending split · ${fmt(spendExpense)} actually spent</h2>
   <div class="charts">
@@ -587,7 +589,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-xs font-medium px-5 py-3 rounded-full shadow-xl z-[100] animate-slide-up max-w-[90%] text-center">
+        <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white text-xs font-medium px-5 py-3 rounded-full shadow-xl z-[100] animate-slide-up max-w-[90%] text-center">
           {toast}
         </div>
       )}

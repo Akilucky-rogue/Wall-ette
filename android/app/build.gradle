@@ -1,23 +1,26 @@
 apply plugin: 'com.android.application'
 
-// Release signing credentials live in android/key.properties (gitignored).
-// Copy android/key.properties.example, fill it in, and bundleRelease /
-// assembleRelease will produce signed artifacts automatically.
+// Release signing. The APK for the website download is signed with the key
+// in android/key.properties. Google Play builds (bundleRelease -Pplay, which
+// npm run android:bundle runs) use the upload key in android/upload.properties:
+// the old key was in a pull request, so Play gets a new one (audit C2). Both
+// files are gitignored; copy the .example next to each and fill it in.
+def forPlay = project.hasProperty('play')
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file("key.properties")
+def keystorePropertiesFile = rootProject.file(forPlay ? "upload.properties" : "key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 android {
-    namespace = "com.wallet.walle"
+    namespace = "com.wallette.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.wallet.walle"
+        applicationId "com.wallette.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.5.1"
+        versionCode 11
+        versionName "1.5.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -50,6 +53,11 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+// Checked after android {} so the build stops with this message alone.
+if (forPlay && !keystorePropertiesFile.exists()) {
+    throw new GradleException("android/upload.properties is missing: create the upload key first (docs/PLAY_SUBMISSION.md, step 1).")
 }
 
 repositories {

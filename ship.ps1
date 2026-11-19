@@ -2,6 +2,16 @@
 # -> install on phone -> commit & push.
 # Usage:  .\ship.ps1 "feat: my change description"
 param([string]$Message = "chore: update build")
+
+# Retired on 19 Nov 2026 until audit item 14 (M12) reworks it. Since the move
+# to Google Play it would build com.wallette.app signed with the old website
+# key and publish it, which blocks installing the Play version, then commit
+# everything with git add -A. Meanwhile:
+#   website and rules:  npm run build; npx firebase-tools deploy --only hosting,firestore:rules
+#   Android:            npm run android:bundle, then upload it in Play Console
+Write-Host "ship.ps1 is retired for now; see the note at the top of this file." -ForegroundColor Yellow
+exit 1
+
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 

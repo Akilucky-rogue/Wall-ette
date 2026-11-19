@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -13,12 +13,20 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <!-- SDK 35 forces edge-to-edge (app drew under the status bar /
-             notification panel). Opt out so the system reserves the insets. -->
-        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <!-- Android 15+ draws apps edge to edge, and from target SDK 36 the
+             opt-out is ignored (audit H6). Capacitor's SystemBars keeps the
+             page clear of the bars: it passes the insets to CSS (the sat and
+             sab variables in index.html), or on older WebViews pads the
+             page, and then this background shows behind the bars.
+             statusBarColor and navigationBarColor apply on Android 14 and
+             older only. Android 15+ would lay navigationBarColor at 80% over
+             the 3-button bar, which clashes with dark themes, so that scrim
+             is off and index.html paints the theme colour there instead. -->
+        <item name="android:windowBackground">#FAF9F6</item>
         <item name="android:statusBarColor">#FAF9F6</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">#FAF9F6</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
     </style>
 
 

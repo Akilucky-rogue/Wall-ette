@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { AppScreen, TransactionType, CATEGORIES } from '../types';
+import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types';
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
+import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
 
@@ -10,11 +11,11 @@ interface NewEntryProps {
 }
 
 // Category quick-picks per type; "More" reveals the full list.
-const EXPENSE_QUICK = ['Food Delivery', 'Groceries', 'Dining', 'Coffee', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Rent', 'Healthcare', 'Cash', 'Subscriptions'];
-const INCOME_QUICK = ['Salary', 'Freelance', 'Bonus', 'Investment', 'Dividend', 'Interest', 'Transfer'];
+const EXPENSE_QUICK: Category[] = ['Food Delivery', 'Groceries', 'Dining', 'Coffee', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Rent', 'Healthcare', 'Cash Withdrawal', 'Subscriptions'];
+const INCOME_QUICK: Category[] = ['Salary', 'Freelance', 'Bonus', 'Investment Returns', 'Dividend', 'Interest Income', 'Transfer In'];
 
 // Merchant → category assist (only fires while category is unset).
-const AUTO_CATEGORY: [RegExp, string][] = [
+const AUTO_CATEGORY: [RegExp, Category][] = [
   [/zomato|swiggy|eatsure/i, 'Food Delivery'],
   [/blinkit|zepto|bigbasket|jiomart|grofers|instamart|dmart/i, 'Groceries'],
   [/mcdonald|kfc|domino|pizza|burger|subway|restaurant/i, 'Dining'],
@@ -23,7 +24,7 @@ const AUTO_CATEGORY: [RegExp, string][] = [
   [/netflix|hotstar|spotify|prime video|sonyliv/i, 'Streaming'],
   [/amazon|flipkart|myntra|ajio|meesho|nykaa/i, 'Shopping'],
   [/petrol|fuel|hpcl|bpcl|shell/i, 'Fuel'],
-  [/jio|airtel|recharge|postpaid/i, 'Phone'],
+  [/jio|airtel|recharge|postpaid/i, 'Phone & Internet'],
 ];
 
 const CAT_ICON = (cat: string): string => {
@@ -49,14 +50,10 @@ const CAT_ICON = (cat: string): string => {
   return 'category';
 };
 
-// Local YYYY-MM-DD without the UTC shift toISOString causes on IST.
-const toLocalInput = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
-  const { currency, addTransaction, convertToBase, transactions, dailyLimit, formatAmount } = useWallet();
+  const { currency, addTransaction, convertToBase, transactions, counted, flowOf, dailyLimit, formatAmount } = useWallet();
   const [amount, setAmount] = useState('0.00');
   const [note, setNote] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -73,11 +70,11 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   // Recent merchants for the active type (last 90 days, by frequency)
   const suggestions = useMemo(() => {
-    const cutoff = Date.now() - 90 * 86400000;
+    const since = addDays(localDay(), -90);
     const freq = new Map<string, number>();
     for (const t of transactions) {
       if (t.type !== type) continue;
-      if (Date.parse(t.date) < cutoff) continue;
+      if (t.date < since) continue;
       const name = prettyMerchant(t.merchant || '');
       if (!name || name === 'Unknown') continue;
       freq.set(name, (freq.get(name) || 0) + 1);
@@ -85,17 +82,24 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n]) => n);
   }, [transactions, type]);
 
-  // Today's expense total (base) for the daily-limit preview
+  // Today's spending (base) for the daily-limit preview. Like the check on
+  // save, only spending counts: money moved to family or your own accounts
+  // doesn't use up the limit.
   const todaySpend = useMemo(() => {
-    const key = new Date().toDateString();
+    const today = localDay();
     let sum = 0;
-    for (const t of transactions) {
-      if (t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === key) sum += t.amount;
+    for (const t of counted) {
+      if (t.type === TransactionType.EXPENSE && t.date === today) sum += t.amount;
     }
     return sum;
-  }, [transactions]);
+  }, [counted]);
 
-  const overLimit = type === TransactionType.EXPENSE && dailyLimit > 0 && numAmount > 0
+  const entryCounts = useMemo(() => flowOf({
+    id: 'draft', amount: 1, type, category: category || 'Uncategorized', date: localDay(),
+    merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
+  }).flow === 'spend', [flowOf, type, category, merchant, note]);
+
+  const overLimit = type === TransactionType.EXPENSE && entryCounts && dailyLimit > 0 && numAmount > 0
     && todaySpend + convertToBase(numAmount) > dailyLimit;
 
   const applyMerchant = (value: string) => {
@@ -140,7 +144,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       amount: amountInBase,
       type,
       category: category || 'Uncategorized',
-      date: selectedDate.toISOString(),
+      date: localDay(selectedDate),
+      createdAt: new Date().toISOString(),
       note,
       merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
     });
@@ -332,9 +337,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <div className="border-t border-black/5 pt-4">
                 <input
                   type="date"
-                  value={toLocalInput(selectedDate)}
-                  max={toLocalInput(new Date())}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
+                  value={localDay(selectedDate)}
+                  max={localDay()}
+                  onChange={(e) => { if (isDay(e.target.value)) setSelectedDate(parseDay(e.target.value)); }}
                   className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal font-serif"
                   title="Custom date"
                   aria-label="Custom date"
@@ -417,7 +422,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       </div>
 
       {toast && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
+        <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
           <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
           <span className="text-[13px] font-medium font-serif">{toast}</span>
         </div>

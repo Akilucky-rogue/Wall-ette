@@ -28,6 +28,7 @@ dist-ssr
 *.keystore
 *.jks
 android/key.properties
+android/upload.properties
 
 # Build artifacts
 *.apk

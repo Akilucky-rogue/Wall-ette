@@ -8,6 +8,11 @@ declare module '*.module.css' {
   export default classes;
 }
 
+// App version from android/app/build.gradle, set by vite.config.ts
+declare const __APP_VERSION__: string;
+/** The Android versionCode. */
+declare const __APP_BUILD__: number;
+
 // Vite `?url` asset imports (used for the bundled pdf.js worker)
 declare module '*?url' {
   const src: string;

@@ -5,7 +5,7 @@ import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firest
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
-import { auth, db } from '../services/firebase';
+import { db } from '../services/firebase';
 import {
   isTotpEnrolled, startTotpEnrollment, finishTotpEnrollment, unenrollTotp,
   isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage,
@@ -13,8 +13,12 @@ import {
 } from '../services/mfa';
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateBiometric, isNative } from '../utils/biometric';
 import { log } from '../utils/log';
+import { PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
+import WhatsNewSheet from './WhatsNewSheet';
+import { latestNotes } from '../services/releaseNotes';
+import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
@@ -57,6 +61,8 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
 const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
   const { user } = useAuth();
   const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions } = useWallet();
+
+  const [notesOpen, setNotesOpen] = useState(false);
 
   // ── Daily limit (unchanged behavior) ──
   const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? dailyLimit.toString() : '');
@@ -250,10 +256,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           throw e;
         }
       }
-      await wipeCloudData(user.uid);
-      setBiometricEnabled(user.uid, false);
+      const uid = user.uid;
+      await wipeCloudData(uid);
       await user.delete();
-      // onAuthStateChanged fires with null → app returns to the Auth screen
+      // Then this device's copy (audit M2); the app reloads to the Auth screen.
+      await forgetDeletedAccount(uid);
     } catch (e: any) {
       log.warn('Account deletion failed:', e?.code);
       setDelError(e?.code === 'auth/wrong-password' || e?.code === 'auth/invalid-credential'
@@ -432,15 +439,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
-                  <Row icon="filter_alt" iconCls="bg-lavender-light text-lavender" title="Ignore Rules" sub="Exclude transfers & reimbursables" onClick={() => onNavigate(AppScreen.IGNORE_RULES)}>
+                  <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money Moved" sub="Your accounts, family, investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
                   <Row icon="policy" iconCls="bg-sand-light text-sand" title="Privacy Policy" sub="How your data is handled"
-                       onClick={() => window.open('https://wall-e-7a113.web.app/privacy.html', '_blank')}>
+                       onClick={() => window.open(PRIVACY_URL, '_blank')}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
                   </Row>
                   <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms & Conditions" sub="The agreement you accepted"
-                       onClick={() => window.open('https://wall-e-7a113.web.app/terms.html', '_blank')}>
+                       onClick={() => window.open(TERMS_URL, '_blank')}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
                   </Row>
               </div>
@@ -451,7 +458,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Account</h4>
               <div className="space-y-3">
                   <button
-                    onClick={() => onLogout ? onLogout() : auth.signOut()}
+                    onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
                     className="w-full bg-white border border-rose/20 text-rose py-4 rounded-3xl font-serif font-medium shadow-sm hover:bg-rose-light/20 transition-all flex items-center justify-center gap-2"
                   >
                       <span className="material-symbols-outlined">logout</span>
@@ -468,13 +475,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       </div>
 
       <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v1.5.1</p>
+        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v{__APP_VERSION__} ({__APP_BUILD__})</p>
+        {isNative() && (
+          <button onClick={() => setNotesOpen(true)} className="mt-2 px-3 py-1 text-[11px] font-medium text-sage hover:text-sage/80 transition-colors">
+            What's new
+          </button>
+        )}
       </div>
+
+      {notesOpen && <WhatsNewSheet notes={latestNotes(__APP_BUILD__)} onClose={() => setNotesOpen(false)} />}
 
       {/* ── 2FA modal ── */}
       {mfaModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !mfaBusy && setMfaModal(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Two-Factor Auth</h3>
               <button onClick={() => setMfaModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={mfaBusy}>
@@ -532,7 +546,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* ── Change password modal ── */}
       {pwModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change Password</h3>
               <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
@@ -611,7 +625,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {/* ── Delete account modal ── */}
       {delOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !delBusy && setDelOpen(false)}>
-          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete Account</h3>
             <p className="text-[12px] text-muted-taupe leading-relaxed mb-4">
               This permanently erases your account and every transaction from the cloud. There is no undo.

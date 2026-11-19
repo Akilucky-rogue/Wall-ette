@@ -1,15 +1,75 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
-import { Transaction, TransactionType, CurrencyCode, IgnoreRule } from '../types';
-import { db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy } from 'firebase/firestore';
+import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, canonicalCategory } from '../types';
+import { auth, db } from '../services/firebase';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
+import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
+import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
 import { log } from '../utils/log';
+
+// Category names from earlier versions (audit M10) are mapped once, as data
+// loads, so every screen, the Edit dialog and budgets see one name each.
+const withListCategories = (list: Transaction[]): Transaction[] =>
+  list.map(t => {
+    if (!t.category) return t;
+    const category = canonicalCategory(t.category, t.type);
+    return category === t.category ? t : { ...t, category };
+  });
+
+// The day and time to store for an entry an earlier version saved as a UTC
+// timestamp (audit H4), or null when its date is already a local day.
+const localDayFields = (t: Transaction): { date: string; createdAt?: string } | null => {
+  const fixed = fromTimestamp(t.date);
+  if (!fixed) return null;
+  return t.createdAt || !fixed.createdAt ? { date: fixed.date } : fixed;
+};
+
+// Everything that loads passes through here, so every screen sees list
+// category names and local days, newest first.
+const asLoaded = (list: Transaction[]): Transaction[] =>
+  withListCategories(list)
+    .map(t => {
+      const fields = localDayFields(t);
+      return fields ? { ...t, ...fields } : t;
+    })
+    .sort(byNewest);
+
+const PAYEE_KINDS = new Set<PayeeKind>(['mine', 'family', 'investment', 'ignore', 'counts', 'salary']);
+
+// Payee rules as saved (Firestore or this device); anything malformed is dropped.
+const asPayeeRules = (raw: unknown): PayeeRule[] =>
+  Array.isArray(raw)
+    ? raw.filter((r): r is PayeeRule =>
+        !!r && typeof r.id === 'string' && typeof r.match === 'string' &&
+        matchText(r.match).length >= MIN_MATCH && PAYEE_KINDS.has(r.kind))
+    : [];
+
+// A budget saved under a list name wins; budgets kept only under old names
+// (Phone and Internet, say) are added together under the list name.
+const withListBudgetNames = (budgets: Record<string, number>): Record<string, number> => {
+  const out: Record<string, number> = {};
+  const fromOldNames: Record<string, number> = {};
+  for (const [category, amount] of Object.entries(budgets)) {
+    const name = canonicalCategory(category, TransactionType.EXPENSE);
+    if (name === category) out[name] = amount;
+    else fromOldNames[name] = (fromOldNames[name] ?? 0) + amount;
+  }
+  for (const [name, amount] of Object.entries(fromOldNames)) {
+    if (!(name in out)) out[name] = amount;
+  }
+  return out;
+};
 
 interface WalletContextType {
   transactions: Transaction[];
   currency: CurrencyCode;
-  ignoreRules: IgnoreRule[];
+  /** Payee rules from the Money Moved screen (audit H3, M9). */
+  payeeRules: PayeeRule[];
+  /** How a transaction counts: spending, income or money moved (never two). */
+  flowOf: (t: Transaction) => FlowInfo;
+  /** The transactions that count as spending or income; money moved is left out. */
+  counted: Transaction[];
   dailyLimit: number;
   mfaEnabled: boolean;
   /** Per-category monthly budgets (INR base). */
@@ -35,7 +95,9 @@ interface WalletContextType {
   /** Clears instantly; cloud deletion runs in the background unless waitForCloud. */
   clearAllTransactions: (waitForCloud?: boolean) => Promise<void>;
   importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string) => void;
-  toggleIgnoreRule: (id: string) => void;
+  /** Adds a rule, or changes the kind of the rule with the same match. */
+  savePayeeRule: (match: string, kind: PayeeKind) => void;
+  deletePayeeRule: (id: string) => void;
   getBalance: () => number;
   getMonthlyIncome: () => number;
   getMonthlyExpense: () => number;
@@ -61,13 +123,6 @@ export const useWallet = () => {
   }
   return context;
 };
-
-const DEFAULT_RULES: IgnoreRule[] = [
-  { id: '1', name: "Internal Transfers", description: "Wallet-to-Wallet", icon: "swap_horiz", color: "sage", isActive: true },
-  { id: '2', name: "Tax Reserve", description: "Automated Sinking", icon: "account_balance", color: "rose", isActive: true },
-  { id: '3', name: "Business Expenses", description: "Reimbursable", icon: "domain", color: "ocean", isActive: false },
-  { id: '4', name: "Network Fees", description: "Gas & Overhead", icon: "token", color: "sand", isActive: true }
-];
 
 // Only these currencies are selectable in the UI; don't keep ~160 rates in state.
 const SUPPORTED_CODES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP'];
@@ -105,7 +160,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
-  const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
+  const [payeeRules, setPayeeRules] = useState<PayeeRule[]>([]);
   const [dailyLimit, setDailyLimitState] = useState<number>(0);
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
   const [budgets, setBudgetsState] = useState<Record<string, number>>({});
@@ -202,7 +257,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Local Storage Fallback Helpers
   const saveToLocal = useCallback((key: string, data: any) => {
-      if (!user) return;
+      // Also skipped once this user has signed out or deleted the account, so
+      // a late mirror write can't put back a key services/session.ts removed.
+      if (!user || auth.currentUser?.uid !== user.uid) return;
       try {
         localStorage.setItem(`${key}_${user.uid}`, JSON.stringify(data));
       } catch (e) { log.error('Local storage save error'); }
@@ -227,6 +284,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       mirrorTimer.current = setTimeout(() => saveToLocal('transactions', txs), 1000);
   }, [saveToLocal]);
   useEffect(() => () => { if (mirrorTimer.current) clearTimeout(mirrorTimer.current); }, []);
+
+  // Entries saved as UTC timestamps get their local day in the cloud too, once
+  // (audit H4). Screens already show the right day from asLoaded; this keeps
+  // the stored copy from depending on the phone's time zone. Each entry is
+  // tried once per session.
+  const dayFixesTried = useRef(new Set<string>());
+  const saveLocalDays = useCallback((stored: { ref: DocumentReference; t: Transaction }[]) => {
+      const fixes: { ref: DocumentReference; fields: { date: string; createdAt?: string } }[] = [];
+      for (const { ref, t } of stored) {
+          if (dayFixesTried.current.has(ref.path)) continue;
+          const fields = localDayFields(t);
+          if (!fields) continue;
+          // The update rule's own checks, so one odd document can't fail a batch.
+          if (typeof t.amount !== 'number' || !(t.amount > 0)) continue;
+          if (t.type !== TransactionType.INCOME && t.type !== TransactionType.EXPENSE) continue;
+          dayFixesTried.current.add(ref.path);
+          fixes.push({ ref, fields });
+      }
+      for (const chunk of chunkArray(fixes, 500)) {
+          const batch = writeBatch(db);
+          chunk.forEach(({ ref, fields }) => batch.update(ref, fields));
+          batch.commit().catch(e => log.warn('Saving local days failed:', e?.code || e?.message));
+      }
+  }, []);
 
   // Persist transactions: immediate when running local-only, debounced otherwise.
   const persistTransactions = useCallback((txs: Transaction[]) => {
@@ -277,7 +358,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (!isBackendReady) {
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(localData);
+        if (localData) setTransactions(asLoaded(localData));
         return;
     }
 
@@ -291,11 +372,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             // half-deleted snapshots repopulate the UI mid-clear.
             if (clearingRef.current) return;
             const txData: Transaction[] = [];
+            const timestamped: { ref: DocumentReference; t: Transaction }[] = [];
             snapshot.forEach((d) => {
-                txData.push(d.data() as Transaction);
+                const t = d.data() as Transaction;
+                txData.push(t);
+                if (!isDay(t.date)) timestamped.push({ ref: d.ref, t });
             });
-            setTransactions(txData);
-            scheduleMirror(txData);
+            const listed = asLoaded(txData);
+            setTransactions(listed);
+            scheduleMirror(listed);
+            if (timestamped.length > 0) saveLocalDays(timestamped);
         }, (error) => {
             log.warn('Firestore access failed, switching to local-only mode:', error.message);
             setIsBackendReady(false);
@@ -304,25 +390,25 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setTransactions(prev => {
                 if (prev.length > 0) return prev;
                 const localData = loadFromLocal('transactions');
-                return localData ?? prev;
+                return localData ? asLoaded(localData) : prev;
             });
         });
     } catch (e) {
         log.warn('Firestore setup error:', e);
         setIsBackendReady(false);
         const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(localData);
+        if (localData) setTransactions(asLoaded(localData));
     }
 
     return () => unsubscribe();
-  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror]);
+  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror, saveLocalDays]);
 
   // Sync Settings (Currency, Rules, Limits, MFA, Opening Balance)
   useEffect(() => {
       if (!user || !isBackendReady) {
           if (!user) {
               setCurrencyState('INR');
-              setIgnoreRules(DEFAULT_RULES);
+              setPayeeRules([]);
               setDailyLimitState(0);
               setMfaEnabledState(false);
               setOpeningBalanceState(0);
@@ -330,9 +416,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                const localCurrency = loadFromLocal('currency');
                if (localCurrency) setCurrencyState(localCurrency);
 
-               const localRules = loadFromLocal('ignoreRules');
-               if (localRules) setIgnoreRules(localRules);
-               else setIgnoreRules(DEFAULT_RULES);
+               setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
 
                const localLimit = loadFromLocal('dailyLimit');
                if (localLimit) setDailyLimitState(localLimit);
@@ -341,7 +425,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                if (localMfa !== null) setMfaEnabledState(localMfa);
 
                const localBudgets = loadFromLocal('budgets');
-               if (localBudgets) setBudgetsState(localBudgets);
+               if (localBudgets) setBudgetsState(withListBudgetNames(localBudgets));
 
                const localGoal = loadFromLocal('savingsGoal');
                if (localGoal !== null) setSavingsGoalState(localGoal || 0);
@@ -365,9 +449,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       setCurrencyState(data.currency);
                       saveToLocal('currency', data.currency);
                   }
-                  if (data.ignoreRules) {
-                      setIgnoreRules(data.ignoreRules);
-                      saveToLocal('ignoreRules', data.ignoreRules);
+                  if (data.payeeRules !== undefined) {
+                      const rules = asPayeeRules(data.payeeRules);
+                      setPayeeRules(rules);
+                      saveToLocal('payeeRules', rules);
                   }
                   if (data.dailyLimit !== undefined) {
                       setDailyLimitState(data.dailyLimit);
@@ -386,8 +471,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       saveToLocal('openingBalanceAsOf', data.openingBalanceAsOf || null);
                   }
                   if (data.budgets) {
-                      setBudgetsState(data.budgets);
-                      saveToLocal('budgets', data.budgets);
+                      const budgetsByName = withListBudgetNames(data.budgets);
+                      setBudgetsState(budgetsByName);
+                      saveToLocal('budgets', budgetsByName);
                   }
                   if (data.savingsGoal !== undefined) {
                       setSavingsGoalState(data.savingsGoal || 0);
@@ -396,7 +482,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               } else if (isOnlineRef.current) {
                   setDoc(settingsRef, {
                       currency: 'INR',
-                      ignoreRules: DEFAULT_RULES,
                       dailyLimit: 0,
                       mfaEnabled: false
                   }, { merge: true })
@@ -407,9 +492,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               const localCurrency = loadFromLocal('currency');
               if (localCurrency) setCurrencyState(localCurrency);
 
-              const localRules = loadFromLocal('ignoreRules');
-              if (localRules) setIgnoreRules(localRules);
-              else setIgnoreRules(DEFAULT_RULES);
+              setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
 
               const localOpeningBalance = loadFromLocal('openingBalance');
               if (localOpeningBalance !== null) {
@@ -421,9 +504,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
            const localCurrency = loadFromLocal('currency');
            if (localCurrency) setCurrencyState(localCurrency);
 
-           const localRules = loadFromLocal('ignoreRules');
-           if (localRules) setIgnoreRules(localRules);
-           else setIgnoreRules(DEFAULT_RULES);
+           setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
 
            const localOpeningBalance = loadFromLocal('openingBalance');
            if (localOpeningBalance !== null) {
@@ -519,28 +600,38 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
   }, [user, isOnline, isBackendReady, saveToLocal]);
 
+  // ── Spending, income and money moved (audit H3) ───────────────────────────
+  // One classifier per rule set. counted leaves money moved out, so totals,
+  // charts and insights see only real spending and income.
+  const flowOf = useMemo(() => flowClassifier(payeeRules), [payeeRules]);
+  const counted = useMemo(
+    () => transactions.filter(t => flowOf(t).flow !== 'moved'),
+    [transactions, flowOf]
+  );
+
   // ── Aggregates ────────────────────────────────────────────────────────────
-  // Single pass over transactions, recomputed only when data changes
-  // (audit Phase 2.3). Each transaction's date is parsed exactly once here.
+  // Recomputed only when data changes (audit Phase 2.3). The balance counts
+  // every transaction; income and expense count only counted ones. Dates are
+  // local days, so they compare as strings.
   const aggregates = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const dayKey = now.toDateString();
+    const dayKey = localDay();
+    const monthKey = dayKey.slice(0, 7);
+
+    let net = 0;
+    for (const t of transactions) net += t.type === TransactionType.INCOME ? t.amount : -t.amount;
 
     let totalIncome = 0, totalExpense = 0;
     let monthlyIncome = 0, monthlyExpense = 0;
     let todayIncome = 0, todayExpense = 0;
 
-    for (const t of transactions) {
+    for (const t of counted) {
       const isIncome = t.type === TransactionType.INCOME;
       if (isIncome) totalIncome += t.amount; else totalExpense += t.amount;
 
-      const d = new Date(t.date);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      if (t.date.slice(0, 7) === monthKey) {
         if (isIncome) monthlyIncome += t.amount; else monthlyExpense += t.amount;
       }
-      if (d.toDateString() === dayKey) {
+      if (t.date === dayKey) {
         if (isIncome) todayIncome += t.amount; else todayExpense += t.amount;
       }
     }
@@ -553,9 +644,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       monthlyExpense,
       todayIncome,
       todayExpense,
-      balance: openingBalance + totalIncome - totalExpense,
+      balance: openingBalance + net,
     };
-  }, [transactions, openingBalance]);
+  }, [transactions, counted, openingBalance]);
 
   const getBalance = useCallback(() => aggregates.balance, [aggregates]);
   const getMonthlyIncome = useCallback(() => aggregates.monthlyIncome, [aggregates]);
@@ -567,13 +658,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addTransaction = useCallback(async (transaction: Transaction): Promise<boolean> => {
     // Check Daily Limit (audit Phase 2.8: reuse the aggregate when it is for
-    // today; recompute only across a midnight boundary).
-    if (transaction.type === TransactionType.EXPENSE && dailyLimit > 0) {
-        const today = new Date().toDateString();
+    // today; recompute only across a midnight boundary). Only spending counts:
+    // money moved to family or your own accounts doesn't use up the limit.
+    if (transaction.type === TransactionType.EXPENSE && dailyLimit > 0 && flowOf(transaction).flow === 'spend') {
+        const today = localDay();
         const todaySpend = aggregates.dayKey === today
             ? aggregates.todayExpense
-            : transactions
-                .filter(t => t.type === TransactionType.EXPENSE && new Date(t.date).toDateString() === today)
+            : counted
+                .filter(t => t.type === TransactionType.EXPENSE && t.date === today)
                 .reduce((acc, t) => acc + t.amount, 0);
 
         if (todaySpend + transaction.amount > dailyLimit) {
@@ -582,7 +674,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     }
 
-    const newTxs = [transaction, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const newTxs = [transaction, ...transactions].sort(byNewest);
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
@@ -595,7 +687,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             });
     }
     return true;
-  }, [transactions, dailyLimit, aggregates, formatAmount, persistTransactions, user, isBackendReady]);
+  }, [transactions, counted, flowOf, dailyLimit, aggregates, formatAmount, persistTransactions, user, isBackendReady]);
 
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
     try {
@@ -607,6 +699,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       const updatedTx = { ...transaction, ...updates, id: transaction.id };
       const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
+      if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
       setTransactions(newTxs);
       persistTransactions(newTxs);
 
@@ -748,7 +841,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     }
 
-    const combined = [...uniqueNew, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const combined = [...uniqueNew, ...transactions].sort(byNewest);
 
     setTransactions(combined);
     persistTransactions(combined);
@@ -771,27 +864,40 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [transactions, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, isBackendReady]);
 
-  const toggleIgnoreRule = useCallback(async (id: string) => {
-    const newRules = ignoreRules.map(rule =>
-      rule.id === id ? { ...rule, isActive: !rule.isActive } : rule
-    );
-    setIgnoreRules(newRules);
-    saveToLocal('ignoreRules', newRules);
-
-    if (user && isOnline && isBackendReady) {
-        try {
-            const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
-            await updateDoc(settingsRef, { ignoreRules: newRules });
-        } catch (e) { log.warn('Backend update failed, using local state'); }
+  // Payee rules save on this device at once and to the cloud through
+  // Firestore's queue, which also holds the write while offline.
+  const persistPayeeRules = useCallback((rules: PayeeRule[]) => {
+    setPayeeRules(rules);
+    saveToLocal('payeeRules', rules);
+    if (user && isBackendReady) {
+        const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
+        setDoc(settingsRef, { payeeRules: rules }, { merge: true })
+            .catch(e => log.warn('Saving payee rules failed:', e?.code || e?.message));
     }
-  }, [ignoreRules, user, isOnline, isBackendReady, saveToLocal]);
+  }, [user, isBackendReady, saveToLocal]);
+
+  const savePayeeRule = useCallback((match: string, kind: PayeeKind) => {
+    const key = matchText(match);
+    if (key.length < MIN_MATCH) return;
+    const same = payeeRules.find(r => matchText(r.match) === key);
+    const id = `rule-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
+    persistPayeeRules(same
+        ? payeeRules.map(r => (r === same ? { ...r, kind } : r))
+        : [...payeeRules, { id, match: match.trim(), kind }]);
+  }, [payeeRules, persistPayeeRules]);
+
+  const deletePayeeRule = useCallback((id: string) => {
+    persistPayeeRules(payeeRules.filter(r => r.id !== id));
+  }, [payeeRules, persistPayeeRules]);
 
   // Memoized provider value (audit Phase 2.1) — consumers no longer re-render
   // from identity churn alone.
   const value = useMemo<WalletContextType>(() => ({
       transactions,
       currency,
-      ignoreRules,
+      payeeRules,
+      flowOf,
+      counted,
       dailyLimit,
       mfaEnabled,
       isOnline,
@@ -810,7 +916,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       deleteTransactions,
       clearAllTransactions,
       importTransactions,
-      toggleIgnoreRule,
+      savePayeeRule,
+      deletePayeeRule,
       openingBalance,
       openingBalanceAsOf,
       getBalance,
@@ -827,11 +934,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       refresh,
       lastLoginTime
   }), [
-      transactions, currency, ignoreRules, dailyLimit, mfaEnabled, isOnline,
+      transactions, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
       isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
-      deleteTransactions, clearAllTransactions, importTransactions, toggleIgnoreRule, getBalance,
+      deleteTransactions, clearAllTransactions, importTransactions, savePayeeRule, deletePayeeRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatAmountCompact,
       convertToBase, retryCloudConnection, refresh, lastLoginTime

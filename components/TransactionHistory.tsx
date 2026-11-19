@@ -1,14 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { AppScreen, Transaction, TransactionType, CATEGORIES } from '../types';
+import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
+import { MOVED_LABELS } from '../services/spend';
 import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
 
 interface TransactionHistoryProps {
   onNavigate: (screen: AppScreen) => void;
 }
 
+// The time an entry was added, when it was added on the day it is dated.
+// Imported rows and back-dated entries have no time of their own.
+const entryTime = (t: Transaction): string | null =>
+  t.createdAt && toDay(t.createdAt) === t.date
+    ? new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -61,6 +70,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
   const filteredTransactions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const today = localDay();
     const filtered = transactions.filter(t => {
       // Search filter
       if (q) {
@@ -76,20 +86,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       // Category Filter
       if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
 
-      // Date Filter
-      if (dateFilter !== 'ALL') {
-        const date = new Date(t.date);
-        const now = new Date();
-        
-        if (dateFilter === 'THIS_MONTH') {
-          if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return false;
-        } else {
-          const diffTime = Math.abs(now.getTime() - date.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-          if (dateFilter === '7_DAYS' && diffDays > 7) return false;
-          if (dateFilter === '30_DAYS' && diffDays > 30) return false;
-          if (dateFilter === '90_DAYS' && diffDays > 90) return false;
-        }
+      // Date Filter: this month, or the last N days counting today
+      if (dateFilter === 'THIS_MONTH') {
+        if (t.date.slice(0, 7) !== today.slice(0, 7)) return false;
+      } else if (dateFilter !== 'ALL') {
+        const days = dateFilter === '7_DAYS' ? 7 : dateFilter === '30_DAYS' ? 30 : 90;
+        if (t.date < addDays(today, 1 - days)) return false;
       }
 
       // Amount Range Filter
@@ -100,33 +102,23 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       return true;
     });
-    // Apply sorting. For date sorts, parse each date once (decorate-sort-undecorate)
-    // instead of re-parsing inside the comparator (audit Phase 2.4).
+    // Apply sorting. Dates are local days, so they sort as strings.
     if (sortBy === 'AMOUNT_DESC') return filtered.sort((a, b) => b.amount - a.amount);
     if (sortBy === 'AMOUNT_ASC') return filtered.sort((a, b) => a.amount - b.amount);
-
-    const decorated = filtered.map(t => ({ t, ts: new Date(t.date).getTime() }));
-    decorated.sort((a, b) => sortBy === 'DATE_ASC' ? a.ts - b.ts : b.ts - a.ts);
-    return decorated.map(d => d.t);
+    return filtered.sort(sortBy === 'DATE_ASC' ? (a, b) => byNewest(b, a) : byNewest);
   }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
 
   // Group by date (Today, Yesterday, Date String).
   // Today/Yesterday computed once, not per transaction (audit Phase 2.4).
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, Transaction[]> = {};
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const todayKey = today.toDateString();
-    const yesterdayKey = yesterday.toDateString();
+    const todayKey = localDay();
+    const yesterdayKey = addDays(todayKey, -1);
 
     filteredTransactions.forEach(t => {
-      const date = new Date(t.date);
-      const dateKey = date.toDateString();
-
-      let key = date.toLocaleDateString('en-GB');
-      if (dateKey === todayKey) key = 'Today';
-      else if (dateKey === yesterdayKey) key = 'Yesterday';
+      let key = parseDay(t.date).toLocaleDateString('en-GB');
+      if (t.date === todayKey) key = 'Today';
+      else if (t.date === yesterdayKey) key = 'Yesterday';
 
       if (!groups[key]) groups[key] = [];
       groups[key].push(t);
@@ -210,7 +202,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     const csvContent = [
         headers.join(","),
         ...filteredTransactions.map(t => {
-            const date = new Date(t.date).toLocaleDateString('en-GB');
+            const date = parseDay(t.date).toLocaleDateString('en-GB');
             const merchant = `"${(t.merchant || "").replace(/"/g, '""')}"`;
             const category = `"${t.category.replace(/"/g, '""')}"`;
             const amount = t.amount.toFixed(2);
@@ -225,7 +217,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `transactions_${localDay()}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -240,8 +232,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setEditForm({
       merchant: transaction.merchant || '',
       amount: transaction.amount.toString(),
-      category: transaction.category,
-      date: new Date(transaction.date).toISOString().split('T')[0],
+      category: transaction.category || 'Uncategorized',
+      date: toDay(transaction.date),
       note: transaction.note || '',
       type: transaction.type
     });
@@ -271,7 +263,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         merchant: editForm.merchant.trim(),
         amount: amount,
         category: editForm.category.trim() || 'Uncategorized',
-        date: new Date(editForm.date).toISOString(),
+        // The day as picked: no UTC round trip (audit H4)
+        date: isDay(editForm.date) ? editForm.date : editingTransaction.date,
         note: editForm.note.trim(),
         type: editForm.type
       };
@@ -417,8 +410,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {/* Filter Modal/Drawer */}
       {showFilters && (
         <>
-            <div className="fixed inset-0 bg-premium-charcoal/30 z-40 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="fixed inset-0 bg-premium-charcoal/30 z-50 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 pb-4 border-b border-black/5">
                     <div className="flex items-center gap-3">
@@ -690,10 +683,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                             <p className="text-[13px] text-premium-charcoal font-serif italic">{t.note || "No notes added."}</p>
                                         </div>
                                     </div>
+                                    {(() => {
+                                        // Money moved isn't spending or income (audit H3): say why
+                                        const info = flowOf(t);
+                                        if (info.flow !== 'moved' || !info.moved) return null;
+                                        return (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
+                                                className="flex items-center gap-1.5 text-[11px] text-lavender font-semibold"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                                                Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
+                                            </button>
+                                        );
+                                    })()}
                                     <div className="flex justify-between items-center pt-1">
                                          <div>
-                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">Time</p>
-                                            <p className="text-[13px] text-premium-charcoal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">{entryTime(t) ? 'Time' : 'Date'}</p>
+                                            <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button 
@@ -723,7 +730,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Delete Confirmation Modal */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-premium-charcoal/20 backdrop-blur-sm" onClick={() => setDeleteId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-premium-charcoal/20 backdrop-blur-sm" onClick={() => setDeleteId(null)}>
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[320px] shadow-2xl border border-white/50 animate-slide-up" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col items-center text-center">
                     <div className="w-12 h-12 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4">
@@ -754,7 +761,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       
       {/* Clear All Confirmation Modal */}
       {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose/10 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-rose/10 backdrop-blur-md">
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[320px] shadow-2xl border-2 border-rose/20 animate-slide-up">
                 <div className="flex flex-col items-center text-center">
                     <div className="w-14 h-14 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4 animate-pulse">
@@ -796,7 +803,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Edit Transaction Modal */}
       {editingTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-premium-charcoal/20 backdrop-blur-sm" onClick={closeEditModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[calc(1rem_+_var(--sat))] pb-[calc(1rem_+_var(--sab))] bg-premium-charcoal/20 backdrop-blur-sm" onClick={closeEditModal}>
             <div className="bg-white rounded-[32px] p-6 w-full max-w-[380px] shadow-2xl border border-white/50 animate-slide-up max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col">
                     <div className="flex items-center justify-between mb-6">
@@ -876,7 +883,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             title="Category"
                             aria-label="Category"
                           >
-                            {CATEGORIES.map(cat => (
+                            {categoryOptions(editForm.category).map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
@@ -937,7 +944,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
       {/* Success Toast */}
       {showToast && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
+          <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
               <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
               <span className="text-[13px] font-medium font-serif">{toastMsg}</span>
           </div>

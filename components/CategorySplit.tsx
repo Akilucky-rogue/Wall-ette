@@ -1,6 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
+import { MOVED_LABELS } from '../services/spend';
+import UnsortedTransfers from './UnsortedTransfers';
 import { prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, MandalaDots, RangoliCorner, Paisley } from './SplashScreen';
 
@@ -11,9 +14,9 @@ interface CategorySplitProps {
 type TimeRange = 'WEEK' | 'MONTH' | 'YEAR';
 type View = 'SPEND' | 'MOVED';
 
-// Money moved (transfers/investments) analyzed separately from money spent —
-// same rule the reports use, so numbers agree everywhere.
-const MOVED_CATS = new Set(['Transfer Out', 'Adjustment', 'Investment']);
+// Money moved (to your own accounts, family, investments) is analyzed apart
+// from money spent, by the wallet's one rule (services/spend.ts), so the
+// numbers agree with every other screen.
 
 const COLORS = ['var(--sage)', 'var(--rose)', 'var(--lavender)', 'var(--ocean)', 'var(--sand)', '#E8C1A0', '#AED5D5', '#C5B8D9'];
 
@@ -33,7 +36,7 @@ const pct = (share: number): string => {
 };
 
 const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
-  const { transactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, formatAmount, formatAmountCompact } = useWallet();
   const [timeRange, setTimeRange] = useState<TimeRange>('MONTH');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [view, setView] = useState<View>('SPEND');
@@ -45,7 +48,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
     if (transactions.length === 0) return new Date();
     let maxTs = -Infinity;
     for (const t of transactions) {
-      const ts = new Date(t.date).getTime();
+      const ts = parseDay(t.date).getTime();
       if (ts > maxTs) maxTs = ts;
     }
     return new Date(maxTs);
@@ -59,7 +62,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
   const filtered = useMemo(() => {
     return transactions.filter(t => {
       if (t.type !== TransactionType.EXPENSE) return false;
-      const txDate = new Date(t.date);
+      const txDate = parseDay(t.date);
       if (timeRange === 'WEEK') {
         const startOfWeek = new Date(selectedDate);
         startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay());
@@ -82,11 +85,14 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
     let spendTotal = 0, movedTotal = 0;
 
     for (const t of filtered) {
-      const isMoved = MOVED_CATS.has(t.category);
+      const info = flowOf(t);
+      const isMoved = info.flow === 'moved';
       const map = isMoved ? movedMap : spendMap;
       if (isMoved) movedTotal += t.amount; else spendTotal += t.amount;
-      let e = map.get(t.category);
-      if (!e) { e = { val: 0, count: 0, merchants: new Map() }; map.set(t.category, e); }
+      // Spending groups by category; money moved by where it went
+      const group = isMoved && info.moved ? MOVED_LABELS[info.moved] : t.category;
+      let e = map.get(group);
+      if (!e) { e = { val: 0, count: 0, merchants: new Map() }; map.set(group, e); }
       e.val += t.amount; e.count++;
       const mer = t.merchant || 'Unknown';
       e.merchants.set(mer, (e.merchants.get(mer) || 0) + t.amount);
@@ -110,7 +116,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
       spendTotal,
       movedTotal,
     };
-  }, [filtered]);
+  }, [filtered, flowOf]);
 
   const activeCats = view === 'SPEND' ? data.spend : data.moved;
   const activeTotal = view === 'SPEND' ? data.spendTotal : data.movedTotal;
@@ -137,6 +143,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
 
   const getIcon = (cat: string) => {
     const lower = cat.toLowerCase();
+    if (lower === 'family') return 'diversity_3';
+    if (lower === 'my accounts') return 'account_balance';
+    if (lower === 'not counted') return 'visibility_off';
     if (lower.includes('food') || lower.includes('dining') || lower.includes('restaurant')) return 'restaurant';
     if (lower.includes('grocer')) return 'local_grocery_store';
     if (lower.includes('transport') || lower.includes('taxi') || lower.includes('fuel') || lower.includes('metro') || lower.includes('train') || lower.includes('flight')) return 'commute';
@@ -273,6 +282,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
+      <UnsortedTransfers onNavigate={onNavigate} className="px-6 mb-4" />
 
       {/* Time Range Toggle */}
       <div className="flex justify-center gap-2 px-6 mb-6">

@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { PLAY_LISTING_PUBLIC, PLAY_STORE_URL } from '../utils/site';
 
 /**
  * "Get the Android app" banner — web only, Android browsers only.
+ *  - Hidden until the Google Play listing is public (PLAY_LISTING_PUBLIC);
+ *    the old self-hosted APK is retired.
  *  - Hidden inside the native app (same bundle runs there).
  *  - Hidden for iOS/desktop visitors (no app for them yet).
- *  - Dismissal is remembered per device.
- * The APK is served from /downloads/wall-ette.apk on Firebase Hosting;
- * swap APK_URL for the Play Store link once the listing is live.
+ *  - Dismissal is remembered per device. The key changed with the move to
+ *    Play, so people who closed the APK banner see this one once.
  */
-const APK_URL = '/downloads/wall-ette.apk';
-const DISMISS_KEY = 'apkBannerDismissed_v1';
+const DISMISS_KEY = 'playBannerDismissed_v1';
 
 const shouldShow = (): boolean => {
   try {
+    if (!PLAY_LISTING_PUBLIC) return false;
     if (Capacitor.isNativePlatform()) return false;
     if (!/android/i.test(navigator.userAgent)) return false;
     if (localStorage.getItem(DISMISS_KEY) === '1') return false;
@@ -33,7 +35,7 @@ const AndroidInstallBanner: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-32px)] max-w-[398px] animate-slide-up">
+    <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-32px)] max-w-[398px] animate-slide-up">
       <div className="bg-premium-charcoal rounded-3xl shadow-2xl p-4 flex items-center gap-3">
         {/* Mini Wall-ette mark */}
         <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shrink-0">
@@ -49,17 +51,16 @@ const AndroidInstallBanner: React.FC = () => {
 
         <div className="flex-1 min-w-0">
           <p className="text-white text-[13px] font-semibold leading-tight">Get the Android app</p>
-          <p className="text-white/55 text-[10px] leading-tight mt-0.5 truncate">
+          <p className="text-white/60 text-[10px] leading-tight mt-0.5 truncate">
             Faster · offline · fingerprint unlock
           </p>
         </div>
 
         <a
-          href={APK_URL}
-          download
+          href={PLAY_STORE_URL}
           className="bg-sage text-white text-[11px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-2xl shrink-0 active:scale-95 transition-transform"
         >
-          Download
+          Get it
         </a>
         <button
           onClick={dismiss}

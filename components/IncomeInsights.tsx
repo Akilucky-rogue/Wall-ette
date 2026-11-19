@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { parseDay } from '../utils/dates';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, LotusFlower, RangoliCorner, MandalaDots } from './SplashScreen';
 
@@ -56,7 +57,7 @@ const topShare = (m: Map<string, number>, total: number, maxN: number): [string,
 
 const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const {
-    transactions, formatAmount, formatAmountCompact,
+    transactions, counted, flowOf, savePayeeRule, formatAmount, formatAmountCompact,
     budgets, savingsGoal, setBudget, setSavingsGoal,
   } = useWallet();
 
@@ -66,14 +67,22 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const [goalInput, setGoalInput] = useState<string | null>(null);
 
   // ── Income analysis (streams, stability, salary) ──
-  const analysis = useMemo(() => analyzeIncome(transactions), [transactions]);
+  // Real income only: money back from your own accounts, family or
+  // investments is left out (audit H3). A stream is your pay once you say so
+  // (a "My pay" rule) or the bank calls it salary; until then it's a guess
+  // to confirm (audit M8).
+  const analysis = useMemo(() => analyzeIncome(counted, new Date(), t => {
+    const rule = flowOf(t).rule;
+    if (rule?.kind === 'salary' || t.category === 'Salary') return true;
+    return rule ? false : null;
+  }), [counted, flowOf]);
   const { streams, stability, salary } = analysis;
 
-  // ── One pass: aggregates for every month ──
+  // ── One pass: aggregates for every month (real income and spending) ──
   const monthAgg = useMemo(() => {
     const map = new Map<string, MonthAgg>();
-    for (const t of transactions) {
-      const d = new Date(t.date);
+    for (const t of counted) {
+      const d = parseDay(t.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       let m = map.get(key);
       if (!m) {
@@ -93,7 +102,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
       }
     }
     return map;
-  }, [transactions]);
+  }, [counted]);
 
   const monthKeys = useMemo(
     () => [...monthAgg.keys()].sort((a, b) => (a < b ? 1 : -1)).slice(0, 12),
@@ -146,7 +155,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.maxExp) {
       lines.push({
         icon: 'local_fire_department', tone: 'mid',
-        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {new Date(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
+        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {parseDay(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
       });
     }
     if (prev && prev.out > 0 && m.out > 0) {
@@ -432,7 +441,29 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     <p className="text-[10px] text-muted-taupe">{stability.label} income</p>
                   </div>
                 )}
-                {salary ? (
+                {salary && !salary.confirmed && salary.payee ? (
+                  <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col">
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Your pay?</p>
+                    <p className="text-[11px] text-premium-charcoal font-semibold truncate" title={salary.streamName}>
+                      {prettyMerchant(salary.streamName)}
+                    </p>
+                    <p className="text-[10px] text-muted-taupe">~{formatAmount(salary.typicalAmount).split('.')[0]} · usually day {salary.typicalDay}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-auto pt-3">
+                      <button
+                        onClick={() => savePayeeRule(salary.payee!, 'salary')}
+                        className="bg-sage-light text-sage py-1.5 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => savePayeeRule(salary.payee!, 'counts')}
+                        className="bg-gray-50 text-premium-charcoal border border-black/5 py-1.5 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                ) : salary?.confirmed ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02]">
                     <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Next Pay</p>
                     <p className="text-premium-charcoal font-serif text-2xl font-bold">

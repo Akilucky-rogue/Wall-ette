@@ -1,13 +1,13 @@
 # ⚡ QUICK START - Wall-ette
 
-**App Live**: https://wall-e-7a113.web.app ✅  
+**App Live**: https://wall-ette.com ✅  
 **Status**: 🚀 Production Ready | 🔐 Secure | 💾 Real-time Sync
 
 ---
 
 ## 🎯 Do This Now (5 min)
 
-1. Visit: https://wall-e-7a113.web.app
+1. Visit: https://wall-ette.com
 2. Sign up with any email
 3. Click "Add Entry"
 4. Add income/expense

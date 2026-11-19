@@ -1,7 +1,7 @@
 # Wall-ette — Technical Specification
 
-**Version:** 1.5.1 (versionCode 8) · **App ID:** `com.wallet.walle` · **Updated:** 3 July 2026
-**Live web:** https://wall-e-7a113.web.app · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
+**Version:** 1.5.3 (versionCode 11) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
+**Live web:** https://wall-ette.com · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
 transactions manually or import real bank statements (PDF/Excel), and the app reconstructs a
@@ -54,14 +54,20 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   and Custom — a user-picked accent + light/dark base, derived at runtime with color-mix math.
 - **Auto mode** follows `prefers-color-scheme` (light → Sage, dark → Midnight) with a live
   media-query listener. Choice persists per device in `localStorage`.
-- Native side: `@capacitor/status-bar` recolors the Android status bar per theme; a
-  `theme-color` meta keeps browser chrome in sync on web.
+- Native side: on Android 15+ the page draws behind both system bars, so they show the
+  theme color (see §6, Windowing); Capacitor's `SystemBars` sets their icon colors per
+  theme. On Android 14 and older `@capacitor/status-bar` tints the status bar and the
+  navigation bar stays cream. A `theme-color` meta keeps browser chrome in sync on web.
 - Deliberately theme-independent: mascot, splash art, exported statement HTML, and the
   shareable Wrapped card (brand-stable artifacts).
 
 ### 2.3 State management
 Plain React context — no Redux/Zustand.
-- **`AuthContext`** — Firebase Auth session state.
+- **`AuthContext`** — Firebase Auth session state. Signing out and account deletion go
+  through `services/session.ts`, which also removes the user's data from the device: the
+  `localStorage` mirror (keys ending in `_<uid>`) and Firestore's offline cache, then
+  reloads. On sign-out the cache is only cleared once unsynced changes reach the cloud
+  (up to 4 s); offline, it stays so they sync at the next sign-in.
 - **`WalletContext`** — transactions, opening balance (+ `openingBalanceAsOf` anchor),
   budgets, savings goal, daily spend limit, currency. Includes batched bulk ops
   (`deleteTransactions` via Firestore `writeBatch` chunks) and an instant, optimistic
@@ -77,11 +83,12 @@ Plain React context — no Redux/Zustand.
 |---|---|
 | **Authentication** | Email/password sign-in. TOTP MFA (authenticator apps) is fully implemented via `TotpMultiFactorGenerator` + QR enrollment but parked behind a "Coming Soon" UI. |
 | **Firestore** | Per-user data under `users/{uid}` (transactions, settings, security log, consent record). `persistentLocalCache` gives offline-first behavior with automatic sync. |
-| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. |
-| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite) plus the self-hosted APK at `/downloads/wall-ette.apk`. |
+| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
+| **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
 
-External network calls are limited to: Firebase, Google Fonts, and `exchangerate-api.com`
-(public FX rates for the currency selector). Statement files never leave the device.
+External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
+(public FX rates for the currency selector) and, on Android, Google Play's update check.
+Statement files never leave the device.
 
 **Consent gate** — new registrations must accept Terms & Privacy (version `2026-06-11`);
 acceptance is recorded with a server timestamp for auditability. Existing logins are unaffected.
@@ -133,12 +140,13 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 
 | Item | Value |
 |---|---|
-| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 |
-| SDK levels | minSdk 24 · target/compileSdk 35 |
+| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) |
+| SDK levels | minSdk 24 · target/compileSdk 36 (Play's minimum from 31 Aug 2026) |
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
-| Signing | PKCS12 keystore at `private/my-release-key.keystore`, wired via gitignored `android/key.properties` |
-| Windowing | `windowOptOutEdgeToEdgeEnforcement` + fixed status/nav bar colors in `styles.xml`; status bar recolored at runtime per theme |
-| Versioning | versionCode 7 · versionName 1.5.0 |
+| Signing | Website APK: PKCS12 keystore at `private/my-release-key.keystore` via gitignored `android/key.properties` (exposed in audit C2; due to be retired). Google Play: a new upload key via gitignored `android/upload.properties`, used by `npm run android:bundle` (`-Pplay`); see `docs/PLAY_SUBMISSION.md` |
+| Windowing | Edge to edge on Android 15+ (target 36 has no opt-out). Capacitor's `SystemBars` passes the bar insets to CSS; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off (`enforceNavigationBarContrast`); the cream colors in `styles.xml` apply on Android 14 and older |
+| Versioning | versionCode 11 · versionName 1.5.3, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger
 GitHub Actions workflow (`ios-build.yml`) produces an unsigned IPA on free macOS runners for
@@ -148,17 +156,18 @@ sideloading. Dormant by decision — Android + web are the active targets.
 
 ## 7. Build, deploy & distribution
 
-`ship.ps1` — the one-command release pipeline:
-
-1. `tsc` typecheck (aborts the ship on any error)
-2. `npm run android:release` → Vite build → `cap sync android` → Gradle `assembleRelease` (auto-signed)
-3. Stage APK into `dist/downloads/wall-ette.apk`
-4. `firebase deploy` (web + hosted APK)
-5. `adb install` to the connected phone (non-fatal if absent)
-6. `git commit` + push
+- **Android:** Google Play only. `npm run android:bundle` builds the signed AAB, uploaded in
+  Play Console; `docs/PLAY_SUBMISSION.md` §9 is the per-release checklist. The website APK
+  is retired: any new one would be `com.wallette.app` signed with the old key, which
+  blocks installing the Play version.
+- **Website and Firestore rules:** `npm run build`, then
+  `npx firebase-tools deploy --only hosting,firestore:rules`.
+- **`ship.ps1` is retired** (it exits at once) until audit item 14 reworks it; it used to
+  build and host the APK, deploy, install on the phone and `git add -A` + push.
 
 Web visitors on Android get an install banner (`AndroidInstallBanner`, UA-gated, dismissal
-remembered) pointing at the hosted APK. iOS/desktop visitors see nothing.
+remembered) that opens Google Play, shown only once `PLAY_LISTING_PUBLIC` in
+`utils/site.ts` is true. iOS/desktop visitors see nothing.
 
 Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run android:build` (debug APK).
 
@@ -190,13 +199,13 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 ├── services/              # firebase, parsers (idfcParser, IDFCBankParser), analytics, insights, mfa
 ├── utils/                 # theme engine, biometric, exportFile, log, currencyUtils
 ├── public/                # favicon, terms.html, privacy.html (deployed statics)
-├── android/               # Capacitor Android project (signing via key.properties)
+├── android/               # Capacitor Android project (signing via key.properties / upload.properties)
 ├── ios/                   # Capacitor iOS project (parked)
 ├── .github/workflows/     # ios-build.yml (manual, unsigned IPA)
 ├── scripts/               # Dev tools: parser debugging, icon generation
 ├── docs/                  # Living docs (this file) + docs/archive/ for historical reports
 ├── private/               # NEVER committed: statements, keystore, old builds
-└── ship.ps1               # One-command release pipeline
+└── ship.ps1               # Old release pipeline, retired for now (§7)
 ```
 
 ---
@@ -205,9 +214,10 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 
 - **TOTP MFA** — built end-to-end, parked as "Coming Soon" (needs Firebase console MFA toggle before enabling the UI).
 - **iOS** — pipeline exists, product decision parked.
-- **Android navigation bar** — stays cream on dark themes (status bar follows the theme; the
-  bottom bar needs an extra plugin — known cosmetic niggle).
+- **Android navigation bar** — follows the theme on Android 15+; on Android 14 and older it
+  stays cream on dark themes (recoloring it there needs an extra plugin — cosmetic niggle).
 - **Bank coverage** — first-class parser for IDFC FIRST (PDF + Excel); other banks fall back
   to the generic balance-delta parser.
-- **Play Store** — submission checklist in `docs/PLAY_SUBMISSION.md`; plan is Play App Signing
-  with a fresh upload key (the historical keystore exposure makes rotation prudent).
+- **Play Store** — submission checklist in `docs/PLAY_SUBMISSION.md`: Play App Signing with
+  a new upload key (the old keystore was exposed, audit C2); the build is wired for it, the
+  key itself is created by hand.

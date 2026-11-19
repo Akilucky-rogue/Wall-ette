@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { log } from '../utils/log';
+import { categorizeNarration, cleanNarration } from './categorize';
 
 type TransactionNature = 
     | 'CONSUMPTION'
@@ -70,9 +71,11 @@ async function extractFromPDF(base64Data: string): Promise<{ text: string; pages
     // Worker is bundled by Vite (?url emits it as a local asset) instead of
     // being fetched from unpkg at runtime — works offline and on native
     // Android, and removes the CDN supply-chain dependency (audit Phase 3.4).
+    // The legacy build ships polyfills (Uint8Array.toHex, Promise.try and
+    // others), so PDF import also works on Android WebView < 140 and iOS < 18.2.
     const [pdfjsLib, worker] = await Promise.all([
-        import('pdfjs-dist'),
-        import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+        import('pdfjs-dist/legacy/build/pdf.mjs'),
+        import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
     ]);
     pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
 
@@ -138,12 +141,14 @@ async function extractFromPDF(base64Data: string): Promise<{ text: string; pages
 
 const DATE_TOKEN = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/;
 const AMT_TOKEN = /^-?[\d,]+\.\d{2}$/;
+// Characters per line in IDFC's Particulars column; longer narrations wrap.
+const NARRATION_WIDTH = 30;
 const MONTH_NUM: Record<string, string> = {
     jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
     jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
 };
 
-interface TableRow { date: string; desc: string; deb: number | null; cre: number | null; bal: number | null }
+interface TableRow { date: string; desc: string; deb: number | null; cre: number | null; bal: number | null; lastLine: string }
 interface TableResult {
     rows: TableRow[];
     summary: { opening: number; totDeb: number; totCre: number; closing: number } | null;
@@ -170,8 +175,11 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
             const ln = lines[i];
             const texts = ln.map(it => it.text);
 
-            // Summary block: label line, values on the NEXT line.
-            if (!summary && texts.includes('Opening') && texts.includes('Balance') && texts.join(' ').includes('Debit')) {
+            // Summary block: label line, values on the NEXT line. Match the
+            // joined line: pdf.js 5.x returns 'Opening Balance' as ONE item, so
+            // testing for separate 'Opening' and 'Balance' items never matched.
+            const joined = texts.join(' ');
+            if (!summary && /Opening\s*Balance/i.test(joined) && /Total\s*Debit/i.test(joined)) {
                 const next = lines[i + 1];
                 const nums = next ? next.filter(it => AMT_TOKEN.test(it.text)).map(it => parseAmount(it.text)) : [];
                 if (nums.length === 4) {
@@ -219,13 +227,22 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
                         desc.push(it.text);
                     }
                 }
-                rows.push({ date, desc: desc.join(' '), deb, cre, bal });
+                const first = desc.join(' ');
+                rows.push({ date, desc: first, deb, cre, bal, lastLine: first });
             } else if (
                 rows.length > 0 &&
                 ln.every(it => it.x >= bounds!.partX - 25 && it.x < bounds!.chqD)
             ) {
                 // Wrapped description line — glue back onto the open row.
-                rows[rows.length - 1].desc += texts.join('');
+                // A line shorter than NARRATION_WIDTH, or a full one that
+                // contains a space, broke at a space the PDF doesn't draw;
+                // a full line with no space was cut mid-word. Without the
+                // space, 'Jio Prep' read as 'JioPrep' and missed its category.
+                const open = rows[rows.length - 1];
+                const line = texts.join('');
+                const brokeAtSpace = open.lastLine.length < NARRATION_WIDTH || open.lastLine.includes(' ');
+                open.desc += (brokeAtSpace && open.desc ? ' ' : '') + line;
+                open.lastLine = line;
             }
             // Anything else (footers, page numbers, in-table "Opening Balance"
             // marker) falls through harmlessly.
@@ -264,7 +281,7 @@ function tableToTransactions(table: TableResult): RawTransaction[] {
             amount,
             type,
             nature: c.nature,
-            category: c.category,
+            category: categorizeNarration(cleanNarration(r.desc), type === 'INCOME' ? 'income' : 'expense'),
             incomeSource: c.incomeSource,
             balance: r.bal ?? undefined,
             note: r.desc,
@@ -304,6 +321,9 @@ const PATTERNS = {
     // Total debit/credit
     totalDebit: /Total\s*(?:Debit|Withdrawals?)[:\s]+([\d,]+\.?\d*)/i,
     totalCredit: /Total\s*(?:Credit|Deposits?)[:\s]+([\d,]+\.?\d*)/i,
+
+    // IDFC summary block: four labels on one line, their values on the next.
+    summaryBlock: /Opening\s*Balance\s+Total\s*Debit\s+Total\s*Credit\s+Closing\s*Balance\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/i,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -373,7 +393,6 @@ const CATEGORY_RULES = {
 function classifyTransaction(description: string, isCredit: boolean): {
     merchant: string;
     nature: TransactionNature;
-    category?: string;
     type: 'INCOME' | 'EXPENSE';
     incomeSource?: IncomeSource;
 } {
@@ -542,7 +561,7 @@ function parseTransactionLines(text: string): RawTransaction[] {
                 amount,
                 type: classification.type,
                 nature: classification.nature,
-                category: classification.category,
+                category: categorizeNarration(cleanNarration(description), classification.type === 'INCOME' ? 'income' : 'expense'),
                 incomeSource: classification.incomeSource,
                 balance,
                 note: description
@@ -606,6 +625,17 @@ function extractHeader(text: string): StatementHeader {
     const creditMatch = text.match(PATTERNS.totalCredit);
     if (creditMatch) {
         header.totalCredit = parseAmount(creditMatch[1]);
+    }
+
+    // The single-label patterns above misread IDFC's layout in flat text:
+    // 'Closing Balance' is followed by the OPENING figure, and both totals
+    // by other labels. When the whole summary block is present, it wins.
+    const block = text.match(PATTERNS.summaryBlock);
+    if (block) {
+        header.openingBalance = parseAmount(block[1]);
+        header.totalDebit = parseAmount(block[2]);
+        header.totalCredit = parseAmount(block[3]);
+        header.closingBalance = parseAmount(block[4]);
     }
 
     header.bankName = 'IDFC FIRST Bank';
@@ -798,7 +828,7 @@ function parseGenericTransactionLines(text: string, openingBalance: number): Raw
             // Balance-delta / Cr-Dr signal outranks keyword classification
             type: isCredit ? 'INCOME' : 'EXPENSE',
             nature: classification.nature,
-            category: classification.category,
+            category: categorizeNarration(cleanNarration(r.desc), isCredit ? 'income' : 'expense'),
             incomeSource: classification.incomeSource,
             balance,
             note: r.desc

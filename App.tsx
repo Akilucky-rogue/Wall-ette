@@ -12,6 +12,7 @@ import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { consumeQuietStart, signOutOfDevice } from './services/session';
+import { breadcrumb } from './services/crashReports';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -96,6 +97,9 @@ function AppContent() {
   // re-registering on every navigation (audit Phase 6.2).
   const currentScreenRef = useRef(currentScreen);
   currentScreenRef.current = currentScreen;
+
+  // The screens leading up to a crash, in its report (Android).
+  useEffect(() => { breadcrumb(`screen ${currentScreen}`); }, [currentScreen]);
 
   // Lock the app when it goes to background on native (Mobile Security).
   // We lock (requiring re-authentication on resume) rather than sign the user

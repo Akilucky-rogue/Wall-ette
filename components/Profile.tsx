@@ -19,6 +19,7 @@ import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
+import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
@@ -158,6 +159,14 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       const ok = await authenticateBiometric('Confirm to enable biometric unlock');
       if (ok) { setBiometricEnabled(user.uid, true); setBioOn(true); }
     }
+  };
+
+  // ── Crash reports (Android, device-local) ──
+  const [crashOn, setCrashOn] = useState(crashReportsOn);
+  const toggleCrashReports = () => {
+    const next = !crashOn;
+    setCrashOn(next);
+    void setCrashReports(next);
   };
 
   // ── Two-factor (TOTP) ──
@@ -380,10 +389,16 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           {/* Preferences */}
           <section className="break-inside-avoid md:mb-5">
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Preferences</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft">
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
                   <Row icon="currency_exchange" iconCls="bg-sand-light text-sand" title="Display Currency" sub="Live exchange rates, INR base">
                       <CurrencySelector />
                   </Row>
+                  {isNative() && (
+                    <Row icon="bug_report" iconCls="bg-blue-zen-light text-blue-zen" title="Crash Reports"
+                         sub="Errors go to Firebase Crashlytics, never your transactions">
+                      <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
+                    </Row>
+                  )}
               </div>
           </section>
 

@@ -10,6 +10,7 @@ One-off development and debugging tools. None of these ship with the app.
 | `check-app-updates.mjs` | Regression check: when the app offers, requires or skips a Google Play update, when "What's new" appears, and that the release notes match `android/app/build.gradle` |
 | `check-duplicates.mjs` | Regression check: bank references, transaction keys, stable import ids and duplicate matching on made-up narrations (audit L1–L3). Given a statements folder, also replays the audit's re-import tests on real statements, before and after, printing counts only |
 | `check-cloud-saves.mjs` | Regression check: refused cloud writes are kept for the "didn't save" banner, sent again by Try again, and dropped on Dismiss or a new sign-in (audit M4) |
+| `check-crash-reports.mjs` | Regression check: crash reports mask personal data, parse stack traces, report each error once (20 a session at most), stop when turned off, and send nothing on the web |
 | `test-parser.mjs`, `test-summary.mjs` | Exercise the IDFC statement parsers against local statement files |
 | `analyze-excel.mjs`, `analyze-excel-detailed.mjs` | Inspect raw Excel statement structure while developing the parser |
 | `analyze-last-transactions.mjs`, `compare-dashboard-vs-statement.mjs` | Reconciliation checks between parsed data and statement totals |

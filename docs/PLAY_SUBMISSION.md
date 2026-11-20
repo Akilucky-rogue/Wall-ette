@@ -32,6 +32,11 @@ The keystore in `private/` was exposed in an old pull request (audit C2), so Goo
 npm run android:bundle
 ```
 Output: `android\app\build\outputs\bundle\release\app-release.aab`, signed with the upload key. The build stops with a message if `android/upload.properties` is missing.
+
+It also needs `android/app/google-services.json`, the Android app's Firebase config for Crashlytics (from 1.5.5). The Android app `com.wallette.app` was registered in Firebase on 20 Nov. The file is gitignored like the signing files, and the build stops with the command to fetch it again:
+```powershell
+npx firebase-tools apps:sdkconfig ANDROID 1:881370415293:android:b9d1da6f023d700e1877d4 --project wall-e-7a113 --out android/app/google-services.json
+```
 Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`. Section 9 has the checklist for every update.
 
 ## 3. Web address
@@ -49,6 +54,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
 - [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
+- [ ] **Deploy the website again before 1.5.5 reaches testers**: the privacy policy of 20 Nov describes crash reports (Crashlytics), and the product page no longer says "no trackers". Then update the Data safety form (section 5).
 - The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app
@@ -60,6 +66,9 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 | Financial info → "Other financial info" | Collected (user-entered/imported transactions) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
+| App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Profile → Crash Reports turns it off |
+| App info and performance → "Diagnostics" (from 1.5.5) | Collected (device details at the time of a crash, such as model, Android version, free memory and storage) · Analytics · Not shared · Optional |
+| Device or other IDs (from 1.5.5) | Collected (the Crashlytics installation ID, which counts how many installs a crash affects; no user ID is set) · Analytics · Not shared · Optional |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
 | Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |

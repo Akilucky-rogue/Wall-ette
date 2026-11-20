@@ -88,7 +88,7 @@ const STEPS = [
 const PRIVACY_POINTS = [
   'Your statement file never leaves your phone. Only the transactions are saved, to your own account.',
   'Each account is walled off by the database rules, so only you can read your data.',
-  'Insights are worked out on your phone. Nothing is sent to an AI service or an analytics company.',
+  'Insights are worked out on your phone. None of your money data goes to an AI service or an analytics company.',
   'No ads, and your data is never sold.',
   'Delete your account and everything in it from Profile, whenever you like.',
 ];
@@ -187,7 +187,7 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
           {[
             ['Checked against 17 real statements', 'Every one matches the bank’s own totals, to the paisa.'],
             ['Read on your phone', 'Statement files are opened on the device and never uploaded anywhere.'],
-            ['No ads, no trackers', 'There is no analytics, and no AI service ever sees your money.'],
+            ['No ads, no AI', 'No advertiser or AI service ever sees your money. Crash reports carry none of it, and you can turn them off.'],
           ].map(([title, text]) => (
             <div key={title} className="md:px-8 first:md:pl-0 last:md:pr-0">
               <p className="font-serif text-[22px] leading-snug text-premium-charcoal">{title}</p>

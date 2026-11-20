@@ -1,12 +1,13 @@
 # Wall-ette — Technical Specification
 
-**Version:** 1.5.4 (versionCode 12) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
+**Version:** 1.5.5 (versionCode 13) · **App ID:** `com.wallette.app` (Android; builds before Play and the iOS project use `com.wallet.walle`) · **Updated:** 19 November 2026
 **Live web:** https://wall-ette.com · **Repo:** https://github.com/Akilucky-rogue/Wall-ette
 
 Wall-ette is an offline-first personal finance tracker for web and Android. Users record
 transactions manually or import real bank statements (PDF/Excel), and the app reconstructs a
-balance-accurate ledger with local-only analytics. No ads, no trackers, no AI/API calls —
-every insight is computed on the device.
+balance-accurate ledger with local-only analytics. No ads, no analytics SDKs, no AI/API
+calls — every insight is computed on the device. The Android app sends crash reports
+(Crashlytics, from 1.5.5), which users can turn off.
 
 ---
 
@@ -88,8 +89,18 @@ Plain React context — no Redux/Zustand.
   save", with Try again and Dismiss. Firestore has already undone a refused change on the
   device. A refusal of a write queued in an earlier session has no promise left to catch,
   so it's undone without the banner. Edits write the whole entry, so a retry also works
-  for an entry the cloud never had. No crash reporting: Crashlytics would change the Data
-  safety answers. Tests: `scripts/check-cloud-saves.mjs`.
+  for an entry the cloud never had. Each refusal also goes to Crashlytics as its kind and
+  error code (`onRefused`, wired in `index.tsx`). Tests: `scripts/check-cloud-saves.mjs`.
+- **Crash reports** (1.5.5) — Firebase Crashlytics on Android. The native SDK reports app
+  crashes; `services/crashReports.ts` adds WebView errors (uncaught errors, unhandled
+  rejections) and handled problems, with screen names as breadcrumbs. Messages pass
+  through `services/crashFormat.ts`, which masks emails, ids and any number that could be
+  an amount or an account or reference number; no user id is set. At most 20 reports a
+  session, each once. On in release builds, off in debug (`firebase_crashlytics_collection_enabled`
+  from a build-type placeholder); Profile → Crash Reports turns it off on a device
+  (`localStorage` `crashReports`, plus `setEnabled` and `deleteUnsentReports`). Web builds
+  send nothing. JS frames point into the minified bundle; the version code says which build.
+  Tests: `scripts/check-crash-reports.mjs`.
 - Device-local prefs (theme, biometric opt-in, banner dismissals) live in `localStorage`.
 
 ---
@@ -104,7 +115,8 @@ Plain React context — no Redux/Zustand.
 | **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
-(public FX rates for the currency selector) and, on Android, Google Play's update check.
+(public FX rates for the currency selector) and, on Android, Google Play's update check and
+Firebase Crashlytics' crash reports.
 Statement files never leave the device.
 
 **Consent gate** — new registrations must accept Terms & Privacy (version `2026-06-11`);
@@ -169,13 +181,14 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 
 | Item | Value |
 |---|---|
-| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) |
+| Capacitor plugins | app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · status-bar 8.0.2 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) · `@capacitor-firebase/crashlytics` 8.6.0 (crash reports; Gradle: `firebase-crashlytics-gradle` 3.0.8, `google-services` 4.4.4) |
+| Firebase (native) | Android app `com.wallette.app`, registered 20 Nov 2026 (`1:881370415293:android:b9d1da6f023d700e1877d4`). Its `android/app/google-services.json` is gitignored, and the build stops with the command to download it if it's missing |
 | SDK levels | minSdk 24 · target/compileSdk 36 (Play's minimum from 31 Aug 2026) |
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
 | Signing | Website APK: PKCS12 keystore at `private/my-release-key.keystore` via gitignored `android/key.properties` (exposed in audit C2; due to be retired). Google Play: a new upload key via gitignored `android/upload.properties`, used by `npm run android:bundle` (`-Pplay`); see `docs/PLAY_SUBMISSION.md` |
 | Windowing | Edge to edge on Android 15+ (target 36 has no opt-out). Capacitor's `SystemBars` passes the bar insets to CSS; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off (`enforceNavigationBarContrast`); the cream colors in `styles.xml` apply on Android 14 and older |
 | Backups & screen | `allowBackup="false"`, plus `res/xml/data_extraction_rules.xml` (Android 12+) and `backup_rules.xml` (11 and earlier) excluding every domain, so neither Google backups nor phone-to-phone transfers copy the WebView's data (mirror, Firestore cache, sign-in). `MainActivity` sets `FLAG_SECURE` in release builds: no screenshots, recordings or recent-apps preview. Debug builds leave capture on for store screenshots (audit M11) |
-| Versioning | versionCode 12 · versionName 1.5.4, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Versioning | versionCode 13 · versionName 1.5.5, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
 | Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger

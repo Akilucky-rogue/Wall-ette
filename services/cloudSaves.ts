@@ -31,6 +31,7 @@ export interface UnsavedState {
 let owner: string | null = null;
 const refused = new Map<string, Refused>();
 const listeners = new Set<() => void>();
+const refusalListeners = new Set<(key: string, code: string) => void>();
 let retrying = 0;
 let state: UnsavedState = { count: 0, code: null, retrying: false };
 
@@ -52,6 +53,12 @@ export function subscribeUnsaved(listener: () => void): () => void {
 }
 
 export const getUnsaved = (): UnsavedState => state;
+
+/** Hears each refusal as it's kept: the key and Firestore's code, never the data. */
+export function onRefused(listener: (key: string, code: string) => void): () => void {
+  refusalListeners.add(listener);
+  return () => { refusalListeners.delete(listener); };
+}
 
 /** The signed-in user (null when signed out). Refusals kept for anyone else are dropped. */
 export function setCloudOwner(uid: string | null): void {
@@ -80,8 +87,10 @@ export function sendToCloud(key: string, items: number, send: () => Promise<unkn
     (e: any) => {
       log.warn('Cloud write refused:', key, e?.code || e?.message);
       if (by === owner) {
-        refused.set(key, { items, code: e?.code || 'unknown', send });
+        const code = e?.code || 'unknown';
+        refused.set(key, { items, code, send });
         publish();
+        refusalListeners.forEach(listener => { try { listener(key, code); } catch { /* a listener's problem */ } });
       }
       return false;
     },

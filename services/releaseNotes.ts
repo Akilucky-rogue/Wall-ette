@@ -19,6 +19,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versionCode: 13,
+    version: '1.5.5',
+    items: [
+      'When something goes wrong, Wall-ette sends a crash report so it can be fixed. Reports never include your transactions, and you can turn them off in Profile.',
+    ],
+  },
+  {
     versionCode: 12,
     version: '1.5.4',
     items: [

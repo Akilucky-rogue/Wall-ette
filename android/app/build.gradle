@@ -19,8 +19,8 @@ android {
         applicationId "com.wallette.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "1.5.4"
+        versionCode 13
+        versionName "1.5.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -47,6 +47,12 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
+            // Crash reports on (Profile can turn them off; services/crashReports.ts).
+            manifestPlaceholders = [crashlyticsCollection: "true"]
+        }
+        debug {
+            // Debug builds never send crash reports.
+            manifestPlaceholders = [crashlyticsCollection: "false"]
         }
     }
     compileOptions {
@@ -80,11 +86,11 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+// Native Firebase, for Crashlytics. google-services.json is gitignored like
+// the signing files; without it crash reporting would fail at runtime, so the
+// build stops instead (docs/PLAY_SUBMISSION.md, step 1).
+if (!file('google-services.json').exists()) {
+    throw new GradleException("android/app/google-services.json is missing. Download it with: npx firebase-tools apps:sdkconfig ANDROID 1:881370415293:android:b9d1da6f023d700e1877d4 --project wall-e-7a113 --out android/app/google-services.json")
 }
+apply plugin: 'com.google.gms.google-services'
+apply plugin: 'com.google.firebase.crashlytics'

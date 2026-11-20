@@ -10,6 +10,7 @@
  *   - a write that throws before sending counts as refused
  *   - Try again sends each refused write again and keeps the ones refused again
  *   - Dismiss forgets them, and a new sign-in drops another user's
+ *   - crash reports hear about each refusal (its key and code only)
  *   - the state only changes when something does (React reads it every render)
  *
  * Usage (after `npm ci`):
@@ -114,6 +115,18 @@ eq('dismiss forgets them', state().count, 0);
   eq('still listed while sending', state().count, 2);
   await new Promise(r => setTimeout(r, 10));
   eq('after trying again', state(), { count: 1, code: 'permission-denied', retrying: false });
+}
+
+// Crash reports hear about each refusal: the key and the code, nothing else.
+{
+  const heard = [];
+  const stop = saves.onRefused((key, code) => heard.push([key, code]));
+  await saves.sendToCloud('import:abc', 500, refuse('resource-exhausted'));
+  await saves.sendToCloud('tx:12', 1, ok);
+  stop();
+  await saves.sendToCloud('tx:13', 1, refuse('permission-denied'));
+  eq('refusals are announced, once each', heard, [['import:abc', 'resource-exhausted']]);
+  saves.dismissUnsaved();
 }
 
 // Another user signs in: what was refused for the last one goes.

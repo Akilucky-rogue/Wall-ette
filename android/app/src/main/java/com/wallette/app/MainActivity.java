@@ -1,12 +1,15 @@
 package com.wallette.app;
 
 import android.content.pm.ApplicationInfo;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
+import androidx.activity.EdgeToEdge;
+import androidx.activity.SystemBarStyle;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
@@ -16,6 +19,10 @@ public class MainActivity extends BridgeActivity {
     // When this process last recovered from losing the WebView's renderer
     // (elapsedRealtime ms; -1 = never). Static, so it outlives recreate().
     private static long lastRendererLoss = -1;
+
+    // Behind the navigation buttons on Android 7, which can only draw them
+    // white (androidx's default dark scrim).
+    private static final int DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,6 +35,17 @@ public class MainActivity extends BridgeActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
         super.onCreate(savedInstanceState);
+
+        // Edge to edge on every Android version, as Android 15+ is anyway:
+        // transparent bars over the page, which paints the theme colour
+        // behind them. Capacitor's SystemBars keeps the page clear of the bars
+        // (index.html), and the page sets the icon colour (utils/theme.ts).
+        // After super.onCreate, so the window has the app theme by then.
+        EdgeToEdge.enable(
+            this,
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            SystemBarStyle.light(Color.TRANSPARENT, DARK_SCRIM)
+        );
 
         bridge.addWebViewListener(new WebViewListener() {
             @Override

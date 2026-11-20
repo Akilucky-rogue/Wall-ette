@@ -7,6 +7,12 @@ export const SITE_URL = `https://${SITE_HOST}`;
 export const PRIVACY_URL = `${SITE_URL}/privacy.html`;
 export const TERMS_URL = `${SITE_URL}/terms.html`;
 
+/**
+ * Sender of the password-reset email (Firebase's default for this project).
+ * Update it if the Firebase email templates get a custom domain.
+ */
+export const ACCOUNT_EMAIL_FROM = 'noreply@wall-e-7a113.firebaseapp.com';
+
 /** Wall-ette on Google Play. */
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.wallette.app';
 

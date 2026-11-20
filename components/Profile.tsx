@@ -108,8 +108,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       const code = err?.code || '';
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         setPwError('Current password is incorrect.');
-      } else if (code === 'auth/weak-password') {
-        setPwError('New password is too weak.');
+      } else if (code === 'auth/weak-password' || code === 'auth/password-does-not-meet-requirements') {
+        setPwError('New password is too weak. It needs everything in the list above.');
+      } else if (code === 'auth/network-request-failed') {
+        setPwError("You're offline. Connect to the internet and try again.");
       } else if (code === 'auth/too-many-requests') {
         setPwError('Too many attempts — please try again in a few minutes.');
       } else {

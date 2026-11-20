@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type MultiFactorResolver } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
+import { sendResetLink } from '../services/passwordReset';
+import { isEmailLike, suggestEmail } from '../utils/emailHints';
 import { log } from '../utils/log';
-import { PRIVACY_URL, TERMS_URL } from '../utils/site';
+import { ACCOUNT_EMAIL_FROM, PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 
 // Bump when terms.html / privacy.html change materially — recorded with
@@ -27,6 +29,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   // Dedicated forgot-password panel + resend cooldown
   const [resetMode, setResetMode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  // The address Firebase said has no account, shown until the email changes
+  const [noAccountFor, setNoAccountFor] = useState<string | null>(null);
+  // Typo hints wait until the field is left, so they don't flicker while typing
+  const [emailChecked, setEmailChecked] = useState(false);
+  const emailFix = emailChecked ? suggestEmail(email) : null;
+
+  const changeEmail = (value: string) => {
+    setEmail(value);
+    setEmailChecked(false);
+    setNoAccountFor(null);
+  };
   // Consent to Terms & Privacy — required for sign-up only.
   const [agreed, setAgreed] = useState(false);
 
@@ -69,11 +82,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           case 'auth/email-already-in-use':
               return "Account already exists. We've switched you to Log In.";
           case 'auth/weak-password':
-              return "Password is too weak. It should be at least 6 characters.";
+          case 'auth/password-does-not-meet-requirements':
+              return "Password must be 8+ characters with an uppercase and a lowercase letter, a number and a symbol.";
           case 'auth/invalid-email':
               return "Please enter a valid email address.";
           case 'auth/too-many-requests':
               return "Too many failed attempts. Please try again later.";
+          case 'auth/network-request-failed':
+              return "You're offline. Connect to the internet and try again.";
           default:
               return message.replace('Firebase: ', '');
       }
@@ -129,37 +145,47 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
   const handleResetPassword = async () => {
       const target = email.trim();
-      if (!target || !target.includes('@')) {
-          setError('Please enter a valid email address.');
+      setEmailChecked(true);
+      if (!isEmailLike(target)) {
+          setError("That doesn't look like an email address. Check it and try again.");
           return;
       }
       setLoading(true);
       setError('');
-      try {
-          await sendPasswordResetEmail(auth, target);
-      } catch (err: any) {
-          // Never reveal whether an account exists (anti-enumeration):
-          // user-not-found is shown as success. Real failures still surface.
-          if (err.code === 'auth/invalid-email') {
-              setError('Please enter a valid email address.');
-              setLoading(false);
-              return;
-          }
-          if (err.code === 'auth/too-many-requests') {
-              setError('Too many attempts — please wait a few minutes and try again.');
-              setLoading(false);
-              return;
-          }
-          if (err.code !== 'auth/user-not-found') {
-              setError(getErrorMessage(err.code, err.message));
-              setLoading(false);
-              return;
-          }
-      }
+      setNoAccountFor(null);
+      const result = await sendResetLink(target);
       setLoading(false);
-      setResetSent(true);
-      setCooldown(30);
+      if (result.status === 'sent') {
+          setResetSent(true);
+          setCooldown(30);
+      } else if (result.status === 'no-account') {
+          // Firebase says so (email enumeration protection is off): the
+          // address has a typo, or isn't the one used to sign up.
+          setResetSent(false);
+          setNoAccountFor(target);
+      } else {
+          setError(result.message);
+      }
   };
+
+  const leaveReset = () => {
+      setResetMode(false);
+      setResetSent(false);
+      setNoAccountFor(null);
+      setError('');
+      setCooldown(0);
+  };
+
+  // Shown under every email field once it's been left: "Did you mean …?"
+  const emailHint = emailFix && (
+      <button
+          type="button"
+          onClick={() => changeEmail(emailFix)}
+          className="mt-1.5 ml-2 text-left text-[11px] text-muted-taupe hover:text-premium-charcoal"
+      >
+          Did you mean <span className="font-semibold text-sage break-words">{emailFix}</span>?
+      </button>
+  );
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
@@ -261,12 +287,15 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <div className="space-y-4">
           {resetSent ? (
             <>
-              <div className="p-4 bg-sage-light/40 border border-sage/20 rounded-2xl">
-                <p className="text-[13px] text-premium-charcoal font-semibold mb-1">Check your inbox</p>
+              <div className="p-4 bg-sage-light/40 border border-sage/20 rounded-2xl" role="status">
+                <p className="text-[13px] text-premium-charcoal font-semibold mb-1">Check your email</p>
                 <p className="text-[12px] text-muted-taupe leading-relaxed">
-                  If an account exists for <span className="font-semibold text-premium-charcoal">{email.trim()}</span>,
-                  a password-reset link is on its way. The link expires in about an hour — check
-                  your spam folder if it doesn't appear within a minute.
+                  We've sent a link to set a new password to{' '}
+                  <span className="font-semibold text-premium-charcoal break-words">{email.trim()}</span>.
+                  It comes from <span className="break-words">{ACCOUNT_EMAIL_FROM}</span> and works for an hour.
+                </p>
+                <p className="text-[12px] text-muted-taupe leading-relaxed mt-2">
+                  Nothing after a few minutes? Look in your spam folder.
                 </p>
               </div>
               <button
@@ -277,24 +306,50 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               >
                 {loading ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Email'}
               </button>
+              <button
+                type="button"
+                onClick={() => { setResetSent(false); setCooldown(0); setError(''); }}
+                className="w-full text-sage py-1 text-[12px] font-semibold hover:underline"
+              >
+                Use a different email
+              </button>
             </>
           ) : (
             <>
               <p className="text-[12px] text-muted-taupe leading-relaxed text-center px-2">
-                Enter your account email and we'll send you a link to set a new password.
+                Enter the email you signed up with and we'll send you a link to set a new password.
               </p>
               <div>
-                <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
+                <label htmlFor="reset-email" className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
                 <input
+                    id="reset-email"
                     type="email"
+                    autoComplete="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => changeEmail(e.target.value)}
+                    onBlur={() => setEmailChecked(true)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleResetPassword(); } }}
                     className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                     placeholder="you@example.com"
                     autoFocus
                 />
+                {emailHint}
               </div>
+              {noAccountFor && (
+                <div className="p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-[12px] leading-relaxed" role="alert">
+                  <p className="text-rose font-medium">
+                    No Wall-ette account uses <span className="font-semibold break-words">{noAccountFor}</span>.
+                  </p>
+                  <p className="text-muted-taupe mt-1">Check the spelling, or try the email you signed up with.</p>
+                  <button
+                    type="button"
+                    onClick={() => { leaveReset(); setIsLogin(false); setAgreed(false); }}
+                    className="mt-2 text-sage font-semibold hover:underline"
+                  >
+                    Create an account with this email
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleResetPassword}
@@ -307,7 +362,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           )}
           <button
             type="button"
-            onClick={() => { setResetMode(false); setResetSent(false); setError(''); setCooldown(0); }}
+            onClick={leaveReset}
             className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
           >
             Back to Sign In
@@ -317,14 +372,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
-            <input 
-                type="email" 
+            <input
+                type="email"
+                autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => changeEmail(e.target.value)}
+                onBlur={() => setEmailChecked(true)}
                 className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                 placeholder="you@example.com"
                 required
             />
+            {emailHint}
           </div>
           <div>
             <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Password</label>
@@ -373,7 +431,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <div className="mt-6 flex flex-col items-center gap-4">
             {isLogin && (
                 <button
-                    onClick={() => { setResetMode(true); setResetSent(false); setError(''); }}
+                    onClick={() => { setResetMode(true); setResetSent(false); setNoAccountFor(null); setError(''); }}
                     className="text-[12px] text-muted-taupe hover:text-sage transition-colors"
                 >
                     Forgot Password?

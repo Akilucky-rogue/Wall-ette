@@ -73,7 +73,7 @@ const Phone: React.FC<{ src: string; alt: string; className?: string; eager?: bo
 const STEPS = [
   {
     title: 'Download your statement',
-    text: 'From IDFC FIRST net banking or the mobile app, as a PDF or an Excel file.',
+    text: 'From your bank’s app or net banking, as a PDF or an Excel file.',
   },
   {
     title: 'Import it',
@@ -96,7 +96,7 @@ const PRIVACY_POINTS = [
 const FAQS = [
   {
     q: 'Which banks does it work with?',
-    a: 'Wall·ette reads IDFC FIRST Bank statements, PDF or Excel, line for line. Statements from other banks go through a general importer that follows the running balance. It handles many banks, but it isn’t checked as closely.',
+    a: 'Wall·ette knows the statements of IDFC FIRST, HDFC, SBI, Kotak, Union Bank and Saraswat Bank, and checks every line against the running balance. Statements from other banks go through a general importer that follows the running balance. It handles many banks, but it isn’t checked as closely.',
   },
   {
     q: 'Do I give Wall·ette my bank login?',
@@ -168,7 +168,7 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
               Your bank statement, made readable.
             </h1>
             <p className="mt-6 max-w-[34rem] text-[17px] leading-relaxed text-zen-charcoal sm:text-[18px]">
-              Import an IDFC FIRST statement and Wall·ette sorts every line into spending, income and money you only
+              Import a bank statement and Wall·ette sorts every line into spending, income and money you only
               moved between your own accounts. The file is read on your phone and never uploaded.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">

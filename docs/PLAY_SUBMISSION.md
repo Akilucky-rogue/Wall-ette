@@ -37,7 +37,14 @@ It also needs `android/app/google-services.json`, the Android app's Firebase con
 ```powershell
 npx firebase-tools apps:sdkconfig ANDROID 1:881370415293:android:b9d1da6f023d700e1877d4 --project wall-e-7a113 --out android/app/google-services.json
 ```
+The release build runs R8 (from 1.5.5), and the Crashlytics Gradle plugin uploads its mapping file, so the build needs a network connection. The bundle carries the mapping file for Play too: nothing to upload by hand under "Deobfuscation files".
+
 Each upload must bump `versionCode` (and `versionName`) in `android/app/build.gradle`. Section 9 has the checklist for every update.
+
+**Play Console notes on release 12 (1.5.4), 20 Nov:**
+- *DEX code optimization below our threshold: Obfuscation 1%* (fix by Feb 2027): R8 is on from 1.5.5. The percentage updates once Play has analysed that release.
+- *Edge-to-edge may not display for all users*: from 1.5.5 `MainActivity` calls `EdgeToEdge.enable`, as the note suggests.
+- *Your app uses deprecated APIs or parameters for edge-to-edge*: the StatusBar plugin and the theme's bar colours that set them are gone in 1.5.5. androidx's own `EdgeToEdge` still calls the deprecated setters on Android 14 and older, so Play may keep naming `androidx.activity.EdgeToEdgeApi…`; that's Google's recommended code, and the note doesn't block releases.
 
 ## 3. Web address
 
@@ -54,7 +61,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
 - [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
-- [ ] **Deploy the website again before 1.5.5 reaches testers**: the privacy policy of 20 Nov describes crash reports (Crashlytics), and the product page no longer says "no trackers". Then update the Data safety form (section 5).
+- [ ] **Deploy the website again before 1.5.5 reaches testers**: the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import. Then update the Data safety form (section 5) and the store listing's full description (section 6).
 - The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app
@@ -88,7 +95,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 >
 > 🌿 MINDFUL BY DESIGN — A zen, clutter-free interface that makes checking your finances a pleasant ritual instead of a chore.
 >
-> 📄 IMPORT YOUR BANK STATEMENTS — Drop in an IDFC FIRST Bank PDF or Excel statement and Wall-ette parses every transaction on your device — the file never leaves your phone. Automatic categorization tuned for Indian merchants and UPI, with duplicate detection built in.
+> 📄 IMPORT YOUR BANK STATEMENTS — Drop in a PDF or Excel statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank, and Wall-ette reads every transaction on your device and checks it against the running balance — the file never leaves your phone. Other banks' PDFs often work too. Automatic categorization tuned for Indian merchants and UPI, with duplicate detection built in.
 >
 > 📊 INSIGHTS THAT MEAN SOMETHING — A live Pulse of your spending: month-over-month category shifts, a daily spending heatmap, weekday patterns, budget pace projection, and automatic detection of recurring charges and subscriptions.
 >

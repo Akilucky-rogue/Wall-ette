@@ -22,7 +22,10 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     versionCode: 13,
     version: '1.5.5',
     items: [
-      'When something goes wrong, Wall-ette sends a crash report so it can be fixed. Reports never include your transactions, and you can turn them off in Profile.',
+      'Import statements from HDFC, SBI, Kotak, Union Bank and Saraswat Bank, as well as IDFC FIRST.',
+      'Password-locked statement PDFs open once you enter their password.',
+      'Forgot Password tells you when no account uses an email, and catches typos like gmial.com.',
+      'Crash reports help fix problems. They never include your transactions, and you can turn them off in Profile.',
       'If Android stops the app to free memory, Wall-ette reopens instead of closing.',
     ],
   },

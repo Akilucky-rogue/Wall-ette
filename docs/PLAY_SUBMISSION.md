@@ -61,7 +61,8 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
 - [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
-- [ ] **Deploy the website again before 1.5.5 reaches testers**: the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import. Then update the Data safety form (section 5) and the store listing's full description (section 6).
+- [x] **Website deployed again on 20 Nov** (hosting only): the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import.
+- [ ] **[YOU]** Before 1.5.5 reaches testers: update the Data safety form (section 5) and the store listing's full description (section 6).
 - The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app

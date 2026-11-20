@@ -40,10 +40,14 @@ android {
     }
     buildTypes {
         release {
-            // Keep minify off: all app logic is JS in the WebView, so R8 gains
-            // nothing and risks breaking the Capacitor bridge.
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 shrinks, optimises and obfuscates the Java and Kotlin code
+            // (Play's DEX optimisation check). The app's own logic is JS in
+            // the WebView, which R8 never sees; Capacitor's rules and
+            // proguard-rules.pro keep the plugins the bridge finds by name.
+            // Crashlytics' Gradle plugin uploads the mapping file so crash
+            // reports read normally, and the bundle carries it for Play.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }

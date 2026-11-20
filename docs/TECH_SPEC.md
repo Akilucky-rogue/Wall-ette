@@ -100,7 +100,13 @@ Plain React context — no Redux/Zustand.
   from a build-type placeholder); Profile → Crash Reports turns it off on a device
   (`localStorage` `crashReports`, plus `setEnabled` and `deleteUnsentReports`). Web builds
   send nothing. JS frames point into the minified bundle; the version code says which build.
+  Turning reports back on first deletes whatever the SDK kept while they were off.
   Tests: `scripts/check-crash-reports.mjs`.
+- **Lost WebView renderer** — when the renderer crashes or Android kills it for memory,
+  Chromium kills the app unless someone handles it, and Crashlytics never sees that.
+  `MainActivity` handles it: reports a `RendererGone` non-fatal, takes the dead WebView out
+  and recreates the activity (it opens locked, as after a restart). A second loss within 30
+  seconds lets the app close, so a renderer that dies on load can't loop.
 - Device-local prefs (theme, biometric opt-in, banner dismissals) live in `localStorage`.
 
 ---

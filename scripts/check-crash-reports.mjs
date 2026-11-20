@@ -169,6 +169,11 @@ eq('nothing is sent while off', globalThis.__calls.length, before);
 
 await crash.setCrashReports(true);
 eq('turned back on', [crash.crashReportsOn(), calls('setEnabled').at(-1)], [true, { enabled: true }]);
+eq('without sending what was kept while off', calls('deleteUnsentReports').length, 2);
+{
+  const order = globalThis.__calls.slice(-2).map(([n]) => n);
+  eq('deleted before collection resumes', order, ['deleteUnsentReports', 'setEnabled']);
+}
 await settle();
 
 // The web build sends nothing.

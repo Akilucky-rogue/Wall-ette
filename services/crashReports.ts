@@ -29,7 +29,11 @@ export function crashReportsOn(): boolean {
   try { return localStorage.getItem(PREF_KEY) !== 'off'; } catch { return true; }
 }
 
-/** Turns crash reports on or off for this device. Off also deletes reports not yet sent. */
+/**
+ * Turns crash reports on or off for this device. Either way, reports not yet
+ * sent are deleted: turning off drops what's queued, and turning back on
+ * mustn't send what the native side recorded while off.
+ */
 export async function setCrashReports(on: boolean): Promise<void> {
   try {
     if (on) localStorage.removeItem(PREF_KEY);
@@ -37,6 +41,7 @@ export async function setCrashReports(on: boolean): Promise<void> {
   } catch { /* storage unavailable */ }
   if (!native) return;
   try {
+    if (on) await FirebaseCrashlytics.deleteUnsentReports();
     await FirebaseCrashlytics.setEnabled({ enabled: on });
     if (!on) await FirebaseCrashlytics.deleteUnsentReports();
   } catch { /* reporting must never break the app */ }

@@ -201,6 +201,20 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 - **Feature screens** — Pulse (daily/heatmap), Category Split (interactive SVG donut with
   merchant drill-down), Income Insights, Fee Hunter, Rewind (lifetime timeline) with
   exportable "Wall·ette Wrapped" canvas cards.
+- **Notifications** (from 1.5.6) — the bell on Home (`components/NotificationCenter.tsx`).
+  `services/notifications.ts` builds them on the device from data the app already has:
+  failed unlock attempts from the security log (`services/securityLog.ts` reads the latest 30;
+  a wrong password followed within 5 minutes by an unlock is a typo and left out), categories
+  at 80% and over their budget this month, today's spending over the daily limit, entries
+  imported twice, possible double charges and bank charges from the last 45 days, price rises
+  still being charged, recurring charges due in the next 3 days, an import reminder when the
+  newest entry is 30 days old, last month's savings against the goal (once the data reaches
+  this month), a downloaded update and this version's release notes. Each notification's id
+  names its subject (`budget:Dining:2026-11:over`, `due:<payee>:<day>`), so new ones stand out;
+  seen and dismissed ids are kept in `localStorage` under `walletNotifications_<uid>`, which
+  sign-out removes. Tapping one opens its screen, and `utils/screenSection.ts` opens Flow on
+  Goals or Pulse at Recurring Charges. Nothing new is collected or sent, so the Data safety
+  answers don't change. Checked by `scripts/check-notifications.mjs`.
 
 ---
 

@@ -62,7 +62,8 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
 - [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
 - [x] **Website deployed again on 20 Nov** (hosting only): the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import.
-- [ ] **[YOU]** Before 1.5.5 reaches testers: update the Data safety form (section 5) and the store listing's full description (section 6).
+- [x] **Data safety form and full description updated in Play Console on 20 Nov** to match sections 5 and 6, and saved. Not sent yet, so 1.5.5's review isn't pushed back.
+- [ ] **[YOU]** Once 1.5.5 is approved: Publishing overview → **Send 2 changes for review** (Data safety, full description).
 - The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).
 
 ## 5. Data safety form — answers that match the app
@@ -77,6 +78,8 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 | App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Profile → Crash Reports turns it off |
 | App info and performance → "Diagnostics" (from 1.5.5) | Collected (device details at the time of a crash, such as model, Android version, free memory and storage) · Analytics · Not shared · Optional |
 | Device or other IDs (from 1.5.5) | Collected (the Crashlytics installation ID, which counts how many installs a crash affects; no user ID is set) · Analytics · Not shared · Optional |
+| Account creation | **Username and password** only (two-factor sign-in is still Coming Soon; the fingerprint unlock is on the device, not a way to sign in) |
+| Personal info | **Email address** only. No name or phone number is asked for, and statement files are read on the phone, so Files and docs isn't collected either |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
 | Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |

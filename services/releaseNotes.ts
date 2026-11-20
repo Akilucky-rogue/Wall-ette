@@ -19,6 +19,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versionCode: 14,
+    version: '1.5.6',
+    items: [
+      'The bell on Home shows what needs a look: budgets running out, bills due soon, bank charges, possible double charges and failed unlock attempts.',
+      "Tap one to go straight to the budget, bill or charge it's about.",
+    ],
+  },
+  {
     versionCode: 13,
     version: '1.5.5',
     items: [

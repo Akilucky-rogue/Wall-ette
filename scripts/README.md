@@ -13,6 +13,7 @@ One-off development and debugging tools. None of these ship with the app.
 | `check-crash-reports.mjs` | Regression check: crash reports mask personal data, parse stack traces, report each error once (20 a session at most), stop when turned off, and send nothing on the web |
 | `check-bank-statements.mjs` | Regression check: made-up statements in each bank's layout (Kotak, Saraswat, Union Bank and SBI PDFs; HDFC and IDFC FIRST Excel) read to the right rows, directions and totals; amounts, bank detection, payees, references and categories for each narration style; a PDF with no text says what to do |
 | `check-password-reset.mjs` | Regression check: Forgot Password's results and messages for each Firebase answer, and typo suggestions for mail domains |
+| `check-notifications.mjs` | Regression check: the bell's notifications from made-up wallets (failed unlocks, budgets, the daily limit, entries imported twice, double charges, bank charges, price rises, bills due, the import reminder, the savings goal), and how seen and dismissed ones are kept |
 | `test-parser.mjs`, `test-summary.mjs` | Exercise the IDFC statement parsers against local statement files |
 | `analyze-excel.mjs`, `analyze-excel-detailed.mjs` | Inspect raw Excel statement structure while developing the parser |
 | `analyze-last-transactions.mjs`, `compare-dashboard-vs-statement.mjs` | Reconciliation checks between parsed data and statement totals |

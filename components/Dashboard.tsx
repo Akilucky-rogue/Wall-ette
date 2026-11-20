@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { byNewest, parseDay } from '../utils/dates';
 import { huntSavings } from '../services/analyticsService';
 import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
+import NotificationCenter from './NotificationCenter';
 import { WallEEyes, WallEMascot, FloatingLeaf, LotusFlower, Sprout, RangoliCorner, Diya } from './SplashScreen';
 import styles from './Dashboard.module.css';
 
@@ -19,7 +20,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance
   } = useWallet();
 
-  const [showNotifications, setShowNotifications] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = () => {
     if (refreshing) return;
@@ -45,7 +45,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   }, []);
-  const notificationRef = useRef<HTMLDivElement>(null);
 
   // --- Balance Trend Data (last 12 months) ---
   // Single pass: bucket net flow by calendar month, then cumulative-sum across
@@ -172,17 +171,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       .slice(0, 5);
   }, [transactions]);
 
-  // Close notifications when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
 
   // Category colors (using CSS module classes to avoid Tailwind purge issues)
   const CAT_COLORS = ['var(--sage)', 'var(--rose)', 'var(--amber)', 'var(--sage-3)', '#94BFCA'] as const;
@@ -211,52 +199,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <WallEMascot mood="happy" size="sm" />
           <span className="text-premium-charcoal font-serif text-xl font-bold tracking-tight select-none">Wall-ette</span>
         </div>
-        {/* Right: Currency + Notification bell */}
+        {/* Right: currency and the notification bell */}
         <div className="relative flex items-center ml-auto min-w-0 gap-2">
           <CurrencySelector />
-          <div className="relative" ref={notificationRef}>
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={`flex items-center justify-center rounded-full h-10 w-10 border border-black/5 transition-colors cursor-pointer ${showNotifications ? 'bg-white text-sage shadow-sm' : 'bg-white/50 text-muted-taupe hover:bg-white'}`}
-            >
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose rounded-full"></span>
-            </button>
-            {showNotifications && (
-                <div className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-xl border border-black/5 p-4 z-[60] animate-slide-up origin-top-right">
-                    <h4 className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest mb-3">Notifications</h4>
-                    <div className="space-y-3">
-                        <div className="flex gap-3 items-start">
-                            <div className="bg-sage-light p-1.5 rounded-lg text-sage">
-                                <span className="material-symbols-outlined text-[16px]">shield</span>
-                            </div>
-                            <div>
-                                <p className="text-xs font-serif font-semibold text-premium-charcoal">Security Check</p>
-                                <p className="text-[10px] text-muted-taupe">Account is secure. Last login verified.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-3 items-start">
-                            <div className="bg-blue-zen-light p-1.5 rounded-lg text-blue-zen">
-                                <span className="material-symbols-outlined text-[16px]">cloud_done</span>
-                            </div>
-                            <div>
-                                <p className="text-xs font-serif font-semibold text-premium-charcoal">Data Synced</p>
-                                <p className="text-[10px] text-muted-taupe">Your wallet is up to date.</p>
-                            </div>
-                        </div>
-                         <div className="flex gap-3 items-start opacity-60">
-                            <div className="bg-sand-light p-1.5 rounded-lg text-sand">
-                                <span className="material-symbols-outlined text-[16px]">handshake</span>
-                            </div>
-                            <div>
-                                <p className="text-xs font-serif font-semibold text-premium-charcoal">Welcome to Wall-ette</p>
-                                <p className="text-[10px] text-muted-taupe">Start your mindful journey.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-          </div>
+          <NotificationCenter onNavigate={onNavigate} />
         </div>
       </div>
 

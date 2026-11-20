@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
+import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot, FloatingLeaf, LotusFlower, RangoliCorner, MandalaDots } from './SplashScreen';
 
@@ -62,6 +63,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   } = useWallet();
 
   const [tab, setTab] = useState<'STORY' | 'GOALS'>('STORY');
+  // A budget or savings notification opens Goals (utils/screenSection.ts).
+  useLayoutEffect(() => { if (takeSection('goals')) setTab('GOALS'); }, []);
   const [selectedMonthIdx, setSelectedMonthIdx] = useState<number | null>(null);
   const [storyMonth, setStoryMonth] = useState<string | null>(null);
   const [goalInput, setGoalInput] = useState<string | null>(null);

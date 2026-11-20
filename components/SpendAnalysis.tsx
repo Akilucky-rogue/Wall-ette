@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
+import { takeSection } from '../utils/screenSection';
 import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
 import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace, prettyMerchant } from '../services/analyticsService';
@@ -24,6 +25,17 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const [heatDay, setHeatDay] = useState<number | null>(null); // selected heatmap day (1-based)
   const [selPoint, setSelPoint] = useState<number | null>(null); // selected trends day/week
   
+  // A notification about a bill due soon opens Pulse at Recurring Charges
+  // (utils/screenSection.ts), once the list has rendered.
+  useEffect(() => {
+    if (!takeSection('recurring')) return;
+    // No cleanup: StrictMode's second run must not cancel it, and after an
+    // unmount the element is gone, so this does nothing.
+    setTimeout(() => {
+      document.getElementById('pulse-recurring')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, 150);
+  }, []);
+
   // AI Insights State
   const [aiInsights, setAiInsights] = useState<FinancialInsight | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -951,7 +963,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Recurring charges / subscriptions */}
       {analysisTab === 'EXPENSE' && recurring.length > 0 && (
-        <div className="px-6 py-2 break-inside-avoid">
+        <div id="pulse-recurring" className="px-6 py-2 break-inside-avoid scroll-mt-24">
           <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
             <div className="flex justify-between items-end mb-3">
               <div>

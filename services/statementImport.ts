@@ -11,6 +11,7 @@
 // (audit L1–L3).
 
 import { Transaction, TransactionType } from '../types';
+import { narrationFields } from './narration';
 
 /** A row as the statement parsers return it. */
 export interface StatementRow {
@@ -48,12 +49,15 @@ const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
  *   "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"   → "rrn:615230407557"
  *   "IMPS-OPM/512345678901/Test Associates LLP/…"     → "rrn:512345678901"
  *   "NEFT/CMS123456789/ACME BROKING PVT LTD/ICIC…"    → "utr:CMS123456789"
+ *   "UPI-ZOMATO LTD-zomato@axis-UTIB0000000-615230407557-PAY" (HDFC) → "rrn:…"
+ *   "MB/NEFT/SRCB012345678901/NAME/" (Saraswat)       → "utr:SRCB012345678901"
  *   "IFT/10000123456/Mr. RAVI KUMAR SHAH/912345"      → null
  * Spaces are ignored: PDF narrations wrap mid-word, which can split one.
  */
 export function bankReference(narration: string | undefined): string | null {
   if (!narration) return null;
-  const segs = narration.toUpperCase().replace(/\s+/g, '').split('/');
+  const segs = narrationFields(narration).map(f => f.toUpperCase().replace(/\s+/g, ''));
+  if (segs.length === 0) return null;
   const rail = segs[0];
   if (/^(UPI|IMPS|MMT)/.test(rail)) {
     const rrn = segs.slice(1).find(s => RRN.test(s));

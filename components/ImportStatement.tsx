@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 // XLSX is only pulled in via IDFCBankParser, which lives in this lazy chunk.
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
-import { parseIDFCStatement } from '../services/idfcParser';
+import { parseStatementPdf, StatementLockedError } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
 import { findDuplicates, fromExcel, toTransactions, type StatementRow } from '../services/statementImport';
 import { getSymbol } from '../utils/currencyUtils';
@@ -56,6 +56,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   
   // Parser tracking
   const [parserUsed, setParserUsed] = useState<string>('');
+
+  // A password-locked PDF waiting for its password (kept only in memory).
+  const [locked, setLocked] = useState<{ base64: string; wrong: boolean } | null>(null);
+  const [pdfPassword, setPdfPassword] = useState('');
 
   // Flip all types (in case AI got it wrong)
   const flipAllTypes = () => {
@@ -231,7 +235,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const stageForReview = async (raw: StatementRow[], parserLabel: string) => {
       const mappedTransactions = await toTransactions(raw);
       if (mappedTransactions.length === 0) {
-          throw new Error('No valid transactions found. Please ensure the file is a clear IDFC bank statement.');
+          throw new Error('No transactions found in this statement. Check it lists transactions with dates and amounts.');
       }
 
       const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions);
@@ -255,15 +259,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       setParsedClosingBalance(closing);
   };
 
-  // PDF path: rule-based IDFC parser only (audit Phase 1.5 — previously the
-  // Excel parser was attempted against the PDF bytes first, a guaranteed throw).
-  const processPdf = async (base64: string) => {
+  // PDF path: the bank's own layout where Wall-ette knows it (IDFC FIRST,
+  // Kotak, Saraswat, Union Bank, SBI), else the generic reader.
+  const processPdf = async (base64: string, password?: string) => {
     try {
         updateProgress('Parsing PDF statement...');
-        const result = await parseIDFCStatement(base64);
+        const result = await parseStatementPdf(base64, password);
+        setLocked(null);
+        setPdfPassword('');
 
         if (result.transactions.length === 0) {
-            throw new Error('Could not parse this statement. Try uploading a clear PDF or Excel file from your IDFC bank statement.');
+            throw new Error("Couldn't find transactions in this PDF. If your bank offers an Excel download, try that.");
         }
 
         storeStatementMeta(
@@ -274,15 +280,31 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
             : `Found ${result.transactions.length} transactions`);
 
+        const bank = result.header.bankName;
         await stageForReview(result.transactions,
-            result.header.bankName === 'Generic (auto-detected)'
+            bank === 'Generic (auto-detected)'
                 ? 'Generic PDF parser (verify amounts)'
-                : 'Rule-based PDF parser');
+                : `${bank ?? 'Bank'} PDF${result.validationPassed ? ' · every row matches the balance' : ' (verify amounts)'}`);
     } catch (err: any) {
+        if (err instanceof StatementLockedError) {
+            // Ask for the PDF's password, then read it again.
+            setLocked({ base64, wrong: err.wrong });
+            setError(null);
+            setStage('IDLE');
+            return;
+        }
         log.warn('PDF import failed:', err?.message);
         setError(err.message || "Could not parse the statement. Please ensure it's a valid bank statement.");
         setStage('IDLE');
     }
+  };
+
+  const unlockPdf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locked || !pdfPassword) return;
+    setStage('PROCESSING');
+    setError(null);
+    await processPdf(locked.base64, pdfPassword);
   };
 
   // Excel path: enhanced IDFC parser (xlsx)
@@ -297,7 +319,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         }
 
         storeStatementMeta(result.summary.openingBalance, result.summary.closingBalance || undefined);
-        await stageForReview(fromExcel(result.transactions), 'Enhanced IDFC parser (Excel)');
+        await stageForReview(fromExcel(result.transactions),
+            `${result.bank} Excel${result.validation.isValid ? ' · totals match the bank' : ' (verify amounts)'}`);
     } catch (err: any) {
         log.warn('Excel import failed:', err?.message);
         setError('Failed to parse Excel file: ' + (err.message || 'Unknown error'));
@@ -314,6 +337,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         setStage('PROCESSING');
         setError(null);
+        setLocked(null);
+        setPdfPassword('');
         setExtractedData([]);
         updateProgress('Reading file...');
 
@@ -468,7 +493,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
 
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Upload your IDFC bank statement (PDF or Excel). Fast, rule-based parsing without AI.
+                Upload a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank, as the PDF or Excel file your bank gives you. Other banks' PDFs often work too. Read on your phone, without AI.
                 </p>
                 
                 <div 
@@ -500,6 +525,39 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         aria-label="Upload bank statement file"
                     />
                 </div>
+
+                {locked && (
+                    <form onSubmit={unlockPdf} className="mt-6 p-4 bg-white/60 border border-sage/20 rounded-2xl animate-slide-up">
+                        <p className="text-premium-charcoal text-sm font-semibold flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sage text-[18px]">lock</span>
+                            This PDF is locked
+                        </p>
+                        <p className="text-muted-taupe text-xs mt-1 leading-relaxed">
+                            {locked.wrong
+                                ? "That password didn't open it. The email the statement came with usually says what to use, often your customer ID or date of birth."
+                                : 'Enter the password your bank set for it. Wall-ette uses it only to open this file and never saves it.'}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                            <input
+                                type="password"
+                                autoComplete="off"
+                                value={pdfPassword}
+                                onChange={e => setPdfPassword(e.target.value)}
+                                className="flex-1 min-w-0 bg-zen-bg rounded-xl px-4 py-2.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage"
+                                placeholder="PDF password"
+                                aria-label="PDF password"
+                                autoFocus
+                            />
+                            <button
+                                type="submit"
+                                disabled={!pdfPassword}
+                                className="px-4 py-2.5 rounded-xl bg-sage text-white text-sm font-semibold disabled:opacity-50"
+                            >
+                                Open
+                            </button>
+                        </div>
+                    </form>
+                )}
 
                 {error && (
                     <div className="mt-6 p-4 bg-rose-light/30 border border-rose/20 rounded-2xl flex gap-3 items-center animate-slide-up">

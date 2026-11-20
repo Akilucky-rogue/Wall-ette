@@ -16,7 +16,7 @@ export type RowDirection = 'income' | 'expense';
  * to them are filed as Investment; services/spend.ts also treats credits from
  * them as money moved, not income.
  */
-export const INVESTMENT_PLATFORM = /zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox|trftochoice|choice.?equity|razorpaytp.*choice/;
+export const INVESTMENT_PLATFORM = /zerodha|groww|kuvera|paytm.?money|coin.?zerodha|angel.?broking|motilaloswal|hdfc.?sec|icicidirect|upstox|trftochoice|choice.?equity|razorpaytp.*choice|indian.?clearing|\biccl\b|bse.?star|nsccl|etmoney|et.?money|scripbox|fisdom|5paisa|smallcase|indmoney|sharekhan|kotak.?sec|axis.?direct|mstock|samco/;
 
 /**
  * Clean up a statement narration: collapse whitespace and drop punctuation,
@@ -39,9 +39,10 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
   // ── INCOME categories ────────────────────────────────────────────────────
   if (type === 'income') {
     if (desc.match(/\bsal\b|salary|payroll|stipend|ctc/)) return 'Salary';
-    if (desc.match(/bonus|incentive|reward|cashback|cb\b/)) return 'Bonus';
-    if (desc.match(/dividend|mutual.?fund|\bmf\b|sip.?return|nav/)) return 'Investment Returns';
-    if (desc.match(/interest|fd.?int|recurring.?dep|int.?cr/)) return 'Interest Income';
+    if (desc.match(/bonus|incentive|reward|cashback|\bcb\b/)) return 'Bonus';
+    // ACH credits from companies (HDFC "ACH C-", Saraswat "ACH Credit:") are dividends.
+    if (desc.match(/dividend|mutual.?fund|\bmf\b|sip.?return|nav|\bach ?c-|ach.?credit/)) return 'Investment Returns';
+    if (desc.match(/interest|fd.?int|recurring.?dep|int.?cr|\bint\.? ?pd\b|\bint\.? ?paid/)) return 'Interest Income';
     if (desc.match(/refund|reversal|chargeback|return|rfd/)) return 'Refunds';
     if (desc.match(/freelance|invoice|consulting|payment.?received/)) return 'Freelance';
     if (desc.match(/rent.?received|rental.?income/)) return 'Rental Income';
@@ -134,7 +135,7 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
   // ── EXPENSE: Investments ─────────────────────────────────────────────────
   if (INVESTMENT_PLATFORM.test(desc))
     return 'Investment';
-  if (desc.match(/mutual.?fund|\bsip\b|\bmf\b|nfo\b|nav\b|demat/))
+  if (desc.match(/mutual.?fund|\bsip\b|\bmf\b|nfo\b|nav\b|demat|nach.?mut/))
     return 'Investment';
   if (desc.match(/fd\b|fixed.?deposit|recurring.?deposit|\brd\b/))
     return 'Investment';
@@ -142,7 +143,7 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
   // ── EXPENSE: Loans & EMI ─────────────────────────────────────────────────
   if (desc.match(/\bemi\b|loan.?emi|equated|home.?loan|car.?loan|personal.?loan|education.?loan|hl\b|pl\b/))
     return 'Loan & EMI';
-  if (desc.match(/credit.?card.?bill|cc.?payment|card.?due|amex|hdfc.?cc|sbi.?card/))
+  if (desc.match(/credit.?card.?bill|cc.?payment|card.?due|amex|hdfc.?cc|sbi.?card|cred.?club|\bcred\b/))
     return 'Credit Card';
 
   // ── EXPENSE: Education ───────────────────────────────────────────────────
@@ -154,7 +155,8 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
     return 'Personal Care';
 
   // ── EXPENSE: ATM / Cash ──────────────────────────────────────────────────
-  if (desc.match(/\batm\b|cash.?withdrawal|cwl\b/))
+  // ATM codes: NFS:CW (Saraswat), ATW/NWD/EAW (HDFC), ATL (Kotak), CSH WDL (SBI)
+  if (desc.match(/\batm\b|cash.?withdrawal|cwl\b|nfs.?cw|\b(atw|atl|nwd|eaw)\b|\b(cash|csh) ?wdl/))
     return 'Cash Withdrawal';
 
   // ── EXPENSE: Subscriptions ───────────────────────────────────────────────
@@ -164,7 +166,8 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
     return 'Gym';
 
   // ── EXPENSE: Transfers (classify last — very broad) ──────────────────────
-  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bift\b|\bupi\b/))
+  // UPIAR/UPIAB: Union Bank's UPI debits and credits.
+  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bift\b|\bupi(ar|ab)?\b|\btrf\b|\btfr\b/))
     return 'Transfer Out';
 
   return 'Other';

@@ -454,7 +454,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           <section className="break-inside-avoid md:mb-5">
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Data & Privacy</h4>
               <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="IDFC PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
+                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="Bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
                   <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>

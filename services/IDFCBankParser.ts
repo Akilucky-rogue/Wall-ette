@@ -43,6 +43,8 @@ interface StatementSummary {
 interface ParseResult {
   transactions: Transaction[];
   summary: StatementSummary;
+  /** "IDFC FIRST Bank" or "HDFC Bank". */
+  bank: string;
   validation: {
     isValid: boolean;
     errors: string[];
@@ -73,57 +75,88 @@ export class IDFCBankParser {
         dateNF: 'DD-MMM-YYYY'
       });
 
-      // Extract summary information
-      const summary = this.extractSummary(data);
-      
-      // Find transaction data start row
-      const headerRowIndex = data.findIndex(row => 
-        row && row.some(cell => 
-          cell && cell.toString().toLowerCase().includes('transaction date')
-        )
-      );
-
-      if (headerRowIndex === -1) {
-        throw new Error('Could not find transaction header row. Expected "Transaction Date" column in Excel.');
+      // The transactions table, found by its column names: IDFC FIRST's
+      // "Transaction Date | Value Date | Particulars | … | Debit | Credit |
+      // Balance", HDFC's "Date | Narration | Chq./Ref.No. | Value Dt |
+      // Withdrawal Amt. | Deposit Amt. | Closing Balance".
+      const columns = this.findColumns(data);
+      if (!columns) {
+        throw new Error('Could not find the transactions table: no row with Date, Debit (or Withdrawal) and Credit (or Deposit) columns.');
       }
+      const bank = this.detectBank(data.slice(0, columns.header));
+      const summary = this.extractSummary(data);
 
-      // Parse transactions starting from next row
       const transactions: Transaction[] = [];
-      const transactionRows = data.slice(headerRowIndex + 1);
-
-      for (const row of transactionRows) {
-        if (!row || row.length < 6) continue;
-        
+      for (const row of data.slice(columns.header + 1)) {
+        if (!row) continue;
         const txn = this.parseTransaction(
-          row[0], // Transaction Date
-          row[1], // Value Date
-          row[2], // Particulars
-          row[3], // Cheque No
-          row[4], // Debit
-          row[5], // Credit
-          row[6]  // Balance
+          row[columns.date],
+          columns.valueDate === undefined ? undefined : row[columns.valueDate],
+          row[columns.narration],
+          columns.ref === undefined ? undefined : row[columns.ref],
+          row[columns.debit],
+          row[columns.credit],
+          columns.balance === undefined ? undefined : row[columns.balance],
+          bank,
         );
-        
         if (txn) transactions.push(txn);
       }
 
       // Validation
       const validation = this.validateTransactions(transactions, summary);
 
-      log.debug(`IDFC Excel: parsed ${transactions.length} transactions (valid: ${validation.isValid})`);
+      log.debug(`Excel statement (${bank}): parsed ${transactions.length} transactions (valid: ${validation.isValid})`);
       if (!validation.isValid) {
-        log.warn(`IDFC Excel: validation reported ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)`);
+        log.warn(`Excel statement: validation reported ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)`);
       }
 
       return {
         transactions,
         summary,
+        bank,
         validation
       };
     } catch (error: any) {
-      log.warn('IDFC Excel parsing failed:', error?.message);
-      throw new Error(`Excel parsing failed: ${error.message} | Please ensure the file is a valid IDFC statement with "Transaction Date" column.`);
+      log.warn('Excel statement parsing failed:', error?.message);
+      throw new Error(`Excel parsing failed: ${error.message}`);
     }
+  }
+
+  /** Where each column is, from the table's header row. */
+  private static findColumns(data: any[][]): {
+    header: number; date: number; valueDate?: number; narration: number; ref?: number;
+    debit: number; credit: number; balance?: number;
+  } | null {
+    for (let i = 0; i < Math.min(80, data.length); i++) {
+      const cells = (data[i] || []).map(c => (c ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' '));
+      const find = (test: RegExp, not?: RegExp) => {
+        const at = cells.findIndex(c => c && test.test(c) && !(not && not.test(c)));
+        return at === -1 ? undefined : at;
+      };
+      const date = find(/^(transaction |txn\.? |tran\.? )?date$|^dt$/);
+      const narration = find(/particulars|narration|description|remarks|details/);
+      const debit = find(/withdrawal|debit|^dr\.?( amount)?$/);
+      const credit = find(/deposit|credit|^cr\.?( amount)?$/);
+      if (date === undefined || narration === undefined || debit === undefined || credit === undefined) continue;
+      return {
+        header: i,
+        date,
+        valueDate: find(/^value d(a)?t(e)?\.?$/),
+        narration,
+        ref: find(/chq|cheque|ref/),
+        debit,
+        credit,
+        balance: find(/balance/),
+      };
+    }
+    return null;
+  }
+
+  /** The bank, from the rows above the table (name or IFSC). */
+  private static detectBank(rows: any[][]): string {
+    const text = rows.map(r => (r || []).join(' ')).join(' ');
+    if (/HDFC\s*BANK|IFSC[^A-Z]{0,20}HDFC0/i.test(text)) return 'HDFC Bank';
+    return 'IDFC FIRST Bank';
   }
 
   // NOTE (audit Phase 5.2): the unused parsePDF / extractSummaryFromText /
@@ -143,33 +176,23 @@ export class IDFCBankParser {
     let statementPeriod = '';
     let customerName = '';
 
-    // Find summary row by looking for "Opening Balance" label
-    let summaryLabelRow = -1;
-    let summaryValueRow = -1;
-
-    for (let i = 0; i < Math.min(30, data.length); i++) {
-      const row = data[i];
-      if (!row) continue;
-
-      const rowText = row.join(' | ').toLowerCase();
-      
-      // Find header row with balance labels
-      if (rowText.includes('opening balance') && rowText.includes('total debit')) {
-        summaryLabelRow = i;
-        summaryValueRow = i + 1; // Values are typically in next row
-        break;
-      }
-    }
-
-    // Extract values from summary
-    if (summaryValueRow > -1 && data[summaryValueRow]) {
-      const valueRow = data[summaryValueRow];
-
-      // Parse values based on column position
-      if (valueRow[0]) openingBalance = this.parseAmount(valueRow[0]);
-      if (valueRow[1]) totalDebit = this.parseAmount(valueRow[1]);
-      if (valueRow[2]) totalCredit = this.parseAmount(valueRow[2]);
-      if (valueRow[3]) closingBalance = this.parseAmount(valueRow[3]);
+    // The summary's labels with the figures in the row below, same columns:
+    // IDFC FIRST puts it above the table ("Opening Balance | Total Debit |
+    // Total Credit | Closing Balance"), HDFC below ("Opening Balance | Debits
+    // | Credits | Closing Bal", under "STATEMENT SUMMARY").
+    for (let i = 0; i < data.length - 1; i++) {
+      const labels = (data[i] || []).map(c => (c ?? '').toString().trim().toLowerCase());
+      const opening = labels.findIndex(c => /^opening bal/.test(c));
+      const debits = labels.findIndex(c => /^(total )?debits?$/.test(c));
+      const credits = labels.findIndex(c => /^(total )?credits?$/.test(c));
+      if (opening === -1 || debits === -1 || credits === -1) continue;
+      const closing = labels.findIndex(c => /^closing bal/.test(c));
+      const values = data[i + 1] || [];
+      openingBalance = this.parseAmount(values[opening]);
+      totalDebit = this.parseAmount(values[debits]);
+      totalCredit = this.parseAmount(values[credits]);
+      if (closing !== -1) closingBalance = this.parseAmount(values[closing]);
+      break;
     }
 
     // Extract other metadata from earlier rows
@@ -213,7 +236,8 @@ export class IDFCBankParser {
     chequeNo: any,
     debit: any,
     credit: any,
-    balance: any
+    balance: any,
+    bank: string
   ): Transaction | null {
     
     // Parse date
@@ -256,10 +280,10 @@ export class IDFCBankParser {
       paymentMethod: this.detectPaymentMethod(description),
       notes: metadata.notes,
       tags: metadata.tags,
-      balance: this.parseAmount(balance),
+      balance: balance === undefined || balance === null || balance === '' ? undefined : this.parseAmount(balance),
       valueDate: parsedValueDate ? this.toLocalISO(parsedValueDate) : undefined,
       chequeNumber: chequeNo?.toString() || undefined,
-      source: 'IDFC FIRST Bank',
+      source: bank,
       rawData: {
         particulars: particulars?.toString(),
         debit: debitAmount,
@@ -309,25 +333,34 @@ export class IDFCBankParser {
    */
   private static parseDate(dateStr: any): Date | null {
     if (!dateStr) return null;
+    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
 
     const str = dateStr.toString().trim();
-    
-    // Try DD-MMM-YYYY format
-    const ddMmmYyyy = /(\d{2})-([A-Za-z]{3})-(\d{4})/.exec(str);
-    if (ddMmmYyyy) {
-      const months: { [key: string]: number } = {
-        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
-        'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-      };
-      const month = months[ddMmmYyyy[2].toLowerCase()];
-      if (month !== undefined) {
-        return new Date(parseInt(ddMmmYyyy[3]), month, parseInt(ddMmmYyyy[1]));
-      }
+    const months: { [key: string]: number } = {
+      'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+      'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+    };
+    const year = (y: string) => (y.length === 2 ? 2000 + parseInt(y) : parseInt(y));
+    const valid = (y: number, m: number, d: number) => {
+      const date = new Date(y, m, d);
+      return date.getMonth() === m && date.getDate() === d ? date : null;
+    };
+
+    // DD-MMM-YYYY (IDFC FIRST), also DD MMM YY
+    const named = /^(\d{1,2})[\s\-\/]([A-Za-z]{3})[A-Za-z]*[\s\-\/,]+(\d{2}|\d{4})$/.exec(str);
+    if (named) {
+      const month = months[named[2].toLowerCase()];
+      return month === undefined ? null : valid(year(named[3]), month, parseInt(named[1]));
     }
 
-    // Try other common formats
-    const date = new Date(str);
-    if (!isNaN(date.getTime())) return date;
+    // DD/MM/YY or DD/MM/YYYY (HDFC). Indian statements put the day first;
+    // new Date() would read 01/02/26 as January 2nd.
+    const numeric = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(str);
+    if (numeric) return valid(year(numeric[3]), parseInt(numeric[2]) - 1, parseInt(numeric[1]));
+
+    // YYYY-MM-DD
+    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+    if (iso) return valid(parseInt(iso[1]), parseInt(iso[2]) - 1, parseInt(iso[3]));
 
     return null;
   }
@@ -381,6 +414,19 @@ export class IDFCBankParser {
         `got ₹${totalCredit.toFixed(2)} (difference: ₹${Math.abs(totalCredit - summary.totalCredit).toFixed(2)})`
       );
     }
+
+    // Each row's balance must move by its amount, the way its column says.
+    let prev: number | undefined;
+    let breaks = 0;
+    for (const t of transactions) {
+      if (t.balance === undefined) { prev = undefined; continue; }
+      if (prev !== undefined) {
+        const expected = prev + (t.type === 'income' ? t.amount : -t.amount);
+        if (Math.abs(expected - t.balance) > tolerance) breaks++;
+      }
+      prev = t.balance;
+    }
+    if (breaks > 0) errors.push(`The running balance doesn't add up at ${breaks} row(s).`);
 
     // Validate balance
     const calculatedClosing = summary.openingBalance + totalCredit - totalDebit;

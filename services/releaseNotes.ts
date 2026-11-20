@@ -23,6 +23,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: '1.5.5',
     items: [
       'When something goes wrong, Wall-ette sends a crash report so it can be fixed. Reports never include your transactions, and you can turn them off in Profile.',
+      'If Android stops the app to free memory, Wall-ette reopens instead of closing.',
     ],
   },
   {

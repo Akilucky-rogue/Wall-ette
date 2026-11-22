@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { AppScreen, Transaction, TransactionType } from '../types';
+import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
-import { huntSavings, normalizeMerchant, prettyMerchant } from '../services/analyticsService';
+import { huntSavings, prettyMerchant } from '../services/analyticsService';
+import { walletCopies } from '../services/statementImport';
 import { WallEMascot, FloatingLeaf, RangoliCorner, MandalaDots } from './SplashScreen';
 
 interface FeeHunterProps {
@@ -18,27 +19,14 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
   // own accounts or family repeats by design (audit H3).
   const hunt = useMemo(() => huntSavings(counted), [counted]);
 
-  // Exact duplicates INSIDE the wallet (same date + type + amount + merchant,
-  // both imported) — usually the result of "Include Anyway" on an overlap.
+  // Statement rows that are in the wallet more than once, usually from "Include
+  // Anyway" on an overlapping statement. Matched like the import check, on
+  // bank reference (or narration), date, direction and amount (audit L3).
   const walletDupes = useMemo(() => {
-    const groups = new Map<string, Transaction[]>();
-    for (const t of transactions) {
-      const key = `${t.date.slice(0, 10)}|${t.type}|${t.amount.toFixed(2)}|${normalizeMerchant(t.merchant || '')}|${(t.merchant || '').slice(0, 60)}`;
-      const g = groups.get(key);
-      if (g) g.push(t);
-      else groups.set(key, [t]);
-    }
-    const surplus: Transaction[] = [];
-    let net = 0, groupCount = 0;
-    for (const g of groups.values()) {
-      if (g.length < 2) continue;
-      groupCount++;
-      for (const t of g.slice(1)) {
-        surplus.push(t);
-        net += t.type === TransactionType.INCOME ? t.amount : -t.amount;
-      }
-    }
-    return { surplus, net, groupCount };
+    const { copies, groups } = walletCopies(transactions);
+    let net = 0;
+    for (const t of copies) net += t.type === TransactionType.INCOME ? t.amount : -t.amount;
+    return { surplus: copies, net, groupCount: groups };
   }, [transactions]);
 
   const cleanDupes = () => {
@@ -114,9 +102,10 @@ const FeeHunter: React.FC<FeeHunterProps> = ({ onNavigate }) => {
               <p className="text-[13px] font-serif font-bold text-rose">{walletDupes.surplus.length}</p>
             </div>
             <p className="text-[10px] text-muted-taupe mb-4 leading-relaxed">
-              {walletDupes.groupCount} transaction{walletDupes.groupCount === 1 ? '' : 's'} exist more than once in your wallet
-              (identical date, amount & merchant) — usually from importing an overlapping statement with
-              "Include Anyway". They skew your balance by {formatAmountCompact(Math.abs(walletDupes.net))}.
+              {walletDupes.groupCount} transaction{walletDupes.groupCount === 1 ? '' : 's'} appear more than once in your wallet
+              (same date, amount and bank reference, or the same narration where the bank gives no reference),
+              usually from importing an overlapping statement with "Include Anyway". They skew your balance
+              by {formatAmountCompact(Math.abs(walletDupes.net))}.
             </p>
             <div className="space-y-2 mb-4 max-h-44 overflow-y-auto">
               {walletDupes.surplus.slice(0, 8).map(t => (

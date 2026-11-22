@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
 import AppUpdates from './components/AppUpdates';
+import CloudSaveBanner from './components/CloudSaveBanner';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -11,6 +12,7 @@ import { AppScreen } from './types';
 import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { consumeQuietStart, signOutOfDevice } from './services/session';
+import { breadcrumb } from './services/crashReports';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -26,6 +28,14 @@ const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
 const Profile = React.lazy(() => import('./components/Profile'));
+const Landing = React.lazy(() => import('./components/Landing'));
+
+// The website shows the product page (components/Landing.tsx) to visitors
+// who aren't signed in; "#signin" in the address shows the sign-in screen
+// instead, so the browser's Back button returns to the page. The Android app
+// never shows it, and only it plays the launch splash.
+const IS_WEB = !Capacitor.isNativePlatform();
+const SIGN_IN_HASH = '#signin';
 
 // ── Swipe navigation ──────────────────────────────────────────────────────
 // Swipe left/right on the four main tabs to move between them; swipe right
@@ -54,7 +64,8 @@ function AppContent() {
   // what makes "biometric login" real — open app → fingerprint → in.
   const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
-  const [showSplash, setShowSplash] = useState(!QUIET_START);
+  const [showSplash, setShowSplash] = useState(!QUIET_START && !IS_WEB);
+  const [showLanding, setShowLanding] = useState(() => IS_WEB && window.location.hash !== SIGN_IN_HASH);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -64,10 +75,31 @@ function AppContent() {
   // an update.
   const [signedInThisRun, setSignedInThisRun] = useState(false);
 
+  // Product page ↔ sign-in screen follows the address, so Back works.
+  useEffect(() => {
+    if (!IS_WEB) return;
+    const sync = () => setShowLanding(window.location.hash !== SIGN_IN_HASH);
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+    return () => {
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('popstate', sync);
+    };
+  }, []);
+  const openSignIn = () => { window.location.hash = SIGN_IN_HASH; };
+  const openProductPage = () => {
+    window.history.pushState(null, '', window.location.pathname + window.location.search);
+    setShowLanding(true);
+    window.scrollTo(0, 0);
+  };
+
   // Ref mirror so long-lived native listeners read the current screen without
   // re-registering on every navigation (audit Phase 6.2).
   const currentScreenRef = useRef(currentScreen);
   currentScreenRef.current = currentScreen;
+
+  // The screens leading up to a crash, in its report (Android).
+  useEffect(() => { breadcrumb(`screen ${currentScreen}`); }, [currentScreen]);
 
   // Lock the app when it goes to background on native (Mobile Security).
   // We lock (requiring re-authentication on resume) rather than sign the user
@@ -239,8 +271,25 @@ function AppContent() {
   }
 
   if (!user) {
+      if (showLanding) {
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <Landing onOpenApp={openSignIn} />
+          </Suspense>
+        );
+      }
       return (
         <>
+          {IS_WEB && (
+            <button
+              type="button"
+              onClick={openProductPage}
+              className="fixed left-4 top-[calc(var(--sat)_+_1rem)] z-50 flex items-center gap-1 rounded-full bg-white/80 px-3.5 py-2 text-[13px] font-medium text-zen-charcoal shadow-soft backdrop-blur hover:text-premium-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+              About Wall·ette
+            </button>
+          )}
           <Auth onAuthSuccess={handleAuthSuccess} />
           <AndroidInstallBanner />
         </>
@@ -309,6 +358,7 @@ function AppContent() {
       </div>
       {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}
       <AppUpdates signedInThisRun={signedInThisRun} />
+      <CloudSaveBanner />
     </WalletProvider>
   );
 }

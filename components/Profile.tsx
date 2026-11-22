@@ -19,6 +19,7 @@ import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
+import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 
 interface ProfileProps {
@@ -107,8 +108,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       const code = err?.code || '';
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         setPwError('Current password is incorrect.');
-      } else if (code === 'auth/weak-password') {
-        setPwError('New password is too weak.');
+      } else if (code === 'auth/weak-password' || code === 'auth/password-does-not-meet-requirements') {
+        setPwError('New password is too weak. It needs everything in the list above.');
+      } else if (code === 'auth/network-request-failed') {
+        setPwError("You're offline. Connect to the internet and try again.");
       } else if (code === 'auth/too-many-requests') {
         setPwError('Too many attempts — please try again in a few minutes.');
       } else {
@@ -158,6 +161,14 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       const ok = await authenticateBiometric('Confirm to enable biometric unlock');
       if (ok) { setBiometricEnabled(user.uid, true); setBioOn(true); }
     }
+  };
+
+  // ── Crash reports (Android, device-local) ──
+  const [crashOn, setCrashOn] = useState(crashReportsOn);
+  const toggleCrashReports = () => {
+    const next = !crashOn;
+    setCrashOn(next);
+    void setCrashReports(next);
   };
 
   // ── Two-factor (TOTP) ──
@@ -257,7 +268,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
         }
       }
       const uid = user.uid;
-      await wipeCloudData(uid);
+      try {
+        await wipeCloudData(uid);
+      } catch {
+        throw new Error("Couldn't erase your data from the cloud, so the account wasn't deleted. Check your connection and try again.");
+      }
       await user.delete();
       // Then this device's copy (audit M2); the app reloads to the Auth screen.
       await forgetDeletedAccount(uid);
@@ -376,10 +391,16 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           {/* Preferences */}
           <section className="break-inside-avoid md:mb-5">
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Preferences</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft">
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
                   <Row icon="currency_exchange" iconCls="bg-sand-light text-sand" title="Display Currency" sub="Live exchange rates, INR base">
                       <CurrencySelector />
                   </Row>
+                  {isNative() && (
+                    <Row icon="bug_report" iconCls="bg-blue-zen-light text-blue-zen" title="Crash Reports"
+                         sub="Errors go to Firebase Crashlytics, never your transactions">
+                      <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
+                    </Row>
+                  )}
               </div>
           </section>
 
@@ -433,7 +454,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
           <section className="break-inside-avoid md:mb-5">
               <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Data & Privacy</h4>
               <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="IDFC PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
+                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="Bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
                   <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>

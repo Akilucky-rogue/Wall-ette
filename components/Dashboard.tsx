@@ -16,7 +16,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
     getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
     getTotalIncome, getTotalExpense, transactions, counted, flowOf, formatAmount,
-    formatAmountCompact, isCloudSyncing, refresh, openingBalance
+    formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance
   } = useWallet();
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -330,7 +330,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             {refreshing ? 'progress_activity' : isCloudSyncing ? 'cloud_sync' : 'cloud_off'}
           </span>
           <span className={`${isCloudSyncing ? 'text-sage' : 'text-rose'} text-[13px] font-semibold`}>
-            {refreshing ? 'Refreshing…' : isCloudSyncing ? 'Live Updates · Tap to Refresh' : 'Local Mode · Tap to Retry'}
+            {refreshing ? 'Refreshing…'
+              : isCloudSyncing ? 'Live Updates · Tap to Refresh'
+              : isOnline ? 'Not Syncing · Tap to Retry'
+              : 'Offline · Changes Sync Later'}
           </span>
         </button>
       </div>

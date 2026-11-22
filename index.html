@@ -3,7 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Wall-ette</title>
+    <title>Wall-ette: your bank statement, made readable</title>
+    <meta name="description" content="Import your bank statement and see your spending, income and transfers clearly. The file is read on your phone, with no ads and no AI services." />
+    <link rel="canonical" href="https://wall-ette.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Wall-ette" />
+    <meta property="og:title" content="Wall-ette: your bank statement, made readable" />
+    <meta property="og:description" content="Import your bank statement and see your spending, income and transfers clearly. Private, with no ads." />
+    <meta property="og:url" content="https://wall-ette.com/" />
+    <meta property="og:image" content="https://wall-ette.com/og-image.png" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="500" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Fonts: preconnect cuts ~1 RTT off first text paint (audit Phase 4.2).
          Material Symbols axis narrowed to the weights actually used (wght 200, FILL 0..1). -->
@@ -12,9 +23,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@200,0..1&display=block" rel="stylesheet" />
     <style>
-        /* System bar insets (audit H6). Android 15+ draws the app edge to
-           edge; Capacitor's SystemBars sets --safe-area-inset-* there, iOS
-           gives env(), and both are 0 where nothing overlaps. Use --sat and
+        /* System bar insets (audit H6). The Android app draws edge to edge
+           on every version; Capacitor's SystemBars sets --safe-area-inset-*
+           there, iOS gives env(), and both are 0 where nothing overlaps. Use --sat and
            --sab for anything fixed to the top or bottom of the screen. Side
            insets (the 3-button bar in landscape) land in the margins around
            every screen's 430px column, so nothing pads for them. */

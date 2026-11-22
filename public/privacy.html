@@ -19,7 +19,7 @@
 <body>
 <div class="page">
   <h1>Wall<span class="dot">·</span>ette — Privacy Policy</h1>
-  <p class="sub">Effective date: 19 November 2026 · Applies to the Wall-ette Android app and wall-ette.com</p>
+  <p class="sub">Effective date: 20 November 2026 · Applies to the Wall-ette Android app and wall-ette.com</p>
 
   <p>Wall-ette is a personal finance tracker operated by an individual developer ("we", "us").
   This policy explains what data the app handles and how. The short version: your financial
@@ -36,6 +36,13 @@
     <li><b>App settings:</b> preferred currency, daily spend limit, and similar preferences.</li>
     <li><b>Security log:</b> timestamps and method (password/biometric) of app unlock attempts,
       stored in your own account space so you can review access to your wallet.</li>
+    <li id="crash-reports"><b>Crash reports (Android app):</b> when the app crashes or hits an
+      error, it sends a report of what went wrong: the error message (with email addresses,
+      IDs and numbers removed), where in the app's code it happened, the screens opened just
+      before, the app version, device details such as the model, Android version and free
+      memory and storage, and a random ID for this installation of the app. Reports never include your
+      transactions, statements, balances, payee names or account details, and they aren't
+      linked to your account. You can turn them off in <b>Profile → Crash Reports</b>.</li>
   </ul>
   <p>We do <b>not</b> collect contacts, location, advertising identifiers, or analytics profiles,
   and the app contains no advertising.</p>
@@ -59,6 +66,8 @@
   <h2>Third-party services</h2>
   <ul>
     <li><b>Google Firebase</b> — authentication and database hosting (data processor).</li>
+    <li><b>Google Firebase Crashlytics</b> — receives the crash reports described above, as a
+      data processor, and deletes them after 90 days.</li>
     <li><b>exchangerate-api.com</b> — the app fetches public currency exchange rates. This
       request contains no personal data or financial information.</li>
     <li><b>Google Fonts</b> — the app and the website load fonts and icons from Google's

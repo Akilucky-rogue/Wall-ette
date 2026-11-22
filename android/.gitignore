@@ -62,7 +62,8 @@ captures/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Native Firebase config, kept out like the signing files (app/build.gradle says how to get it)
+google-services.json
 
 # Freeline
 freeline.py

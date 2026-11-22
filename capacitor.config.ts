@@ -7,7 +7,14 @@ const config: CapacitorConfig = {
   // still has that bundle ID.
   appId: 'com.wallette.app',
   appName: 'Wall-ette',
-  webDir: 'dist'
+  webDir: 'dist',
+  plugins: {
+    SystemBars: {
+      // index.html asks for viewport-fit=cover; saying so up front saves a
+      // layout jump while Capacitor checks the page.
+      initialViewportFitValueHint: 'cover',
+    },
+  },
 };
 
 export default config;

@@ -17,6 +17,7 @@
 
 import { Transaction, TransactionType, type PayeeKind, type PayeeRule } from '../types';
 import { INVESTMENT_PLATFORM } from './categorize';
+import { narrationFields } from './narration';
 
 export type Flow = 'spend' | 'income' | 'moved';
 export type MovedKind = 'mine' | 'family' | 'investment' | 'ignore' | 'adjustment';
@@ -101,18 +102,20 @@ export const isSpend = (t: Transaction, flowOf: (t: Transaction) => FlowInfo): b
 // ── Payees ─────────────────────────────────────────────────────────────────
 
 // Narration pieces that are plumbing or boilerplate, not a payee.
-const NOT_A_PAYEE = /^(upi|mob|dr|cr|rev|neft|imps|rtgs|ift|nach|ach|pos|atm|nfs|opm|inet|visa|ecom|self|pay ?req(uest)?|pay ?via ?r(azorpay)?|fund ?tr(f|ansfer)|transfer|payment|credit adjustment)$/i;
+const NOT_A_PAYEE = /^(upi|mob|dr|cr|rev|neft|imps|rtgs|ift|nach|ach( ?[cd]| credit| debit)?|ecs|mut|si|tpt|pos|atm|nfs|cw|opm|inet|visa|ecom|self|trf ?(fr|from|to)?|pay ?req(uest)?|pay ?via ?r(azorpay)?|fund ?tr(f|ansfer)|transfer|payment|credit adjustment)$/i;
 
 /**
  * The payee named in a statement narration, or null when it names none.
  *   "IFT/1000…/Mr. RAVI KUMAR SHAH/123"           → "Mr. RAVI KUMAR SHAH"
  *   "UPI/DR/6152…/ZOMATO L/UTIB/zomatoo/UPI"       → "ZOMATO L"
+ *   "UPI-ZOMATO LTD-zomato@axis-UTIB0…-6152…" (HDFC) → "ZOMATO LTD"
+ *   "MB/TRF FR/RAVI SHAH/" (Saraswat)              → "RAVI SHAH"
  *   "NEFT/CMS123/CHOICE EQUITY BROKING PVT LTD/…"  → "CHOICE EQUITY BROKING PVT LTD"
  *   "UPI/MOB/6152…/UPI", "IMPS-OPM/Fund Trf/…"     → null
  */
 export function payeeName(narration: string | undefined): string | null {
   if (!narration) return null;
-  const segs = narration.split('/').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const segs = narrationFields(narration);
   if (segs.length < 2) return null; // a plain name typed in New Entry is not a statement payee
   for (const seg of segs.slice(1)) {
     if (NOT_A_PAYEE.test(seg)) continue;

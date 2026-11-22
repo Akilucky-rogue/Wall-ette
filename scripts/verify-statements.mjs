@@ -2,9 +2,11 @@
 /**
  * Statement regression check.
  *
- * Runs the app's real parsers (services/idfcParser.ts for PDF,
- * services/IDFCBankParser.ts for Excel) over every statement in a folder and
- * checks each against the bank's own summary, to the paisa:
+ * Runs the app's real parsers (services/idfcParser.ts for PDF, which hands
+ * Kotak, Saraswat, Union Bank and SBI to services/bankPdfLayouts.ts, and
+ * services/IDFCBankParser.ts for IDFC FIRST and HDFC Excel) over every
+ * statement in a folder and checks each against the bank's own summary, to
+ * the paisa (banks that print none are checked against the running balance):
  *   - debit total and credit total
  *   - opening + credits - debits = closing
  *   - the parser's own validation flag

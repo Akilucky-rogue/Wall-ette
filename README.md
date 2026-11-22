@@ -25,7 +25,7 @@ Wall-ette (Wallet & Assets Logic / Living Economy) brings peace of mind to perso
 *   **Security Logs**: Tracks login attempts and unlocking methods (Password/Bio/MFA).
 
 ### 📄 Statement Import (rule-based, no AI, no network)
-*   **Smart Import**: Upload IDFC FIRST Bank statements as PDF or Excel.
+*   **Smart Import**: Upload bank statements as PDF or Excel: IDFC FIRST, HDFC (Excel), SBI, Kotak, Union Bank and Saraswat Bank, each checked against its running balance; other banks through a general reader. Password-locked PDFs open with their password.
     *   Deterministic rule-based parsers (`services/idfcParser.ts`, `services/IDFCBankParser.ts`) with balance validation against statement totals.
     *   Automatic merchant categorization via comprehensive Indian merchant/UPI patterns.
     *   Duplicate detection against existing transactions at review time.

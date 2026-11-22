@@ -1,21 +1,17 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# R8 rules for release builds (android/app/build.gradle).
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Capacitor ships rules that keep every plugin class with its @PluginMethod
+# methods, which the bridge looks up by name and annotation
+# (node_modules/@capacitor/android/capacitor/proguard-rules.pro), and AGP's
+# proguard-android-optimize.txt keeps annotations. These cover the rest.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Methods the page calls through addJavascriptInterface (Capacitor's bridge,
+# SystemBars). AGP's defaults keep them too; said here so the bridge doesn't
+# depend on that.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Line numbers in Java stack traces for Crashlytics, which maps the short
+# names back with the mapping file its Gradle plugin uploads.
+-keepattributes SourceFile,LineNumberTable

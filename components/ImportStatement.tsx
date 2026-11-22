@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 // XLSX is only pulled in via IDFCBankParser, which lives in this lazy chunk.
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
-import { parseIDFCStatement } from '../services/idfcParser';
+import { parseStatementPdf, StatementLockedError } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
+import { findDuplicates, fromExcel, toTransactions, type StatementRow } from '../services/statementImport';
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
@@ -24,99 +25,6 @@ interface EditingTransaction {
     type: TransactionType;
     date: string;
 }
-
-// Normalize merchant name for comparison
-const normalizeMerchant = (merchant: string): string => {
-    return merchant
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '') // Remove special chars
-        .replace(/\d+/g, '')       // Remove numbers (transaction IDs, etc.)
-        .trim();
-};
-
-// Fuzzy merchant equivalence (same rules as before: containment, shared
-// 6-char prefix for UPI ids, or exact normalized match).
-const merchantsMatch = (a: string, b: string): boolean => {
-    if (a.length > 3 && b.length > 3) {
-        if (a.includes(b) || b.includes(a)) return true;
-        if (a.substring(0, 6) === b.substring(0, 6)) return true;
-    }
-    return a === b;
-};
-
-interface DupCandidate { amount: number; merchant: string | null; used: boolean } // merchant pre-normalized
-
-// Index existing transactions by `date|type` so duplicate detection is
-// O(new × bucket) instead of O(new × all existing), with each merchant
-// normalized exactly once (audit Phase 2.7).
-const buildDuplicateIndex = (existing: Transaction[]): Map<string, DupCandidate[]> => {
-    const index = new Map<string, DupCandidate[]>();
-    for (const t of existing) {
-        const key = `${t.date}|${t.type}`;
-        let bucket = index.get(key);
-        if (!bucket) { bucket = []; index.set(key, bucket); }
-        bucket.push({ amount: t.amount, merchant: t.merchant ? normalizeMerchant(t.merchant) : null, used: false });
-    }
-    return index;
-};
-
-// COUNT-AWARE matching: each existing transaction can absorb exactly ONE
-// incoming duplicate. If a statement has two legit ₹249 payments and the
-// wallet only has one, the second stays selected instead of being lost.
-// Exact-merchant matches are claimed before fuzzy ones.
-const claimDuplicate = (tx: Transaction, index: Map<string, DupCandidate[]>): boolean => {
-    const bucket = index.get(`${tx.date}|${tx.type}`);
-    if (!bucket) return false;
-    const txMerchant = normalizeMerchant(tx.merchant || '');
-    // Pass 1: exact normalized-merchant match
-    for (const cand of bucket) {
-        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
-        if (cand.merchant !== null && cand.merchant === txMerchant) {
-            cand.used = true;
-            return true;
-        }
-    }
-    // Pass 2: fuzzy (containment / shared prefix) or merchant-less existing rows
-    for (const cand of bucket) {
-        if (cand.used || Math.abs(tx.amount - cand.amount) > 0.01) continue;
-        if (cand.merchant === null || merchantsMatch(txMerchant, cand.merchant)) {
-            cand.used = true;
-            return true;
-        }
-    }
-    return false;
-};
-
-// Validate raw parser output and map to the app's Transaction shape with a
-// stable content hash id. Shared by the Excel and PDF paths (was duplicated 3x).
-const mapRawToTransactions = (rawTransactions: any[]): Transaction[] => {
-    const valid: Transaction[] = [];
-    rawTransactions.forEach((t: any, index: number) => {
-        if (!t.date || !t.amount || !t.type || !t.merchant) return;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return;
-        if (typeof t.amount !== 'number' || t.amount <= 0) return;
-        if (t.type !== 'INCOME' && t.type !== 'EXPENSE') return;
-
-        const cleanMerchant = (t.merchant || 'unknown').replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
-        const idString = `${t.date}-${t.amount}-${cleanMerchant}-${t.type}-${index}`;
-        let hash = 0;
-        for (let i = 0; i < idString.length; i++) {
-            const char = idString.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        valid.push({
-            id: `import-${Math.abs(hash)}`,
-            date: t.date,
-            merchant: t.merchant.trim(),
-            amount: Math.abs(t.amount),
-            type: t.type === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE,
-            category: t.category?.trim() || 'Uncategorized',
-            note: t.note?.trim() || ''
-        });
-    });
-    return valid;
-};
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
@@ -148,6 +56,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   
   // Parser tracking
   const [parserUsed, setParserUsed] = useState<string>('');
+
+  // A password-locked PDF waiting for its password (kept only in memory).
+  const [locked, setLocked] = useState<{ base64: string; wrong: boolean } | null>(null);
+  const [pdfPassword, setPdfPassword] = useState('');
 
   // Flip all types (in case AI got it wrong)
   const flipAllTypes = () => {
@@ -320,17 +232,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Shared staging: map raw parser output -> validate -> detect duplicates ->
   // populate the review screen. Used by both Excel and PDF paths
   // (audit Phases 1.5 + 2.7 — was duplicated inline three times).
-  const stageForReview = (raw: any[], parserLabel: string) => {
-      const mappedTransactions = mapRawToTransactions(raw);
+  const stageForReview = async (raw: StatementRow[], parserLabel: string) => {
+      const mappedTransactions = await toTransactions(raw);
       if (mappedTransactions.length === 0) {
-          throw new Error('No valid transactions found. Please ensure the file is a clear IDFC bank statement.');
+          throw new Error('No transactions found in this statement. Check it lists transactions with dates and amounts.');
       }
 
-      const dupIndex = buildDuplicateIndex(existingTransactions);
-      const foundDuplicates = new Set<string>();
-      for (const tx of mappedTransactions) {
-          if (claimDuplicate(tx, dupIndex)) foundDuplicates.add(tx.id);
-      }
+      const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions);
 
       log.debug(`Import staged: ${mappedTransactions.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
 
@@ -351,15 +259,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       setParsedClosingBalance(closing);
   };
 
-  // PDF path: rule-based IDFC parser only (audit Phase 1.5 — previously the
-  // Excel parser was attempted against the PDF bytes first, a guaranteed throw).
-  const processPdf = async (base64: string) => {
+  // PDF path: the bank's own layout where Wall-ette knows it (IDFC FIRST,
+  // Kotak, Saraswat, Union Bank, SBI), else the generic reader.
+  const processPdf = async (base64: string, password?: string) => {
     try {
         updateProgress('Parsing PDF statement...');
-        const result = await parseIDFCStatement(base64);
+        const result = await parseStatementPdf(base64, password);
+        setLocked(null);
+        setPdfPassword('');
 
         if (result.transactions.length === 0) {
-            throw new Error('Could not parse this statement. Try uploading a clear PDF or Excel file from your IDFC bank statement.');
+            throw new Error("Couldn't find transactions in this PDF. If your bank offers an Excel download, try that.");
         }
 
         storeStatementMeta(
@@ -370,15 +280,31 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
             : `Found ${result.transactions.length} transactions`);
 
-        stageForReview(result.transactions,
-            result.header.bankName === 'Generic (auto-detected)'
+        const bank = result.header.bankName;
+        await stageForReview(result.transactions,
+            bank === 'Generic (auto-detected)'
                 ? 'Generic PDF parser (verify amounts)'
-                : 'Rule-based PDF parser');
+                : `${bank ?? 'Bank'} PDF${result.validationPassed ? ' · every row matches the balance' : ' (verify amounts)'}`);
     } catch (err: any) {
+        if (err instanceof StatementLockedError) {
+            // Ask for the PDF's password, then read it again.
+            setLocked({ base64, wrong: err.wrong });
+            setError(null);
+            setStage('IDLE');
+            return;
+        }
         log.warn('PDF import failed:', err?.message);
         setError(err.message || "Could not parse the statement. Please ensure it's a valid bank statement.");
         setStage('IDLE');
     }
+  };
+
+  const unlockPdf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locked || !pdfPassword) return;
+    setStage('PROCESSING');
+    setError(null);
+    await processPdf(locked.base64, pdfPassword);
   };
 
   // Excel path: enhanced IDFC parser (xlsx)
@@ -393,18 +319,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         }
 
         storeStatementMeta(result.summary.openingBalance, result.summary.closingBalance || undefined);
-
-        // Convert parser output to the shared raw shape
-        const raw = result.transactions.map((t: any) => ({
-            date: t.date,
-            merchant: (t.description || 'Unknown').substring(0, 100),
-            amount: t.amount,
-            type: t.type?.toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE',
-            category: t.category,
-            note: t.notes || t.description
-        }));
-
-        stageForReview(raw, 'Enhanced IDFC parser (Excel)');
+        await stageForReview(fromExcel(result.transactions),
+            `${result.bank} Excel${result.validation.isValid ? ' · totals match the bank' : ' (verify amounts)'}`);
     } catch (err: any) {
         log.warn('Excel import failed:', err?.message);
         setError('Failed to parse Excel file: ' + (err.message || 'Unknown error'));
@@ -421,6 +337,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         setStage('PROCESSING');
         setError(null);
+        setLocked(null);
+        setPdfPassword('');
         setExtractedData([]);
         updateProgress('Reading file...');
 
@@ -575,7 +493,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
 
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Upload your IDFC bank statement (PDF or Excel). Fast, rule-based parsing without AI.
+                Upload a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank, as the PDF or Excel file your bank gives you. Other banks' PDFs often work too. Read on your phone, without AI.
                 </p>
                 
                 <div 
@@ -607,6 +525,39 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         aria-label="Upload bank statement file"
                     />
                 </div>
+
+                {locked && (
+                    <form onSubmit={unlockPdf} className="mt-6 p-4 bg-white/60 border border-sage/20 rounded-2xl animate-slide-up">
+                        <p className="text-premium-charcoal text-sm font-semibold flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sage text-[18px]">lock</span>
+                            This PDF is locked
+                        </p>
+                        <p className="text-muted-taupe text-xs mt-1 leading-relaxed">
+                            {locked.wrong
+                                ? "That password didn't open it. The email the statement came with usually says what to use, often your customer ID or date of birth."
+                                : 'Enter the password your bank set for it. Wall-ette uses it only to open this file and never saves it.'}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                            <input
+                                type="password"
+                                autoComplete="off"
+                                value={pdfPassword}
+                                onChange={e => setPdfPassword(e.target.value)}
+                                className="flex-1 min-w-0 bg-zen-bg rounded-xl px-4 py-2.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage"
+                                placeholder="PDF password"
+                                aria-label="PDF password"
+                                autoFocus
+                            />
+                            <button
+                                type="submit"
+                                disabled={!pdfPassword}
+                                className="px-4 py-2.5 rounded-xl bg-sage text-white text-sm font-semibold disabled:opacity-50"
+                            >
+                                Open
+                            </button>
+                        </div>
+                    </form>
+                )}
 
                 {error && (
                     <div className="mt-6 p-4 bg-rose-light/30 border border-rose/20 rounded-2xl flex gap-3 items-center animate-slide-up">
@@ -652,7 +603,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     {duplicateIds.size} Duplicate{duplicateIds.size > 1 ? 's' : ''} Detected
                                 </p>
                                 <p className="text-xs text-blue-700 leading-relaxed">
-                                    These transactions already exist in your wallet (same date, amount & merchant). They've been auto-deselected to prevent double-counting.
+                                    These are already in your wallet: same date and amount, and the same bank reference (or payee, where the bank gives none). They've been deselected so nothing counts twice.
                                 </p>
                                 <div className="flex items-center gap-3 mt-3">
                                     <button

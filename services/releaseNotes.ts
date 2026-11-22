@@ -19,6 +19,28 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versionCode: 13,
+    version: '1.5.5',
+    items: [
+      'Import statements from HDFC, SBI, Kotak, Union Bank and Saraswat Bank, as well as IDFC FIRST.',
+      'Password-locked statement PDFs open once you enter their password.',
+      'Forgot Password tells you when no account uses an email, and catches typos like gmial.com.',
+      'Crash reports help fix problems. They never include your transactions, and you can turn them off in Profile.',
+      'If Android stops the app to free memory, Wall-ette reopens instead of closing.',
+    ],
+  },
+  {
+    versionCode: 12,
+    version: '1.5.4',
+    items: [
+      "Wall-ette tells you if a change didn't save to your account, and lets you try again.",
+      'Re-imports match payments by bank reference, so same-day payments of the same amount are never mixed up.',
+      'Fee Hunter finds duplicates from importing a statement as both PDF and Excel.',
+      'Signing out or deleting your account also clears your data from this phone.',
+      'Screenshots and the recent-apps view no longer show your wallet, and phone backups leave it out.',
+    ],
+  },
+  {
     versionCode: 11,
     version: '1.5.3',
     items: [

@@ -1,10 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// IDFC FIRST BANK STATEMENT PARSER - RULE-BASED (NO AI)
+// STATEMENT PDF PARSER - RULE-BASED (NO AI)
+// IDFC FIRST here; Kotak, Saraswat, Union Bank and SBI through
+// bankPdfLayouts.ts; anything else through the generic fallback.
 // Fast, accurate, deterministic parsing with balance validation
 // ═══════════════════════════════════════════════════════════════
 
 import { log } from '../utils/log';
 import { categorizeNarration, cleanNarration } from './categorize';
+import { detectBank, parseBankStatement, type BankRow } from './bankPdfLayouts';
 
 type TransactionNature = 
     | 'CONSUMPTION'
@@ -67,7 +70,18 @@ interface ParsedStatement {
 
 interface PdfItem { text: string; x: number; y: number; w: number }
 
-async function extractFromPDF(base64Data: string): Promise<{ text: string; pages: PdfItem[][] }> {
+/**
+ * The PDF is locked with a password (common for statements sent by email).
+ * `wrong` when a password was given and didn't open it.
+ */
+export class StatementLockedError extends Error {
+    constructor(readonly wrong: boolean) {
+        super(wrong ? "That password didn't open the PDF." : 'This PDF is locked with a password.');
+        this.name = 'StatementLockedError';
+    }
+}
+
+async function extractFromPDF(base64Data: string, password?: string): Promise<{ text: string; pages: PdfItem[][] }> {
     // Worker is bundled by Vite (?url emits it as a local asset) instead of
     // being fetched from unpkg at runtime — works offline and on native
     // Android, and removes the CDN supply-chain dependency (audit Phase 3.4).
@@ -85,7 +99,14 @@ async function extractFromPDF(base64Data: string): Promise<{ text: string; pages
         bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    let pdf;
+    try {
+        pdf = await pdfjsLib.getDocument({ data: bytes, password }).promise;
+    } catch (err: any) {
+        // pdf.js: PasswordException, code 1 = needs one, 2 = wrong one.
+        if (err?.name === 'PasswordException') throw new StatementLockedError(err.code === 2);
+        throw err;
+    }
     const numPages = pdf.numPages;
     let fullText = '';
     const pages: PdfItem[][] = [];
@@ -158,6 +179,8 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
     const rows: TableRow[] = [];
     let summary: TableResult['summary'] = null;
     let bounds: { chqD: number; dc: number; cb: number; partX: number } | null = null;
+    // Set at IDFC's closing line, "------- End of the statement -------".
+    let tableEnded = false;
 
     for (const items of pages) {
         // Bucket into visual lines (~4pt tolerance); pdf.js y grows upward,
@@ -207,6 +230,15 @@ function parseIDFCTable(pages: PdfItem[][]): TableResult {
                 continue;
             }
             if (!bounds) continue;
+
+            // The closing line sits in the Particulars column, so it used to be
+            // glued onto the last row's narration, which then no longer
+            // matched the Excel export's (audit L3). No rows follow it.
+            if (/end\s+of\s+(the\s+)?statement/i.test(joined)) {
+                tableEnded = true;
+                continue;
+            }
+            if (tableEnded) continue;
 
             const m = DATE_TOKEN.exec(texts[0]);
             const month = m ? MONTH_NUM[m[2].toLowerCase()] : undefined;
@@ -288,6 +320,25 @@ function tableToTransactions(table: TableResult): RawTransaction[] {
         });
     }
     return out;
+}
+
+/** Rows from bankPdfLayouts.ts, categorised the same way as IDFC's. */
+function bankRowsToTransactions(rows: BankRow[]): RawTransaction[] {
+    return rows.map(r => {
+        const income = r.type === 'INCOME';
+        const c = classifyTransaction(r.narration, income);
+        return {
+            date: r.date,
+            merchant: r.narration.substring(0, 100) || c.merchant,
+            amount: r.amount,
+            type: r.type,
+            nature: c.nature,
+            category: categorizeNarration(cleanNarration(r.narration), income ? 'income' : 'expense'),
+            incomeSource: c.incomeSource,
+            balance: r.balance,
+            note: r.narration,
+        };
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -843,12 +894,42 @@ function parseGenericTransactionLines(text: string, openingBalance: number): Raw
 // MAIN PARSER FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function parseIDFCStatement(base64Data: string): Promise<ParsedStatement> {
+export async function parseStatementPdf(base64Data: string, password?: string): Promise<ParsedStatement> {
     const startTime = Date.now();
 
     try {
         // Extract positioned items + flat text from the PDF
-        const { text, pages } = await extractFromPDF(base64Data);
+        const { text, pages } = await extractFromPDF(base64Data, password);
+
+        // "Microsoft Print to PDF", scanners and screenshots save a picture
+        // of the statement: no text for any app to read.
+        if (pages.every(items => items.length === 0)) {
+            throw new Error(
+                "This PDF is a picture of a statement, with no text in it (Print to PDF, a scan or a screenshot makes these). " +
+                "Download the statement from your bank's app or net banking as a PDF or Excel file, and import that."
+            );
+        }
+
+        // Kotak, Saraswat, Union Bank, SBI: their own table layouts, with
+        // every row checked against the running balance.
+        const bank = detectBank(text);
+        if (bank) {
+            const statement = parseBankStatement(bank, pages);
+            log.debug(`${statement.bankName} PDF: parsed ${statement.rows.length} transactions in ${Date.now() - startTime}ms`);
+            if (statement.errors.length) log.warn(`${statement.bankName} PDF: ${statement.errors.length} check(s) failed`);
+            return {
+                header: {
+                    bankName: statement.bankName,
+                    openingBalance: statement.opening,
+                    closingBalance: statement.closing,
+                    totalDebit: statement.totalDebit,
+                    totalCredit: statement.totalCredit,
+                },
+                transactions: bankRowsToTransactions(statement.rows),
+                validationPassed: statement.errors.length === 0,
+                errors: statement.errors,
+            };
+        }
 
         // Extract header info from flat text (period, account no, …)
         const header = extractHeader(text);
@@ -890,13 +971,17 @@ export async function parseIDFCStatement(base64Data: string): Promise<ParsedStat
         };
 
     } catch (error) {
-        log.error('IDFC parser error'); // no payload — may contain statement content
+        // A locked PDF is expected: Import asks for its password.
+        if (!(error instanceof StatementLockedError)) log.error('Statement PDF parser error'); // no payload — may contain statement content
         throw error;
     }
 }
+
+/** The PDF entry point under its old name (scripts use it). */
+export const parseIDFCStatement = parseStatementPdf;
 
 // ═══════════════════════════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export default { parseIDFCStatement };
+export default { parseStatementPdf, parseIDFCStatement };

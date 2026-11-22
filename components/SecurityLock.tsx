@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, type MultiFactorResolver } from 'firebase/auth';
+import { reauthenticateWithCredential, EmailAuthProvider, type MultiFactorResolver } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
+import { sendResetLink } from '../services/passwordReset';
 import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
 
 interface SecurityLockProps {
@@ -119,14 +120,22 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     }
   };
 
+  const [resetBusy, setResetBusy] = useState(false);
   const handleForgotPassword = async () => {
-      if (!auth.currentUser?.email) return;
-      try {
-          await sendPasswordResetEmail(auth, auth.currentUser.email);
-          setInfo(`Recovery email sent to ${auth.currentUser.email}`);
-          setError('');
-      } catch (err) {
-          setError("Failed to send recovery email.");
+      const address = auth.currentUser?.email;
+      if (!address || resetBusy) return;
+      setResetBusy(true);
+      setError('');
+      setInfo('');
+      const result = await sendResetLink(address);
+      setResetBusy(false);
+      if (result.status === 'sent') {
+          setInfo(`We've sent a link to set a new password to ${address}. It works for an hour.`);
+      } else if (result.status === 'no-account') {
+          // The signed-in account was deleted elsewhere.
+          setError('This account no longer exists. Sign out to continue.');
+      } else {
+          setError(result.message);
       }
   };
 
@@ -215,8 +224,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             </div>
 
             <div className="flex justify-end mb-6">
-                <button type="button" onClick={handleForgotPassword} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide">
-                    Forgot Password?
+                <button type="button" onClick={handleForgotPassword} disabled={resetBusy} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide disabled:opacity-50">
+                    {resetBusy ? 'Sending…' : 'Forgot Password?'}
                 </button>
             </div>
 

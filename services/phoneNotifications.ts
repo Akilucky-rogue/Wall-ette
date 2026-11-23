@@ -75,7 +75,7 @@ export function notificationNumber(key: string): number {
 export function billReminders(counted: Transaction[], now: Date, money: (n: number) => string): PhoneNote[] {
   const today = localDay(now);
   const notes: PhoneNote[] = [];
-  for (const r of detectRecurringCharges(counted, now)) {
+  for (const r of detectRecurringCharges(counted, now, Infinity)) {
     const due = localDay(r.nextExpected);
     if (due < today || daysBetween(today, due) > BILL_AHEAD_DAYS) continue;
     const evening = atHour(addDays(due, -1), EVENING_HOUR);

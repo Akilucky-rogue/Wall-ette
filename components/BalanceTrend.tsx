@@ -15,8 +15,8 @@ interface BalanceTrendProps {
  * included, as the balance does.
  */
 const BalanceTrend: React.FC<BalanceTrendProps> = ({ endMonth, className = '' }) => {
-  const { transactions, openingBalance, formatAmount, formatAmountCompact } = useWallet();
-  const money = (n: number) => formatAmount(n).split('.')[0];
+  const { transactions, openingBalance, formatWhole, formatAmountCompact } = useWallet();
+  const money = formatWhole;
 
   // One pass: net flow per month in the window, then a running sum.
   const months = useMemo(() => {
@@ -94,7 +94,7 @@ const BalanceTrend: React.FC<BalanceTrendProps> = ({ endMonth, className = '' })
               </linearGradient>
             </defs>
             {[8, 50, 92].map(y => (
-              <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="var(--line-2)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray="3 3" />
+              <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="var(--line-2)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
             ))}
             <polygon points={`0,100 ${line} 100,100`} fill="url(#balTrendFill)" />
             <polyline points={line} fill="none" stroke="var(--sage)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />

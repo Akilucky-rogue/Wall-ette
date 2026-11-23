@@ -4,6 +4,7 @@ import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, type M
 import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { toBase, toShown } from '../utils/currencyUtils';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import {
@@ -94,20 +95,21 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
 const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' }) => {
   const { user } = useAuth();
   const {
-    dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
-    clearAllTransactions, currency, counted, budgets,
+    dailyLimit, setDailyLimit, formatAmount, formatWhole, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
+    clearAllTransactions, currency, counted, budgets, shownRate,
   } = useWallet();
 
   const [notesOpen, setNotesOpen] = useState(false);
 
-  // ── Daily limit (unchanged behavior) ──
-  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? dailyLimit.toString() : '');
+  // ── Daily limit: typed in the currency shown, saved in rupees ──
+  const shownLimit = dailyLimit > 0 ? String(toShown(dailyLimit, shownRate)) : '';
+  const [limitInput, setLimitInput] = useState(shownLimit);
   const [limitSaved, setLimitSaved] = useState(false);
-  useEffect(() => { setLimitInput(dailyLimit > 0 ? dailyLimit.toString() : ''); }, [dailyLimit]);
+  useEffect(() => { setLimitInput(shownLimit); }, [shownLimit]);
   const handleSaveLimit = () => {
-    let val = parseFloat(limitInput);
-    if (limitInput.trim() === '' || isNaN(val)) { setDailyLimit(0); setLimitInput(''); }
-    else { if (val < 0) val = 0; setDailyLimit(val); setLimitInput(val === 0 ? '' : val.toString()); }
+    const val = parseFloat(limitInput);
+    if (limitInput.trim() === '' || isNaN(val) || val <= 0) { setDailyLimit(0); setLimitInput(''); }
+    else if (limitInput !== shownLimit) setDailyLimit(toBase(val, shownRate));
     setLimitSaved(true);
     setTimeout(() => setLimitSaved(false), 1200);
   };
@@ -140,7 +142,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     // Budgets and limits already past count as shown, so switching on
     // doesn't bring a burst of old news; new ones come from now on.
     const now = new Date();
-    const money = (n: number) => formatAmount(n).split('.')[0];
+    const money = formatWhole;
     const already = currentAlerts({ counted, budgets, dailyLimit, now, money }).map(a => a.key);
     saveShown(uid, markShown(loadShown(uid), already, now.getTime()));
     setPhoneMsg('');
@@ -364,7 +366,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     ? new Date(user.metadata.creationTime).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
     : '—';
   const monthlyNet = getMonthlyIncome() - getMonthlyExpense();
-  const money = (n: number) => formatAmount(n).split('.')[0];
+  const money = formatWhole;
   const lastSignIn = lastLoginTime
     ? `${lastLoginTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${lastLoginTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'just now';
@@ -394,13 +396,13 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       preview: `${themeName}, amounts in ${currency}`,
     },
     {
-      screen: AppScreen.SELF_ABOUT, title: PAGE_TITLE.about, icon: 'info', tint: 'bg-sand-light text-[#A8844F]',
+      screen: AppScreen.SELF_ABOUT, title: PAGE_TITLE.about, icon: 'info', tint: 'bg-sand-light text-sand-ink',
       preview: `Version ${__APP_VERSION__}`,
     },
   ];
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       {/* Header: Self, or the page's title with a way back */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         {page !== 'hub' && (
@@ -535,7 +537,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                   inputMode="numeric"
                   min="0"
                   value={limitInput}
-                  onChange={e => { const val = e.target.value; if (/^\d*$/.test(val) || val === '') setLimitInput(val); setLimitSaved(false); }}
+                  onChange={e => { const val = e.target.value; if (/^\d*\.?\d{0,2}$/.test(val)) setLimitInput(val); setLimitSaved(false); }}
                   onBlur={handleSaveLimit}
                   placeholder="No limit"
                   title="Daily spend limit"
@@ -569,7 +571,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
           </Card>
           {isNative() && (
             <Card>
-              <Row icon="bug_report" iconCls="bg-sand-light text-[#A8844F]" title="Crash reports"
+              <Row icon="bug_report" iconCls="bg-sand-light text-sand-ink" title="Crash reports"
                    sub="Errors go to Firebase Crashlytics, never your transactions">
                 <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
               </Row>
@@ -623,7 +625,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             </div>
           </Card>
           <Card>
-            <Row icon="currency_exchange" iconCls="bg-sand-light text-[#A8844F]" title="Show amounts in" sub="Converted at live exchange rates; saved in INR">
+            <Row icon="currency_exchange" iconCls="bg-sand-light text-sand-ink" title="Show amounts in" sub="Converted at live exchange rates; saved in INR">
               <CurrencySelector />
             </Row>
             {isNative() && (
@@ -650,7 +652,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             )}
           </div>
           <Card>
-            <Row icon="policy" iconCls="bg-sand-light text-[#A8844F]" title="Privacy policy" sub="How your data is handled"
+            <Row icon="policy" iconCls="bg-sand-light text-sand-ink" title="Privacy policy" sub="How your data is handled"
                  onClick={() => window.open(PRIVACY_URL, '_blank')}>
               {external}
             </Row>
@@ -702,7 +704,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                   </div>
                 )}
                 <div className="bg-zen-bg rounded-xl px-4 py-3 mb-5">
-                  <p className="text-[11px] text-muted-taupe font-semibold mb-1">Manual key</p>
+                  <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-bold mb-1">Manual key</p>
                   <p className="text-[12px] font-mono text-premium-charcoal break-all select-all">{enrollment.secretKey}</p>
                 </div>
                 <p className="text-[12px] text-muted-taupe leading-relaxed mb-2">2. Enter the 6-digit code the app shows:</p>
@@ -745,21 +747,21 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Current password</label>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Current password</label>
                     <input type="password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
                            autoComplete="current-password" autoFocus
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                            placeholder="••••••••" />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">New password</label>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">New password</label>
                     <input type="password" value={pwNew} onChange={e => setPwNew(e.target.value)}
                            autoComplete="new-password"
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                            placeholder="••••••••" />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Confirm new password</label>
+                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Confirm new password</label>
                     <input type="password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
                            autoComplete="new-password"
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
@@ -839,7 +841,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
               {delBusy ? 'Deleting…' : 'Permanently Delete Everything'}
             </button>
             <button onClick={() => setDelOpen(false)} disabled={delBusy}
-                    className="w-full text-muted-taupe py-2 text-[12px] font-medium hover:text-premium-charcoal">
+                    className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal">
               Cancel
             </button>
           </div>

@@ -31,7 +31,7 @@ const WhatsNewSheet: React.FC<WhatsNewSheetProps> = ({ notes, onClose }) => (
       <div className="space-y-5">
         {notes.map(note => (
           <section key={note.versionCode}>
-            <p className="text-muted-taupe text-[12px] font-semibold mb-2.5">Version {note.version}</p>
+            <p className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-2.5">Version {note.version}</p>
             <ul className="space-y-2.5">
               {note.items.map(item => (
                 <li key={item} className="flex gap-3 text-[13px] text-premium-charcoal leading-relaxed">

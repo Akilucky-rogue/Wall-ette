@@ -24,11 +24,17 @@ const LIGHT_BASE: Palette = {
   'ink': '#333333', 'ink-2': '#4A4947', 'mut': '#8E8D8A', 'mut-2': '#B9B7B2',
   'line': '#EFEDE8', 'line-2': '#E8E5DE',
   'rose': '#D4A5A5', 'rose-2': '#E8A5A5', 'rose-3': '#C98989', 'rose-strong': '#E57373', 'rose-soft': '#F5E6E6',
-  'sand': '#D6C6B2', 'sand-soft': '#F4EFE9', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
+  'sand': '#D6C6B2', 'sand-soft': '#F4EFE9', 'sand-ink': '#A8844F', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
   'amber': '#FBBF24', 'amber-2': '#F5D485', 'amber-3': '#F59E42',
   'lavender': '#B8B5D0', 'lavender-soft': '#EBEAF2',
   'ocean': '#9CB5C1', 'ocean-soft': '#E6EEF2',
   'bluez': '#A7BBC7', 'bluez-soft': '#E6EEF2',
+  // Charts (components/charts): an ocean teal for money in, clay for money
+  // out with its three steps (bills, everyday, one-offs), and the clay's
+  // quiet step for the month before. Earthy like the themes, and checked
+  // with the dataviz palette validator against the card in each mode
+  // (colour-blind separation, contrast); the same in every theme.
+  'viz-in': '#1D7AA3', 'viz-out': '#C0714A', 'viz-out-1': '#8A4A2C', 'viz-out-3': '#E2A685', 'viz-ctx': '#E2A685',
 };
 
 const DARK_BASE: Palette = {
@@ -36,11 +42,12 @@ const DARK_BASE: Palette = {
   'ink': '#ECEAE4', 'ink-2': '#D6D4CE', 'mut': '#98968F', 'mut-2': '#6E6C66',
   'line': '#2B2B28', 'line-2': '#32322E',
   'rose': '#D4A5A5', 'rose-2': '#E8A5A5', 'rose-3': '#C98989', 'rose-strong': '#E57373', 'rose-soft': '#3A2A2A',
-  'sand': '#C9B69C', 'sand-soft': '#312B22', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
+  'sand': '#C9B69C', 'sand-soft': '#312B22', 'sand-ink': '#D9B98A', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
   'amber': '#E0B33C', 'amber-2': '#C9A94F', 'amber-3': '#E09A50',
   'lavender': '#B4B0CE', 'lavender-soft': '#2C2A38',
   'ocean': '#96B0BD', 'ocean-soft': '#253035',
   'bluez': '#A0B5C2', 'bluez-soft': '#253035',
+  'viz-in': '#3D98BC', 'viz-out': '#C8744D', 'viz-out-1': '#A35A37', 'viz-out-3': '#E2A584', 'viz-ctx': '#A35A37',
 };
 
 // ── Preset accents (sage-* aliases are the app's "accent" slots) ──────────
@@ -99,7 +106,7 @@ const CHANNEL_KEYS = [
   'bg', 'card', 'card-alt', 'ink', 'ink-2', 'mut', 'line', 'line-2',
   'sage', 'sage-soft', 'sage-line',
   'rose', 'rose-soft', 'lavender', 'lavender-soft',
-  'sand', 'sand-soft', 'ocean', 'ocean-soft', 'bluez', 'bluez-soft',
+  'sand', 'sand-soft', 'sand-ink', 'ocean', 'ocean-soft', 'bluez', 'bluez-soft',
 ] as const;
 
 // ── Color math (custom theme derivation) ───────────────────────────────────

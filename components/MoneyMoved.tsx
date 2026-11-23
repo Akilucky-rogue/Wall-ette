@@ -80,7 +80,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
     parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.SELF_DATA)}
@@ -100,7 +100,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
         </p>
         {(movedOut > 0 || movedIn > 0) && (
           <div className="mt-4 bg-white rounded-2xl px-4 py-3 shadow-soft border border-black/[0.02] flex items-center justify-between">
-            <span className="text-[12px] text-muted-taupe font-semibold">Not counted</span>
+            <span className="text-[11px] uppercase tracking-wider text-muted-taupe font-bold">Not counted</span>
             <span className="text-[13px] text-premium-charcoal font-semibold tabular-nums">
               {formatAmountCompact(movedOut)} out · {formatAmountCompact(movedIn)} in
             </span>
@@ -111,7 +111,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
       {/* To sort: transfers to and from payees no rule covers yet */}
       {suggestions.length > 0 && (
         <section className="px-6 pb-2">
-          <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-1 pl-1">To sort</h3>
+          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To sort</h3>
           <p className="text-muted-taupe text-[12px] mb-3 pl-1">
             These transfers count as spending or income until you sort them.
           </p>
@@ -149,7 +149,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
           {suggestions.length > SHOW_FIRST && (
             <button
               onClick={() => setShowAll(v => !v)}
-              className="w-full mt-3 text-[12px] font-semibold text-sage py-2"
+              className="w-full mt-3 text-[11px] font-semibold text-sage uppercase tracking-wider py-2"
             >
               {showAll ? 'Show fewer' : `Show ${suggestions.length - SHOW_FIRST} more`}
             </button>
@@ -159,7 +159,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
 
       {/* Your rules */}
       <section className="px-6 pt-6">
-        <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-3 pl-1">Your rules</h3>
+        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-3 pl-1">Your rules</h3>
         {rules.length === 0 ? (
           <p className="text-muted-taupe text-[13px] italic pl-1">
             No rules yet. Sort a payee above, or add a word that appears in its payments below.
@@ -204,7 +204,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
 
       {/* Add a rule by hand */}
       <section className="px-6 pt-6">
-        <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-3 pl-1">Add a rule</h3>
+        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-3 pl-1">Add a rule</h3>
         <div className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft space-y-3">
           <input
             type="text"

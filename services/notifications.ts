@@ -232,7 +232,7 @@ const CADENCE: Record<string, string> = {
 
 function dueNotes({ counted, now, money }: NotificationInput): AppNotification[] {
   const today = localDay(now);
-  return detectRecurringCharges(counted, now)
+  return detectRecurringCharges(counted, now, Infinity)
     .map(r => ({ r, day: localDay(r.nextExpected) }))
     .filter(({ day }) => day >= today && daysBetween(today, day) <= DUE_AHEAD_DAYS)
     .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : b.r.amount - a.r.amount))

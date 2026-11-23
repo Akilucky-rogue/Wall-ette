@@ -29,6 +29,11 @@ module.exports = {
         'lavender-light': 'rgb(var(--c-lavender-soft) / <alpha-value>)',
         'sand': 'rgb(var(--c-sand) / <alpha-value>)',
         'sand-light': 'rgb(var(--c-sand-soft) / <alpha-value>)',
+        // Readable ink on sand tints (the theme's sand is too faint for text).
+        'sand-ink': 'rgb(var(--c-sand-ink) / <alpha-value>)',
+        // Text on denim (styles.css .wallet).
+        'denim-ink': 'var(--wallet-ink)',
+        'denim-mut': 'var(--wallet-mut)',
         'ocean': 'rgb(var(--c-ocean) / <alpha-value>)',
         'ocean-light': 'rgb(var(--c-ocean-soft) / <alpha-value>)',
         'blue-zen': 'rgb(var(--c-bluez) / <alpha-value>)',

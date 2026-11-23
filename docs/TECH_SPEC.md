@@ -51,9 +51,9 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   sub-screen → parent, tab → Home, Home → `minimizeApp()`.
 - **Pages, not long scrolls** (1.5.6) — Pulse is a hub (`SpendAnalysis` with no `page`) that
   links to its own pages, `PULSE_TRENDS`, `PULSE_CATEGORIES`, `PULSE_RECURRING` and
-  `PULSE_HEALTH` (the same component with `page` set); they share the month and the
-  Expenses/Income switch through `components/pulseView.ts`, a small `useSyncExternalStore`
-  store. Self is a hub (who you are, sign out) with `SELF_ACCOUNT`, `SELF_ALERTS`, `SELF_DATA`,
+  `PULSE_HEALTH` (Insights; the same component with `page` set); they share the month through
+  `components/pulseView.ts`, a small `useSyncExternalStore` store. Everything Pulse shows comes
+  from one pure analysis, `services/pulseAnalysis.ts` (§5, Pulse), drawn by `components/charts/`. Self is a hub (who you are, sign out) with `SELF_ACCOUNT`, `SELF_ALERTS`, `SELF_DATA`,
   `SELF_APPEARANCE` and `SELF_ABOUT` (`Profile` with `page` set); Money moved now sits under
   Your data. Home opens `LEFT_TO_SPEND` (§5); the 12-month balance chart moved from Home to
   Flow's Story (`components/BalanceTrend.tsx`, ending at the story's month).
@@ -83,10 +83,19 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   presses it in. `styles.css` adds `.icon-fill` (filled symbols), `.wallet` (Home's balance: a
   stitched card with a fine weave, `.wallet-pocket`, `.wallet-emboss`) and `.receipt` (a
   zigzag torn edge made with a mask; its shadow is a `drop-shadow` on `.receipt-lift`).
-  Every screen uses the same page header (a back arrow, the title on the left); labels are
-  sentence case, with no all-caps eyebrows; hairlines, dividers and switch tracks use the ink
-  colour at low opacity (`border-premium-charcoal/[0.08]`), so they show on dark themes too.
-  The decorative leaves, lotuses and rangoli stay on the sign-in, lock and update screens only.
+  Every screen uses the same page header (a back arrow, the title on the left) and opens with
+  one wallet card for its key figure (`components/ui/Denim.tsx`); card labels are Wall-ette's
+  small caps (`BUDGETS · NOVEMBER`); hairlines, dividers and switch tracks use the ink colour at
+  low opacity (`border-premium-charcoal/[0.08]`), so they show on dark themes too. The dock keeps
+  its sprout and lotus, and data screens their leaves, rangoli, diya and potted plant.
+  `docs/DESIGN_SYSTEM.md` has the tokens, components, layouts and the 1.5.6 audit.
+- **Charts** (1.5.6) — `--viz-in` (teal), `--viz-out` (clay) and its steps are the same in every
+  theme, validated for colour blindness and contrast in light and dark. `components/charts/kit.tsx`
+  gives each chart a card with a legend, a tooltip on hover, tap or keyboard focus, and a
+  Numbers switch that shows the same figures as a table.
+- **Wide screens** (1.5.6) — from 1024px the dock gives way to a rail on the left (logo, the four
+  tabs, Add an entry, Import a statement); `App.tsx` pads the content for it and screens lay out
+  on 12-column grids (Home and Pulse up to 1152px, forms and settings 672–768px).
 - Deliberately theme-independent: mascot, splash art, exported statement HTML, and the
   shareable Wrapped card (brand-stable artifacts).
 
@@ -98,7 +107,12 @@ Plain React context — no Redux/Zustand.
   reloads. On sign-out the cache is only cleared once unsynced changes reach the cloud
   (up to 4 s); offline, it stays so they sync at the next sign-in.
 - **`WalletContext`** — transactions, opening balance (+ `openingBalanceAsOf` anchor),
-  budgets, savings goal, daily spend limit, currency. Includes batched bulk ops
+  budgets, savings goal, daily spend limit, currency. Money is always saved in rupees; from
+  1.5.6 amounts can be shown in any currency the rate feed knows (`utils/currencyUtils.ts`,
+  Intl formatting with each currency's own decimals, rates cached as `fxRates_v2`). Anything
+  typed (a new entry, an edit, a budget, the daily limit, the savings goal, Vault's amount
+  filter) is in the shown currency and saved with `toBase` to the paisa; inputs show saved
+  rupees with `toShown` (`scripts/check-entry.mjs`, `scripts/check-currency.mjs`). Includes batched bulk ops
   (`deleteTransactions` via Firestore `writeBatch` chunks) and an instant, optimistic
   `clearAllTransactions` (local state clears immediately; cloud deletion continues in the
   background).
@@ -229,11 +243,29 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   (a pay up to 5 days early counts), it covers today only. Checked by
   `scripts/check-left-to-spend.mjs`; shown on Home (`components/LeftToSpendCard.tsx`) and on its
   own page (`components/LeftToSpend.tsx`).
-- **`insightsService.ts`** — savings rate, anomaly detection (3× median), 50/30/20 budget heuristic.
+- **Pulse** (`services/pulseAnalysis.ts`, from 1.5.6) — one pure analysis of a month that every
+  Pulse page, the hub's wallet and the statement report draw from: six months of money in and
+  out; spending added up day by day; bills (fixed-cost categories, and payees that charge on a
+  schedule outside everyday categories), everyday spending and one-offs (at least 3× the month's
+  median payment and ₹2,000); each category against its usual; payees; weekdays; and insights
+  ordered worth a look, going well, good to know. Accuracy rules: the projection runs only
+  everyday spending forward at its daily rate and adds bills still due from their schedule (rent
+  and one-offs already paid are counted once); the live month is compared with the same day of
+  the month before; "usual" and averages use only months the data fully covers (a first month
+  starting after the 7th, or a last one ending more than 7 days early, is left out); when the
+  newest entry is more than 3 days old the live month is read up to it and says so; shares are
+  whole percents that add up to 100 (largest remainder). Checked by `scripts/check-pulse.mjs`:
+  a hand-worked example plus invariants on 300 random wallets (about 20,000 checks).
+- **Statement report** (`services/statementReport.ts`, from 1.5.6) — Data Studio's HTML
+  statement and CSV, built from Pulse's analysis month by month, so the figures match. The page
+  uses the app's look (the stitched wallet, Crimson Pro figures, caps labels), escapes every
+  payee and note, and prints to PDF; the CSV has ISO dates, rupees to the paisa, how each entry
+  counts (spending, income or money moved) and writes formula-like text as text. Checked by
+  `scripts/check-report.mjs`. The old health check (`insightsService.ts`) is gone.
 - **Moved-vs-spent separation** — Transfer Out / Adjustment / Investment count in cash-flow
   totals but are excluded from every *spending* analysis (reports, Category Split, heatmaps).
 - **Feature screens** — Pulse (a hub and pages: Trends, Categories, Recurring with price rises,
-  Health check), Category Split (interactive SVG donut with merchant drill-down), Income
+  Insights, with "Ask Wall-ette" marked coming soon), Category Split (interactive SVG donut with merchant drill-down), Income
   Insights (Flow), Left to spend, Rewind (lifetime timeline) with exportable "Wall·ette
   Wrapped" canvas cards. Fee Hunter was removed in 1.5.6.
 - **Notifications** (from 1.5.6) — the bell on Home (`components/NotificationCenter.tsx`).

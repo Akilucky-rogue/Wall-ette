@@ -202,7 +202,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             <button
                 type="button"
                 onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); setPassword(''); }}
-                className="w-full text-muted-taupe py-2 text-[12px] font-medium hover:text-premium-charcoal"
+                className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
             >
                 Back to Password
             </button>
@@ -241,7 +241,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                 <>
                     <div className="relative flex items-center gap-2 py-4">
                         <div className="h-px bg-black/5 flex-1"></div>
-                        <span className="text-[12px] text-muted-taupe">Or</span>
+                        <span className="text-[10px] text-muted-taupe uppercase tracking-widest">Or</span>
                         <div className="h-px bg-black/5 flex-1"></div>
                     </div>
                     <button
@@ -261,7 +261,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             <button
                 onClick={() => { setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false)); }}
                 disabled={signingOut}
-                className="text-[12px] text-rose font-medium hover:text-rose/80 transition-colors disabled:opacity-60"
+                className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
                 {signingOut ? 'Signing out…' : 'Sign Out'}
             </button>
@@ -269,7 +269,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       </div>
       
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-[12px] text-muted-taupe/60 font-medium">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe/60 font-medium">
           Wall-ette Secured
         </p>
       </div>

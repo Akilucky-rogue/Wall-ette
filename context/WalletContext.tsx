@@ -3,7 +3,7 @@ import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, canon
 import { auth, db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { CURRENCIES, getCurrencyFormatter, getCompactCurrencyFormatter } from '../utils/currencyUtils';
+import { FALLBACK_RATES, getCurrencyFormatter, getCompactCurrencyFormatter, getWholeCurrencyFormatter, isCurrencyCode } from '../utils/currencyUtils';
 import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
@@ -111,8 +111,16 @@ interface WalletContextType {
   getTotalIncome: () => number;
   getTotalExpense: () => number;
   formatAmount: (amountInBase: number) => string;
+  /** Whole units, no decimals: for figures read at a glance. */
+  formatWhole: (amountInBase: number) => string;
   formatAmountCompact: (amountInBase: number) => string;
   convertToBase: (amount: number) => number;
+  /** The currency amounts are shown in (the chosen one once its rate is known, else INR). */
+  shownCurrency: CurrencyCode;
+  /** Rate of the shown currency per 1 INR. */
+  shownRate: number;
+  /** Live rates per 1 INR, for the currency picker. */
+  exchangeRates: Record<string, number>;
   retryCloudConnection: () => void;
   /** Force re-subscribe of cloud listeners — the manual "pull to refresh". */
   refresh: () => void;
@@ -129,17 +137,10 @@ export const useWallet = () => {
   return context;
 };
 
-// Only these currencies are selectable in the UI; don't keep ~160 rates in state.
-const SUPPORTED_CODES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP'];
-const FX_CACHE_KEY = 'fxRates_v1';
+// Every currency the rate service knows (about 160, utils/currencyUtils.ts).
+const FX_CACHE_KEY = 'fxRates_v2';
 const FX_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-const FALLBACK_RATES: Record<string, number> = {
-  INR: 1,
-  USD: 0.012,
-  EUR: 0.011,
-  GBP: 0.0095,
-};
 
 const readFxCache = (): { rates: Record<string, number>; fetchedAt: number } | null => {
   try {
@@ -219,10 +220,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             const res = await fetch('https://api.exchangerate-api.com/v4/latest/INR');
             if (res.ok) {
                 const data = await res.json();
-                // Keep only the currencies the app supports.
+                // Every currency with a usable rate (per 1 INR).
                 const rates: Record<string, number> = {};
-                for (const code of SUPPORTED_CODES) {
-                    if (typeof data?.rates?.[code] === 'number') rates[code] = data.rates[code];
+                for (const [code, rate] of Object.entries(data?.rates ?? {})) {
+                    if (isCurrencyCode(code) && typeof rate === 'number' && rate > 0) rates[code] = rate;
                 }
                 if (Object.keys(rates).length > 0) {
                     setExchangeRates(prev => ({ ...prev, ...rates }));
@@ -241,24 +242,28 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => clearInterval(interval);
   }, [isOnline]);
 
-  // Helper: Format Amount based on active currency and live rate.
-  // Uses a cached Intl.NumberFormat (audit Phase 2.2).
-  const formatAmount = useCallback((amountInBase: number): string => {
-      const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
-      return getCurrencyFormatter(currency).format(amountInBase * rate);
+  // The currency amounts are shown in, and its rate per 1 INR. A currency
+  // whose rate isn't known yet (offline on a first start) shows as INR.
+  const { shownCurrency, shownRate } = useMemo(() => {
+      const rate = exchangeRates[currency] ?? FALLBACK_RATES[currency];
+      return rate && rate > 0 ? { shownCurrency: currency, shownRate: rate } : { shownCurrency: 'INR', shownRate: 1 };
   }, [currency, exchangeRates]);
+
+  // Amounts in the shown currency, with its own decimal places. Cached
+  // Intl.NumberFormat per currency (audit Phase 2.2).
+  const formatAmount = useCallback((amountInBase: number): string =>
+      getCurrencyFormatter(shownCurrency).format(amountInBase * shownRate), [shownCurrency, shownRate]);
+
+  // Whole units, for figures read at a glance: ₹1,23,457, $1,335.
+  const formatWhole = useCallback((amountInBase: number): string =>
+      getWholeCurrencyFormatter(shownCurrency).format(Math.round(amountInBase * shownRate)), [shownCurrency, shownRate]);
 
   // Short form for chart axes: ₹85.7K instead of ₹85,707.00
-  const formatAmountCompact = useCallback((amountInBase: number): string => {
-      const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
-      return getCompactCurrencyFormatter(currency).format(amountInBase * rate);
-  }, [currency, exchangeRates]);
+  const formatAmountCompact = useCallback((amountInBase: number): string =>
+      getCompactCurrencyFormatter(shownCurrency).format(amountInBase * shownRate), [shownCurrency, shownRate]);
 
-  // Helper: Convert display currency amount back to base (INR) for storage
-  const convertToBase = useCallback((amount: number): number => {
-      const rate = exchangeRates[currency] || CURRENCIES[currency].rate || 1;
-      return amount / rate;
-  }, [currency, exchangeRates]);
+  // An amount typed in the shown currency, back to INR for storage.
+  const convertToBase = useCallback((amount: number): number => amount / shownRate, [shownRate]);
 
   // Local Storage Fallback Helpers
   const saveToLocal = useCallback((key: string, data: any) => {
@@ -450,7 +455,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           unsubscribe = onSnapshot(settingsRef, (docSnap) => {
               if (docSnap.exists()) {
                   const data = docSnap.data();
-                  if (data.currency) {
+                  if (isCurrencyCode(data.currency)) {
                       setCurrencyState(data.currency);
                       saveToLocal('currency', data.currency);
                   }
@@ -547,6 +552,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Settings used to skip the cloud while offline, so the next sync put the
   // old value back; Firestore's queue now holds them until it reconnects.
   const setCurrency = useCallback((code: CurrencyCode) => {
+    if (!isCurrencyCode(code)) return;
     setCurrencyState(code);
     saveToLocal('currency', code);
     saveSetting('currency', { currency: code });
@@ -886,8 +892,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       getTotalIncome,
       getTotalExpense,
       formatAmount,
+      formatWhole,
       formatAmountCompact,
       convertToBase,
+      shownCurrency,
+      shownRate,
+      exchangeRates,
       retryCloudConnection,
       refresh,
       lastLoginTime
@@ -898,8 +908,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       deleteTransactions, clearAllTransactions, importTransactions, savePayeeRule, deletePayeeRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
-      getTotalIncome, getTotalExpense, formatAmount, formatAmountCompact,
-      convertToBase, retryCloudConnection, refresh, lastLoginTime
+      getTotalIncome, getTotalExpense, formatAmount, formatWhole, formatAmountCompact,
+      convertToBase, shownCurrency, shownRate, exchangeRates, retryCloudConnection, refresh, lastLoginTime
   ]);
 
   return (

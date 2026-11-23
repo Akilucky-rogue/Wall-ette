@@ -121,11 +121,5 @@ export function categoryOptions(current: string): readonly string[] {
   return current && !(CATEGORIES as readonly string[]).includes(current) ? [current, ...CATEGORIES] : CATEGORIES;
 }
 
-export type CurrencyCode = 'INR' | 'USD' | 'EUR' | 'GBP';
-
-export interface CurrencyConfig {
-  code: CurrencyCode;
-  symbol: string;
-  rate: number; // Rate relative to base (INR)
-  locale: string;
-}
+/** An ISO 4217 code ('INR', 'USD', 'AED', …). Stored amounts are always INR. */
+export type CurrencyCode = string;

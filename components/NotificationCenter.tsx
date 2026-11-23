@@ -16,7 +16,7 @@ import WhatsNewSheet from './WhatsNewSheet';
 const TONE: Record<NotificationTone, string> = {
   alert: 'bg-rose-light text-rose',
   // The theme's sand is too faint for a thin glyph on its own tint.
-  warn: 'bg-sand-light text-[#A8844F]',
+  warn: 'bg-sand-light text-sand-ink',
   good: 'bg-sage-light text-sage',
   info: 'bg-ocean-light text-ocean',
 };
@@ -37,7 +37,7 @@ interface NotificationCenterProps {
  * seen yet; closing the panel marks them seen.
  */
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) => {
-  const { transactions, counted, budgets, dailyLimit, savingsGoal, formatAmount } = useWallet();
+  const { transactions, counted, budgets, dailyLimit, savingsGoal, formatAmount, formatWhole } = useWallet();
   const uid = useAuth().user?.uid ?? null;
   const update = useSyncExternalStore(subscribe, getUpdateState);
 
@@ -60,7 +60,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
   }, [uid]);
   useEffect(() => { readLog(); }, [readLog]);
 
-  const money = useCallback((n: number) => formatAmount(n).split('.')[0], [formatAmount]);
+  const money = formatWhole;
   const all = useMemo(() => buildNotifications({
     now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks,
     updateReady: update.phase === 'ready',

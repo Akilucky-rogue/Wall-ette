@@ -6,7 +6,9 @@ import { PLAY_LISTING_PUBLIC, PLAY_STORE_URL, PRIVACY_URL, TERMS_URL } from '../
 /**
  * wall-ette.com for visitors who aren't signed in (web only; App.tsx).
  * "Open the web app" and "Sign in" lead to the existing sign-in screen.
- * Screenshots in public/landing/ show the Play reviewer account's sample data.
+ * Screenshots in public/landing/ show made-up sample data (pulse, home, flow,
+ * history and rewind from the UI harness's sample wallet; import from the Play
+ * reviewer account).
  */
 interface LandingProps {
   onOpenApp: () => void;
@@ -224,8 +226,8 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
           </div>
           <div className="-mx-5 mt-14 flex snap-x snap-mandatory gap-6 overflow-x-auto px-5 pb-4 sm:mx-0 sm:px-0 md:grid md:grid-cols-3 md:items-end md:gap-10 md:overflow-visible">
             {[
-              { src: '/landing/pulse.webp', alt: 'Pulse screen with sample data: ₹59,594 spent this month, 21% less than October', caption: 'Pulse: this month’s spending, against last month' },
-              { src: '/landing/home.webp', alt: 'Home screen with sample data: a balance of ₹1,81,238', caption: 'Home: your balance and today’s numbers', lift: true },
+              { src: '/landing/pulse.webp', alt: 'Pulse screen with sample data: ₹45,616 spent in November so far, 21% more than by this day in October, on course for ₹52.5K', caption: 'Pulse: where this month is heading, and what stands out' },
+              { src: '/landing/home.webp', alt: 'Home screen with sample data: a balance of ₹2,77,023', caption: 'Home: your balance and today’s numbers', lift: true },
               { src: '/landing/flow.webp', alt: 'Flow screen with sample data: the November story of what came in, went out and was kept', caption: 'Flow: your month as a short story' },
             ].map(p => (
               <figure key={p.src} className={`w-[68%] shrink-0 snap-center sm:w-[44%] md:w-auto ${p.lift ? 'md:-translate-y-8' : ''}`}>
@@ -294,7 +296,7 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
                 <h3 className="font-serif text-[24px] leading-tight">Every entry, findable</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-zen-charcoal">Search by merchant, category or note, and export what you need.</p>
               </div>
-              <img src="/landing/history.webp" alt="History screen with sample data" width={640} height={1138} loading="lazy" decoding="async"
+              <img src="/landing/history.webp" alt="Vault screen with sample data: every entry, newest first" width={640} height={1138} loading="lazy" decoding="async"
                 className="mx-auto mt-6 block h-[230px] w-[78%] rounded-t-[22px] border border-b-0 border-sage-border object-cover object-top" />
             </article>
 
@@ -304,7 +306,7 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
                 <h3 className="font-serif text-[24px] leading-tight">Rewind</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-zen-charcoal">Your year at a glance, with records and streaks, ready to share.</p>
               </div>
-              <img src="/landing/rewind.webp" alt="Rewind screen with sample data" width={640} height={1138} loading="lazy" decoding="async"
+              <img src="/landing/rewind.webp" alt="Rewind screen with sample data: a year of entries and all-time records" width={640} height={1138} loading="lazy" decoding="async"
                 className="mx-auto mt-6 block h-[230px] w-[78%] rounded-t-[22px] border border-b-0 border-sage-border object-cover object-top" />
             </article>
 

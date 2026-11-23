@@ -19,14 +19,14 @@ interface LeftToSpendProps {
 
 /** The page: the figure, how it adds up, and the bills still to come. */
 const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
-  const { formatAmount, savingsGoal } = useWallet();
+  const { formatWhole, savingsGoal } = useWallet();
   const left = useLeftToSpend();
-  const money = (n: number) => formatAmount(n).split('.')[0];
+  const money = formatWhole;
   const movedLabel = !left || left.invested === 0 ? 'Sent to family' : left.invested >= left.moved ? 'Invested' : 'Sent to family and invested';
   const goals = () => { openAt('goals'); onNavigate(AppScreen.INCOME_INSIGHTS); };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
@@ -161,7 +161,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
               <ul className="divide-y divide-premium-charcoal/[0.06]">
                 {left.bills.map((b, i) => (
                   <li key={i} className="flex items-center gap-3 px-5 py-3">
-                    <span className="w-9 h-9 rounded-2xl bg-sand-light text-[#A8844F] flex items-center justify-center shrink-0">
+                    <span className="w-9 h-9 rounded-2xl bg-sand-light text-sand-ink flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined icon-fill text-[18px]" aria-hidden="true">event</span>
                     </span>
                     <span className="flex-1 min-w-0">

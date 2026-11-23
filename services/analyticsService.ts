@@ -127,7 +127,9 @@ const CADENCES: CadenceRule[] = [
  */
 export const detectRecurringCharges = (
   transactions: Transaction[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** How many to return, largest monthly cost first (8 for lists; Infinity for totals). */
+  limit = 8,
 ): RecurringCharge[] => {
   const groups = new Map<string, { tx: Transaction; ts: number }[]>();
 
@@ -184,7 +186,7 @@ export const detectRecurringCharges = (
     });
   }
 
-  return results.sort((a, b) => b.monthlyCost - a.monthlyCost).slice(0, 8);
+  return results.sort((a, b) => b.monthlyCost - a.monthlyCost).slice(0, limit);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

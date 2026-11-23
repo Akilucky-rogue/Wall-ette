@@ -43,11 +43,11 @@ export const UsageBar: React.FC<{ left: Left; thin?: boolean }> = ({ left, thin 
 
 /** Home's card: what's left and the daily amount; opens the page. */
 const LeftToSpendCard: React.FC<{ onNavigate: (screen: AppScreen) => void; className?: string }> = ({ onNavigate, className = '' }) => {
-  const { formatAmount } = useWallet();
+  const { formatWhole } = useWallet();
   const left = useLeftToSpend();
   if (!left) return null;
   const over = left.left < 0;
-  const money = (n: number) => formatAmount(n).split('.')[0];
+  const money = formatWhole;
   return (
     <div className={className}>
       <button
@@ -55,7 +55,7 @@ const LeftToSpendCard: React.FC<{ onNavigate: (screen: AppScreen) => void; class
         className="w-full bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] text-left"
       >
         <span className="flex items-center justify-between gap-3">
-          <span className="text-[12px] font-semibold text-muted-taupe">Left to spend {periodLabel(left)}</span>
+          <span className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Left to spend · {periodLabel(left)}</span>
           <span className="material-symbols-outlined text-muted-taupe/60 text-[18px]" aria-hidden="true">chevron_right</span>
         </span>
         <span className="flex items-baseline justify-between gap-3 mt-1">

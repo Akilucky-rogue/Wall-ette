@@ -74,6 +74,9 @@ function motionFor(prev: AppScreen, next: AppScreen): string {
   return 'motion-safe:animate-tab-in';
 }
 
+// Full-screen flows on phones: no dock (the rail on wide screens stays).
+const DOCKLESS = new Set<AppScreen>([AppScreen.NEW_ENTRY, AppScreen.IMPORT]);
+
 // Sign-out and account deletion clear this device's data and reload the app;
 // that start-up skips the launch splash (services/session.ts). Read once per
 // page load, outside React.
@@ -393,36 +396,19 @@ function AppContent() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <Suspense fallback={<LoadingFallback />}>
-          {/* Keyed by screen, so each change plays its entrance: a page slides
-              in over the one it opens from, going back slides the other way,
-              tabs rise into place (tailwind animations; off with reduced motion). */}
-          <div key={currentScreen} className={screenMotion}>
-            {renderScreen()}
-          </div>
-        </Suspense>
-        {(currentScreen === AppScreen.DASHBOARD ||
-          currentScreen === AppScreen.HISTORY ||
-          currentScreen === AppScreen.ANALYSIS ||
-          currentScreen === AppScreen.PULSE_TRENDS ||
-          currentScreen === AppScreen.PULSE_CATEGORIES ||
-          currentScreen === AppScreen.PULSE_RECURRING ||
-          currentScreen === AppScreen.PULSE_HEALTH ||
-          currentScreen === AppScreen.INCOME_INSIGHTS ||
-          currentScreen === AppScreen.CATEGORY_SPLIT ||
-          currentScreen === AppScreen.SELF ||
-          currentScreen === AppScreen.SELF_ACCOUNT ||
-          currentScreen === AppScreen.SELF_ALERTS ||
-          currentScreen === AppScreen.SELF_DATA ||
-          currentScreen === AppScreen.SELF_APPEARANCE ||
-          currentScreen === AppScreen.SELF_ABOUT ||
-          currentScreen === AppScreen.EXPORT ||
-          currentScreen === AppScreen.REWIND ||
-          currentScreen === AppScreen.LEFT_TO_SPEND ||
-          currentScreen === AppScreen.MONEY_MOVED
-        ) && (
-          <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />
-        )}
+        {/* Wide screens leave room for the navigation rail on the left
+            (components/Navigation.tsx); phones and tablets use the dock. */}
+        <div className="lg:pl-[240px]">
+          <Suspense fallback={<LoadingFallback />}>
+            {/* Keyed by screen, so each change plays its entrance: a page slides
+                in over the one it opens from, going back slides the other way,
+                tabs rise into place (tailwind animations; off with reduced motion). */}
+            <div key={currentScreen} className={screenMotion}>
+              {renderScreen()}
+            </div>
+          </Suspense>
+        </div>
+        <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} showDock={!DOCKLESS.has(currentScreen)} />
         <AndroidInstallBanner />
       </div>
       {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}

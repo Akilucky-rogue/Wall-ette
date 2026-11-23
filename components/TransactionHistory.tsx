@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { getSymbol, toBase, toShown } from '../utils/currencyUtils';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
 import { WallEMascot, WallEEyes } from './SplashScreen';
@@ -21,7 +22,9 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, shownRate, shownCurrency } = useWallet();
+  // Amounts typed here (filters, edits) are in the currency shown; saved amounts are rupees.
+  const symbol = getSymbol(shownCurrency);
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -101,8 +104,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       // Amount Range Filter
       const minAmt = parseFloat(minAmount);
       const maxAmt = parseFloat(maxAmount);
-      if (!isNaN(minAmt) && t.amount < minAmt) return false;
-      if (!isNaN(maxAmt) && t.amount > maxAmt) return false;
+      const shown = toShown(t.amount, shownRate);
+      if (!isNaN(minAmt) && shown < minAmt) return false;
+      if (!isNaN(maxAmt) && shown > maxAmt) return false;
 
       return true;
     });
@@ -110,7 +114,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     if (sortBy === 'AMOUNT_DESC') return filtered.sort((a, b) => b.amount - a.amount);
     if (sortBy === 'AMOUNT_ASC') return filtered.sort((a, b) => a.amount - b.amount);
     return filtered.sort(sortBy === 'DATE_ASC' ? (a, b) => byNewest(b, a) : byNewest);
-  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
+  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery, shownRate]);
 
   // One group per day, newest first, with the day's net; sorted by amount,
   // one group in that order instead.
@@ -252,7 +256,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setEditingTransaction(transaction);
     setEditForm({
       merchant: transaction.merchant || '',
-      amount: transaction.amount.toString(),
+      amount: String(toShown(transaction.amount, shownRate)),
       category: transaction.category || 'Uncategorized',
       date: toDay(transaction.date),
       note: transaction.note || '',
@@ -275,8 +279,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const handleEditSubmit = async () => {
     if (!editingTransaction) return;
     
-    const amount = parseFloat(editForm.amount);
-    if (isNaN(amount) || amount <= 0) return;
+    const typed = parseFloat(editForm.amount);
+    if (isNaN(typed) || typed <= 0) return;
+    // Unchanged, the saved rupees stay exactly as they were; changed, the
+    // amount typed in the currency shown is saved in rupees.
+    const amount = editForm.amount === String(toShown(editingTransaction.amount, shownRate))
+      ? editingTransaction.amount
+      : toBase(typed, shownRate);
+    if (amount <= 0) return;
     
     setEditSaving(true);
     try {
@@ -303,7 +313,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
         <div className="flex items-center justify-between mb-5 -mt-0.5">
@@ -388,7 +398,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         {/* Active Filters Summary */}
         {activeFilterCount > 0 && (
           <div className="flex items-center gap-2 pt-2 overflow-x-auto no-scrollbar">
-            <span className="text-[12px] text-muted-taupe flex-shrink-0">Active:</span>
+            <span className="text-[10px] text-muted-taupe uppercase tracking-wider flex-shrink-0">Active:</span>
             {dateFilter !== 'ALL' && (
               <span className="px-2 py-1 bg-sage/10 text-sage text-[10px] font-medium rounded-full flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">calendar_today</span>
@@ -404,7 +414,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
             {(minAmount || maxAmount) && (
               <span className="px-2 py-1 bg-ocean/10 text-ocean text-[10px] font-medium rounded-full flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">payments</span>
-                {minAmount && maxAmount ? `₹${minAmount}-${maxAmount}` : minAmount ? `≥₹${minAmount}` : `≤₹${maxAmount}`}
+                {minAmount && maxAmount ? `${symbol}${minAmount}-${maxAmount}` : minAmount ? `≥${symbol}${minAmount}` : `≤${symbol}${maxAmount}`}
               </span>
             )}
             {sortBy !== 'DATE_DESC' && (
@@ -422,7 +432,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {showFilters && (
         <>
             <div className="fixed inset-0 bg-premium-charcoal/30 z-50 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
+            <div className="fixed bottom-0 left-0 right-0 lg:left-[240px] z-50 bg-white rounded-t-[32px] shadow-float max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 pb-4 border-b border-premium-charcoal/[0.08]">
                     <div className="flex items-center gap-3">
@@ -436,7 +446,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     </div>
                     <button 
                       onClick={clearFilters} 
-                      className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-semibold text-rose hover:bg-rose-light/20 rounded-full transition-colors"
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-rose uppercase tracking-wider hover:bg-rose-light/20 rounded-full transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">restart_alt</span>
                       Reset
@@ -449,7 +459,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-sage text-[18px]">calendar_month</span>
-                          <p className="text-[12px] font-semibold text-muted-taupe">Time period</p>
+                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Time Period</p>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             {[
@@ -479,7 +489,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-lavender text-[18px]">sort</span>
-                          <p className="text-[12px] font-semibold text-muted-taupe">Sort by</p>
+                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Sort By</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
@@ -508,13 +518,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-ocean text-[18px]">payments</span>
-                          <p className="text-[12px] font-semibold text-muted-taupe">Amount range</p>
+                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Amount Range</p>
                         </div>
                         <div className="flex gap-3">
                             <div className="flex-1">
                               <label className="text-[10px] text-muted-taupe mb-1 block">Min amount</label>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">{symbol}</span>
                                 <input
                                     type="number"
                                     placeholder="0"
@@ -528,7 +538,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             <div className="flex-1">
                               <label className="text-[10px] text-muted-taupe mb-1 block">Max amount</label>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">{symbol}</span>
                                 <input
                                     type="number"
                                     placeholder="∞"
@@ -546,7 +556,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-rose text-[18px]">category</span>
-                            <p className="text-[12px] font-semibold text-muted-taupe">Category</p>
+                            <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Category</p>
                           </div>
                           <span className="text-[10px] text-muted-taupe">{categories.length - 1} categories</span>
                         </div>
@@ -777,12 +787,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         This will permanently delete <span className="underline decoration-rose">ALL</span> transactions. This action is irreversible.
                     </p>
                     
-                    <p className="text-[12px] text-muted-taupe mb-2">Type "DELETE" to confirm</p>
+                    <p className="text-[10px] text-muted-taupe uppercase tracking-widest mb-2">Type "DELETE" to confirm</p>
                     <input 
                         type="text" 
                         value={clearInput}
                         onChange={(e) => setClearInput(e.target.value)}
-                        className="w-full bg-zen-bg border border-rose/20 rounded-xl px-4 py-3 text-center text-sm font-semibold text-rose outline-none focus:ring-2 focus:ring-rose/30 mb-6"
+                        className="w-full bg-zen-bg border border-rose/20 rounded-xl px-4 py-3 text-center text-sm font-bold text-rose outline-none focus:ring-2 focus:ring-rose/30 mb-6 uppercase"
                         placeholder="DELETE"
                     />
 
@@ -825,7 +835,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Transaction Type Toggle */}
                     <div className="mb-4">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Type</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Type</label>
                         <div className="flex gap-2">
                             <button
                                 type="button"
@@ -854,7 +864,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Merchant */}
                     <div className="mb-4">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Merchant / Description</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Merchant / Description</label>
                         <input
                             type="text"
                             value={editForm.merchant}
@@ -866,7 +876,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Amount */}
                     <div className="mb-4">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Amount</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Amount, {shownCurrency}</label>
                         <input
                             type="number"
                             step="0.01"
@@ -880,7 +890,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Category */}
                     <div className="mb-4">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Category</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Category</label>
                         <select
                             value={editForm.category}
                             onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
@@ -896,7 +906,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Date */}
                     <div className="mb-4">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Date</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Date</label>
                         <input
                             type="date"
                             value={editForm.date}
@@ -909,7 +919,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Note */}
                     <div className="mb-6">
-                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Note</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Note</label>
                         <textarea
                             value={editForm.note}
                             onChange={(e) => setEditForm(prev => ({ ...prev, note: e.target.value }))}

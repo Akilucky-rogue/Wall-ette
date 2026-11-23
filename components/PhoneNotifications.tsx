@@ -15,7 +15,7 @@ const SETTLE_MS = 2500;
  * on. Renders nothing.
  */
 const PhoneNotifications: React.FC = () => {
-  const { counted, budgets, dailyLimit, formatAmount } = useWallet();
+  const { counted, budgets, dailyLimit, formatWhole } = useWallet();
   const uid = useAuth().user?.uid ?? null;
   const on = useSyncExternalStore(subscribePhoneSwitch, () => (uid ? phoneNotificationsOn(uid) : false));
 
@@ -23,7 +23,7 @@ const PhoneNotifications: React.FC = () => {
     if (!uid || !on) return;
     const timer = setTimeout(() => {
       const now = new Date();
-      const money = (n: number) => formatAmount(n).split('.')[0];
+      const money = formatWhole;
       const bills = billReminders(counted, now, money);
       const fresh = newAlerts(currentAlerts({ counted, budgets, dailyLimit, now, money }), loadShown(uid));
       void postPhoneNotes(bills, fresh).then(posted => {
@@ -31,7 +31,7 @@ const PhoneNotifications: React.FC = () => {
       });
     }, SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [uid, on, counted, budgets, dailyLimit, formatAmount]);
+  }, [uid, on, counted, budgets, dailyLimit, formatWhole]);
 
   return null;
 };

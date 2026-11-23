@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types';
-import { getSymbol } from '../utils/currencyUtils';
+import { getSymbol, localeFor, niceAmount, toBase } from '../utils/currencyUtils';
+import { amountValue, pressKey } from '../utils/entryAmount';
 import { useWallet } from '../context/WalletContext';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { done } from '../utils/haptics';
+import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
 
 interface NewEntryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -50,10 +52,15 @@ const CAT_ICON = (cat: string): string => {
   return 'category';
 };
 
-const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
+// Quick amounts in rupees; in another currency, the nearest round figure.
+const QUICK_AMOUNTS_INR = [100, 200, 500, 1000, 2000, 5000];
 
 const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
-  const { currency, addTransaction, convertToBase, transactions, counted, flowOf, dailyLimit, formatAmount } = useWallet();
+  const { shownCurrency, shownRate, addTransaction, transactions, counted, flowOf, dailyLimit, formatAmount, formatWhole } = useWallet();
+  const quickAmounts = useMemo(
+    () => [...new Set(QUICK_AMOUNTS_INR.map(q => (shownCurrency === 'INR' ? q : niceAmount(q * shownRate))))].filter(q => q > 0),
+    [shownCurrency, shownRate],
+  );
   const [amount, setAmount] = useState('0.00');
   const [note, setNote] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -66,7 +73,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   const [saveAndAdd, setSaveAndAdd] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const numAmount = parseFloat(amount) || 0;
+  const numAmount = amountValue(amount);
 
   // Recent merchants for the active type (last 90 days, by frequency)
   const suggestions = useMemo(() => {
@@ -102,7 +109,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   // Only an entry dated today counts toward today's limit.
   const forToday = localDay(selectedDate) === localDay();
   const overLimit = type === TransactionType.EXPENSE && entryCounts && forToday && dailyLimit > 0 && numAmount > 0
-    && todaySpend + convertToBase(numAmount) > dailyLimit;
+    && todaySpend + toBase(numAmount, shownRate) > dailyLimit;
 
   const applyMerchant = (value: string) => {
     setMerchant(value);
@@ -120,26 +127,13 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     setShowAllCats(false);
   };
 
-  const handleKeypad = (val: string) => {
-    if (val === 'backspace') {
-      if (amount.length <= 1 || amount === '0.00') setAmount('0.00');
-      else setAmount(prev => (prev.length > 1 ? prev.slice(0, -1) : '0.00'));
-    } else {
-      if (amount === '0.00') {
-        setAmount(val === '.' ? '0.' : val);
-      } else {
-        if (val === '.' && amount.includes('.')) return;
-        const dotIdx = amount.indexOf('.');
-        if (dotIdx !== -1 && amount.length - dotIdx > 2) return;
-        if (dotIdx === -1 && amount.length >= 8 && val !== '.') return; // sane cap
-        setAmount(prev => prev + val);
-      }
-    }
-  };
+  const handleKeypad = (val: string) => setAmount(prev => pressKey(prev, val));
 
   const handleSave = async () => {
     if (numAmount <= 0) return;
-    const amountInBase = convertToBase(numAmount);
+    // Typed in the currency shown; saved in rupees, to the paisa.
+    const amountInBase = toBase(numAmount, shownRate);
+    if (amountInBase <= 0) return;
 
     const success = await addTransaction({
       id: `txn-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`,
@@ -179,7 +173,10 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   const amtFont = amount.length > 9 ? 'text-[36px]' : amount.length > 6 ? 'text-[46px]' : 'text-[56px]';
 
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden">
+    <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
+      <FloatingLeaf className="top-20 right-5 opacity-35" delay={0.3} />
+      <Sprout className="absolute top-32 left-4 opacity-40" />
+      <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="var(--gold-1)" mirror />
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
@@ -196,20 +193,21 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       <div className="flex-1 overflow-y-auto px-6 pt-2 flex flex-col gap-6 pb-4">
         {/* Amount hero */}
         <div className="text-center py-4 relative">
-          <p className="text-muted-taupe text-[12px] font-medium mb-2">Amount</p>
+          <div className="absolute top-2 right-8"><Diya className="opacity-50" /></div>
+          <p className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-2">Amount</p>
           <div className="flex items-center justify-center gap-1">
-            <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/50'}`}>{getSymbol(currency)}</span>
+            <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/50'}`}>{getSymbol(shownCurrency)}</span>
             <span className={`font-serif leading-none ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/40'}`}>{amount}</span>
           </div>
           {/* Quick amounts */}
           <div className="flex justify-center gap-1.5 mt-4 flex-wrap">
-            {QUICK_AMOUNTS.map(q => (
+            {quickAmounts.map(q => (
               <button
                 key={q}
                 onClick={() => setAmount(String(q))}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${amount === String(q) ? 'bg-sage text-white border-sage' : 'bg-white text-muted-taupe border-premium-charcoal/[0.08] hover:border-sage/30'}`}
               >
-                {getSymbol(currency)}{q.toLocaleString('en-IN')}
+                {getSymbol(shownCurrency)}{q.toLocaleString(localeFor(shownCurrency))}
               </button>
             ))}
           </div>
@@ -241,7 +239,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 <span className="material-symbols-outlined text-[20px]">storefront</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-muted-taupe font-semibold">Merchant or payee</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Merchant / Payee</p>
                 <input
                   type="text"
                   value={merchant}
@@ -269,12 +267,12 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           {/* Category — visual chip grid */}
           <div className="bg-white rounded-[24px] p-4 shadow-soft border border-black/[0.01]">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[12px] text-muted-taupe font-semibold">
+              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">
                 Category{autoCat && category ? <span className="text-sage normal-case tracking-normal"> · auto: {category}</span> : ''}
               </p>
               <button
                 onClick={() => setShowAllCats(v => !v)}
-                className="text-[12px] font-semibold text-sage"
+                className="text-[10px] font-bold uppercase tracking-wider text-sage"
               >
                 {showAllCats ? 'Less' : 'More'}
               </button>
@@ -306,7 +304,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined text-[20px]">calendar_today</span>
             </div>
             <div className="flex-1">
-              <p className="text-[12px] text-muted-taupe font-semibold">Date</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
               <p className="text-premium-charcoal text-[15px] font-serif font-semibold">{dateLabel}</p>
             </div>
             <span className="material-symbols-outlined text-muted-taupe opacity-40">expand_more</span>
@@ -359,7 +357,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined text-[20px]">notes</span>
             </div>
             <div className="flex-1">
-              <p className="text-[12px] text-muted-taupe font-semibold">Note</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
               <input
                 className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif placeholder:text-muted-taupe/40"
                 placeholder="Add details..."
@@ -377,8 +375,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <div className="flex items-center gap-2 bg-rose-light/40 border border-rose/20 rounded-2xl px-4 py-3">
               <span className="material-symbols-outlined text-rose text-[18px]">warning</span>
               <p className="text-rose text-[11px] font-medium leading-relaxed">
-                This takes today past your {formatAmount(dailyLimit).split('.')[0]} daily limit
-                ({formatAmount(todaySpend).split('.')[0]} spent so far). It still saves.
+                This takes today past your {formatWhole(dailyLimit)} daily limit
+                ({formatWhole(todaySpend)} spent so far). It still saves.
               </p>
             </div>
           )}

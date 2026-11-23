@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { getSymbol, toBase, toShown } from '../utils/currencyUtils';
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
@@ -60,8 +61,8 @@ const topShare = (m: Map<string, number>, total: number, maxN: number): [string,
 
 const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const {
-    transactions, counted, flowOf, savePayeeRule, formatAmount, formatAmountCompact,
-    budgets, savingsGoal, setBudget, setSavingsGoal,
+    transactions, counted, flowOf, savePayeeRule, formatAmount, formatWhole, formatAmountCompact,
+    budgets, savingsGoal, setBudget, setSavingsGoal, shownRate, shownCurrency,
   } = useWallet();
 
   const [tab, setTab] = useState<'STORY' | 'GOALS'>('STORY');
@@ -141,28 +142,28 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.inc > 0) {
       lines.push({
         icon: 'south_west', tone: 'pos',
-        text: <><b>{formatAmount(m.inc).split('.')[0]}</b> came in{topSource ? <> — mostly from <b>{prettyMerchant(topSource[0])}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
+        text: <><b>{formatWhole(m.inc)}</b> came in{topSource ? <> — mostly from <b>{prettyMerchant(topSource[0])}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
       });
     }
     if (m.out > 0) {
       lines.push({
         icon: 'north_east', tone: 'neg',
-        text: <><b>{formatAmount(m.out).split('.')[0]}</b> went out{topCat ? <>, led by <b>{topCat[0]}</b> ({formatAmountCompact(topCat[1])})</> : null}.</>,
+        text: <><b>{formatWhole(m.out)}</b> went out{topCat ? <>, led by <b>{topCat[0]}</b> ({formatAmountCompact(topCat[1])})</> : null}.</>,
       });
     }
     lines.push(saved >= 0
       ? {
           icon: 'savings', tone: 'pos',
-          text: <>You kept <b>{formatAmount(saved).split('.')[0]}</b>{m.inc > 0 ? <> — <b>{Math.round((saved / m.inc) * 100)}%</b> of income</> : null}.</>,
+          text: <>You kept <b>{formatWhole(saved)}</b>{m.inc > 0 ? <> — <b>{Math.round((saved / m.inc) * 100)}%</b> of income</> : null}.</>,
         }
       : {
           icon: 'warning', tone: 'neg',
-          text: <>You spent <b>{formatAmount(Math.abs(saved)).split('.')[0]}</b> more than you earned{isCurrent ? ' so far this month' : ''}.</>,
+          text: <>You spent <b>{formatWhole(Math.abs(saved))}</b> more than you earned{isCurrent ? ' so far this month' : ''}.</>,
         });
     if (m.maxExp) {
       lines.push({
         icon: 'local_fire_department', tone: 'mid',
-        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatAmount(m.maxExp.amount).split('.')[0]} on {parseDay(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
+        text: <>Largest single spend: <b>{prettyMerchant(m.maxExp.merchant || m.maxExp.category)}</b> — {formatWhole(m.maxExp.amount)} on {parseDay(m.maxExp.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</>,
       });
     }
     if (prev && prev.out > 0 && m.out > 0) {
@@ -259,7 +260,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const hasData = transactions.length > 0;
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
@@ -326,11 +327,11 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {story && storyKey && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid mt-4 lg:mt-0">
                   <div className="flex items-baseline justify-between mb-1">
-                    <p className="text-[13px] font-semibold text-premium-charcoal">The {monthLabel(storyKey)} story</p>
-                    {story.isCurrent && <span className="text-[11px] text-sage font-semibold">In progress</span>}
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">The {monthLabel(storyKey)} story</p>
+                    {story.isCurrent && <span className="text-[9px] text-sage font-bold uppercase tracking-wider">In progress</span>}
                   </div>
                   <p className={`font-serif text-2xl font-bold mb-4 ${story.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
-                    {story.saved >= 0 ? '+' : '−'}{formatAmount(Math.abs(story.saved)).split('.')[0]}
+                    {story.saved >= 0 ? '+' : '−'}{formatWhole(Math.abs(story.saved))}
                     <span className="text-[12px] font-sans font-medium text-muted-taupe ml-2">{story.saved >= 0 ? 'kept' : 'overspent'}</span>
                   </p>
                   <div className="space-y-3">
@@ -349,7 +350,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {/* Money flow diagram for the story month */}
               {story && flowSvg && storyKey && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                  <p className="text-[13px] font-semibold text-premium-charcoal mb-1">Money flow</p>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Money Flow</p>
                   <p className="text-[10px] text-muted-taupe mb-3">
                     {monthLabel(storyKey)} · in {formatAmountCompact(story.m.inc)} → out {formatAmountCompact(story.m.out)}{story.saved > 0 ? ` → saved ${formatAmountCompact(story.saved)}` : ''}
                   </p>
@@ -397,7 +398,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
 
                   <div className="mt-4 pt-3 border-t border-premium-charcoal/[0.08] grid grid-cols-2 gap-x-4 gap-y-1.5">
                     <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold text-muted-taupe">In</p>
+                      <p className="text-[9px] uppercase tracking-widest text-muted-taupe font-bold">In</p>
                       {flowSvg.leftNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: n.color }} />
@@ -407,7 +408,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       ))}
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold text-muted-taupe">Out</p>
+                      <p className="text-[9px] uppercase tracking-widest text-muted-taupe font-bold">Out</p>
                       {flowSvg.rightNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${n.name === 'Saved' ? 'bg-sage' : 'bg-[var(--mut)]/60'}`} />
@@ -424,7 +425,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               <div className="grid grid-cols-2 gap-4 break-inside-avoid">
                 {stability && (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col items-center">
-                    <p className="text-[13px] font-semibold text-premium-charcoal self-start mb-2">Stability</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start mb-2">Stability</p>
                     <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                       <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                       <circle
@@ -441,11 +442,11 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                 )}
                 {salary && !salary.confirmed && salary.payee ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col">
-                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Your pay?</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Your pay?</p>
                     <p className="text-[11px] text-premium-charcoal font-semibold truncate" title={salary.streamName}>
                       {prettyMerchant(salary.streamName)}
                     </p>
-                    <p className="text-[10px] text-muted-taupe">~{formatAmount(salary.typicalAmount).split('.')[0]} · usually day {salary.typicalDay}</p>
+                    <p className="text-[10px] text-muted-taupe">~{formatWhole(salary.typicalAmount)} · usually day {salary.typicalDay}</p>
                     <div className="grid grid-cols-2 gap-2 mt-auto pt-3">
                       <button
                         onClick={() => savePayeeRule(salary.payee!, 'salary')}
@@ -463,7 +464,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   </div>
                 ) : salary?.confirmed ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02]">
-                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Next pay</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Next Pay</p>
                     <p className="text-premium-charcoal font-serif text-2xl font-bold">
                       {salary.daysUntil === 0 ? 'Today' : `${salary.daysUntil}d`}
                     </p>
@@ -473,13 +474,13 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     <p className="text-[11px] text-sage font-semibold mt-2 truncate" title={salary.streamName}>
                       {prettyMerchant(salary.streamName)}
                     </p>
-                    <p className="text-[10px] text-muted-taupe">~{formatAmount(salary.typicalAmount).split('.')[0]}</p>
+                    <p className="text-[10px] text-muted-taupe">~{formatWhole(salary.typicalAmount)}</p>
                   </div>
                 ) : (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col justify-center">
-                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Average a month</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Avg / Month</p>
                     <p className="text-premium-charcoal font-serif text-xl font-bold">
-                      {formatAmount(stability?.avgMonthly ?? 0).split('.')[0]}
+                      {formatWhole(stability?.avgMonthly ?? 0)}
                     </p>
                     <p className="text-[10px] text-muted-taupe mt-1">across active months</p>
                   </div>
@@ -495,10 +496,10 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {trend && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
                   <div className="flex justify-between items-center mb-3">
-                    <p className="text-[13px] font-semibold text-premium-charcoal">Income, 12 months</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">12-Month Income</p>
                     {selectedMonthIdx !== null && (
                       <p className="text-[11px] font-semibold text-sage">
-                        {trend[selectedMonthIdx].label}: {formatAmount(trend[selectedMonthIdx].value).split('.')[0]}
+                        {trend[selectedMonthIdx].label}: {formatWhole(trend[selectedMonthIdx].value)}
                       </p>
                     )}
                   </div>
@@ -517,7 +518,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                           />
                         </div>
                         {i % 3 === 0 || i === trend.length - 1 ? (
-                          <span className="text-[10px] text-muted-taupe">{m.label}</span>
+                          <span className="text-[9px] font-bold text-muted-taupe uppercase">{m.label}</span>
                         ) : (
                           <span className="text-[8px]">&nbsp;</span>
                         )}
@@ -530,7 +531,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {/* Income streams */}
               {streams.length > 0 && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                  <p className="text-[13px] font-semibold text-premium-charcoal mb-4">Income streams, last 12 months</p>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">Income Streams · last 12 months</p>
                   <div className="space-y-3">
                     {streams.map((s, i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -542,17 +543,17 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-[13px] font-semibold text-premium-charcoal truncate" title={s.name}>{prettyMerchant(s.name)}</p>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${BADGE_STYLES[s.badge].cls}`}>
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${BADGE_STYLES[s.badge].cls}`}>
                               {BADGE_STYLES[s.badge].label}
                             </span>
                           </div>
                           <p className="text-[10px] text-muted-taupe">
-                            {s.occurrences}× · typical {formatAmount(s.typicalAmount).split('.')[0]}
+                            {s.occurrences}× · typical {formatWhole(s.typicalAmount)}
                             {s.badge === 'FIXED' ? ` · ~day ${s.typicalDay}` : ''}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[13px] font-bold text-sage">{formatAmount(s.total12m).split('.')[0]}</p>
+                          <p className="text-[13px] font-bold text-sage">{formatWhole(s.total12m)}</p>
                           <p className="text-[9px] text-muted-taupe">{s.sharePct}% of income</p>
                         </div>
                       </div>
@@ -567,7 +568,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
             <div className="space-y-4 lg:columns-2 lg:gap-x-5">
               {/* Savings goal */}
               <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                <p className="text-[13px] font-semibold text-premium-charcoal mb-3">Savings goal for {monthLabel(currentKey, 'long')}</p>
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Savings goal · {monthLabel(currentKey, 'long')}</p>
                 <div className="flex items-center gap-5">
                   <div className="relative w-20 h-20 shrink-0">
                     <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
@@ -593,16 +594,17 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       {goalData.saved >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(goalData.saved))} saved
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="text-[12px] text-muted-taupe shrink-0">Target</span>
+                      <span className="text-[10px] text-muted-taupe uppercase tracking-wider shrink-0">Target</span>
                       <input
                         type="number"
                         inputMode="numeric"
-                        placeholder="Set ₹"
-                        value={goalInput ?? (savingsGoal > 0 ? String(savingsGoal) : '')}
+                        placeholder={`Set ${getSymbol(shownCurrency)}`}
+                        value={goalInput ?? (savingsGoal > 0 ? String(toShown(savingsGoal, shownRate)) : '')}
                         onChange={e => setGoalInput(e.target.value)}
                         onBlur={() => {
                           if (goalInput !== null) {
-                            setSavingsGoal(parseFloat(goalInput) || 0);
+                            // Typed in the currency shown; saved in rupees.
+                            if (goalInput !== String(toShown(savingsGoal, shownRate))) setSavingsGoal(toBase(Math.max(0, parseFloat(goalInput) || 0), shownRate));
                             setGoalInput(null);
                           }
                         }}
@@ -628,7 +630,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
 
               {/* Category budgets */}
               <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                <p className="text-[13px] font-semibold text-premium-charcoal mb-1">Category budgets</p>
+                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Category budgets</p>
                 <p className="text-[10px] text-muted-taupe mb-4">
                   Spending this month vs your monthly cap. Bars fill automatically as you spend —
                   sand at 80%, red when over. Caps reset every month.
@@ -644,6 +646,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         spent={r.spent}
                         budget={r.budget}
                         formatAmountCompact={formatAmountCompact}
+                        shownRate={shownRate}
+                        symbol={getSymbol(shownCurrency)}
                         onSet={amt => setBudget(r.cat, amt)}
                       />
                     ))}
@@ -661,12 +665,16 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
 interface BudgetRowProps {
   cat: string;
   spent: number;
+  /** In rupees. */
   budget: number;
   formatAmountCompact: (n: number) => string;
+  shownRate: number;
+  symbol: string;
+  /** Called with rupees. */
   onSet: (amount: number) => void;
 }
 
-const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountCompact, onSet }) => {
+const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountCompact, shownRate, symbol, onSet }) => {
   const [val, setVal] = useState<string | null>(null);
   const pct = budget > 0 ? spent / budget : 0;
   const over = budget > 0 && spent > budget;
@@ -682,12 +690,13 @@ const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountC
         <input
           type="number"
           inputMode="numeric"
-          placeholder="Cap ₹"
-          value={val ?? (budget > 0 ? String(budget) : '')}
+          placeholder={`Cap ${symbol}`}
+          value={val ?? (budget > 0 ? String(toShown(budget, shownRate)) : '')}
           onChange={e => setVal(e.target.value)}
           onBlur={() => {
             if (val !== null) {
-              onSet(parseFloat(val) || 0);
+              // Typed in the currency shown; saved in rupees.
+              if (val !== String(toShown(budget, shownRate))) onSet(toBase(Math.max(0, parseFloat(val) || 0), shownRate));
               setVal(null);
             }
           }}

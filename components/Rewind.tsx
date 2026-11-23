@@ -6,7 +6,7 @@ import { prettyMerchant } from '../services/analyticsService';
 import { exportImage } from '../utils/exportFile';
 import { log } from '../utils/log';
 import { SITE_HOST } from '../utils/site';
-import { WallEMascot } from './SplashScreen';
+import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
 
 interface RewindProps {
   onNavigate: (screen: AppScreen) => void;
@@ -29,13 +29,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const TRANSFER_RX = /^(ift|imps|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]/i;
 
 const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, formatAmount, formatWhole, formatAmountCompact } = useWallet();
   const [wrapYear, setWrapYear] = useState<number | null>(null);
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const fmt = (n: number) => formatAmount(n).split('.')[0];
+  const fmt = formatWhole;
 
   // ── One pass: lifetime + per-year aggregates + records ──
   const life = useMemo(() => {
@@ -234,7 +234,12 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
+      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="#A8B89E" />
+      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
+      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="#D4B896" />
+      <Diya className="absolute bottom-44 left-8 opacity-30" />
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
@@ -258,21 +263,21 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         <div className="px-6 pt-2 space-y-4 lg:columns-2 lg:gap-x-5">
           {/* Lifetime hero */}
           <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] break-inside-avoid">
-            <p className="text-[12px] text-muted-taupe font-semibold mb-1">Your money since {parseDay(life.first).getFullYear()}</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Your money since {parseDay(life.first).getFullYear()}</p>
             <p className="text-premium-charcoal font-serif text-[26px] font-bold leading-tight">
               {life.yearsCount} {life.yearsCount === 1 ? 'year' : 'years'} · {life.txCount.toLocaleString('en-IN')} entries
             </p>
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div>
-                <p className="text-[11px] text-muted-taupe">Earned</p>
+                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Earned</p>
                 <p className="text-[14px] font-serif font-bold text-sage whitespace-nowrap">{formatAmountCompact(life.totalInc)}</p>
               </div>
               <div>
-                <p className="text-[11px] text-muted-taupe">Spent</p>
+                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Spent</p>
                 <p className="text-[14px] font-serif font-bold text-rose whitespace-nowrap">{formatAmountCompact(life.totalOut)}</p>
               </div>
               <div>
-                <p className="text-[11px] text-muted-taupe">Kept</p>
+                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Kept</p>
                 <p className="text-[14px] font-serif font-bold text-premium-charcoal whitespace-nowrap">{life.lifeRate}%</p>
               </div>
             </div>
@@ -280,7 +285,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
 
           {/* Year by year */}
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-            <p className="text-[12px] text-muted-taupe font-semibold mb-4">Year by year</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">Year by year</p>
             <div className="space-y-2.5">
               {life.yearRows.map(([y, v]) => (
                 <div key={y} className="flex items-center gap-2">
@@ -303,7 +308,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
 
           {/* Records */}
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-            <p className="text-[12px] text-muted-taupe font-semibold mb-4">All-time records</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">All-time records</p>
             <div className="space-y-3">
               {life.maxExp && (
                 <div className="flex items-start gap-3">
@@ -341,7 +346,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
           {/* On this day */}
           {life.onThisDay.length > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-              <p className="text-[12px] text-muted-taupe font-semibold mb-4">On this day</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">On this day</p>
               <div className="space-y-2.5">
                 {life.onThisDay.map(t => (
                   <div key={t.id} className="flex items-center gap-2 min-w-0">
@@ -360,7 +365,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
           {wrapped && (
             <div className="bg-premium-charcoal rounded-3xl p-6 shadow-soft break-inside-avoid">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[12px] text-white/60 font-semibold">Wall·ette Wrapped</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/60 font-bold">Wall·ette Wrapped</p>
                 <div className="flex gap-1.5">
                   {wrapYears.slice(0, 4).map(y => (
                     <button
@@ -376,15 +381,15 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
               <p className="text-white font-serif text-3xl font-bold">{wrapped.year}{wrapped.isCurrent ? <span className="text-white/40 text-base font-sans font-medium"> so far</span> : ''}</p>
               <div className="grid grid-cols-3 gap-3 mt-4 mb-5">
                 <div>
-                  <p className="text-[11px] text-white/50">In</p>
+                  <p className="text-[9px] text-white/50 uppercase tracking-wider">In</p>
                   <p className="text-[14px] font-serif font-bold text-sage-light whitespace-nowrap">{formatAmountCompact(wrapped.inc)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-white/50">Out</p>
+                  <p className="text-[9px] text-white/50 uppercase tracking-wider">Out</p>
                   <p className="text-[14px] font-serif font-bold text-rose-light whitespace-nowrap">{formatAmountCompact(wrapped.out)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-white/50">Kept</p>
+                  <p className="text-[9px] text-white/50 uppercase tracking-wider">Kept</p>
                   <p className="text-[14px] font-serif font-bold text-white whitespace-nowrap">{wrapped.rate}%</p>
                 </div>
               </div>

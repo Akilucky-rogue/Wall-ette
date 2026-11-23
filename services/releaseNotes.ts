@@ -23,12 +23,12 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: '1.5.6',
     // Play allows 500 characters in all (scripts/check-app-updates.mjs).
     items: [
-      'Left to spend, on Home: what you can still spend before your next pay, after bills and your savings goal.',
-      'The bell flags budgets, bills due, price rises and failed unlocks. Turn on phone reminders in Self.',
-      'Pulse and Self are now short pages instead of long scrolls.',
-      'Payees show by name instead of bank codes, and Vault is more compact.',
-      'Your daily limit warns instead of blocking, and budgets show on Home.',
-      'Fee Hunter is gone. Remove entries imported twice from Vault.',
+      'A new Pulse: money in and out, your spending pace, where it went and what stands out, with charts.',
+      'Show amounts in any currency. They stay saved in rupees.',
+      'Left to spend, on Home: what you can still spend before your next pay.',
+      'Statement reports match Pulse to the rupee and look like the app.',
+      'The bell and phone reminders flag budgets, bills due and price rises.',
+      'Payees show by name, Vault is more compact, and Fee Hunter is gone.',
     ],
   },
   {

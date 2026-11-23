@@ -278,7 +278,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           <button
             type="button"
             onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); }}
-            className="w-full text-muted-taupe py-1 text-[12px] font-medium hover:text-premium-charcoal"
+            className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
           >
             Back
           </button>
@@ -320,7 +320,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 Enter the email you signed up with and we'll send you a link to set a new password.
               </p>
               <div>
-                <label htmlFor="reset-email" className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Email</label>
+                <label htmlFor="reset-email" className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
                 <input
                     id="reset-email"
                     type="email"
@@ -363,7 +363,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           <button
             type="button"
             onClick={leaveReset}
-            className="w-full text-muted-taupe py-1 text-[12px] font-medium hover:text-premium-charcoal"
+            className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
           >
             Back to Sign In
           </button>
@@ -371,7 +371,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Email</label>
+            <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
             <input
                 type="email"
                 autoComplete="email"
@@ -385,7 +385,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             {emailHint}
           </div>
           <div>
-            <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Password</label>
+            <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Password</label>
             <input 
                 type="password" 
                 value={password}

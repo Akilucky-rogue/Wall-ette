@@ -151,7 +151,7 @@ export function leftToSpend({ transactions, flowOf, savingsGoal, now = new Date(
   // and investments that repeat.
   const outgoing = kept.filter(k => k.t.type === TransactionType.EXPENSE).map(k => k.t);
   const bills: UpcomingBill[] = [];
-  for (const r of detectRecurringCharges(outgoing, now)) {
+  for (const r of detectRecurringCharges(outgoing, now, Infinity)) {
     const step = STEP_DAYS[r.cadence];
     let due = localDay(r.nextExpected);
     // A few days late is still expected; much later, it has probably stopped.

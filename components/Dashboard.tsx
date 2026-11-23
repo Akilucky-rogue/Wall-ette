@@ -19,7 +19,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
-    getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount,
+    getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount, formatWhole,
     formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance, budgets,
   } = useWallet();
 
@@ -156,10 +156,72 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     return 'payments';
   };
 
+  const quickServices = (
+    <>
+          <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight mb-5">Quick Services</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <button
+              onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-sage-light text-sage p-3 rounded-2xl">
+                <span className="material-symbols-outlined">add_box</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Add</span>
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.EXPORT)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-rose-light text-rose p-3 rounded-2xl">
+                <span className="material-symbols-outlined">description</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Report</span>
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">
+                <span className="material-symbols-outlined">bubble_chart</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Flow</span>
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.IMPORT)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-sand-light text-sand p-3 rounded-2xl">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Import</span>
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.REWIND)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-lavender/10 text-lavender p-3 rounded-2xl">
+                <span className="material-symbols-outlined">history</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Rewind</span>
+            </button>
+            <button
+              onClick={() => onNavigate(AppScreen.LEFT_TO_SPEND)}
+              className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+            >
+              <div className="bg-ocean-light text-ocean p-3 rounded-2xl">
+                <span className="material-symbols-outlined">account_balance_wallet</span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter text-center leading-tight">Left to spend</span>
+            </button>
+          </div>
+    </>
+  );
+
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-6xl mx-auto overflow-x-hidden pb-24 lg:pb-12 bg-zen-bg">
       {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 sticky top-0 z-30">
+      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 lg:px-8 pb-2 sticky top-0 z-30">
         {/* Left: Logo and Name */}
         <div className="flex items-center gap-3 min-w-0">
           <WallEMascot mood="happy" size="sm" />
@@ -174,7 +236,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       {/* The wallet: the balance for the period picked, with what came in and
           went out in its two pockets (styles.css .wallet) */}
-      <section className="px-5 pt-3 pb-2" aria-label="Balance">
+      <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:px-8 lg:items-start">
+      <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-label="Balance">
         <div className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden">
           <div className="relative flex items-center justify-between gap-3">
             <p className="text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>Balance</p>
@@ -198,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
 
           <h1 className="relative wallet-emboss font-serif text-[40px] leading-none tabular-nums mt-4 truncate">
-            {formatAmount(balance).split('.')[0]}
+            {formatWhole(balance)}
           </h1>
 
           <div className="relative flex items-center justify-between gap-2 mt-3 min-h-[28px]">
@@ -267,10 +330,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </section>
+      <div className="hidden lg:block lg:col-span-5 lg:pt-3">
+        {quickServices}
+      </div>
+      </div>
 
-      {/* Desktop: cards flow into two columns; phones/APK keep the single
-          column (CSS columns are inert below md). */}
-      <div className="md:columns-2 md:gap-x-0">
+      {/* Wider screens: cards flow into two columns, three on desktops;
+          phones/APK keep the single column (CSS columns are inert below md). */}
+      <div className="md:columns-2 md:gap-x-0 lg:columns-3 lg:px-2">
 
       {/* What's left until pay day, once something has come in */}
       <LeftToSpendCard onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
@@ -280,10 +347,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="px-6 pt-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[13px] font-semibold text-premium-charcoal">
-                Budgets for {new Date().toLocaleString('en-GB', { month: 'long' })}
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">
+                Budgets · {new Date().toLocaleString('en-GB', { month: 'long' })}
               </p>
-              <button onClick={openGoals} className="text-[12px] text-sage font-semibold hover:underline">Edit</button>
+              <button onClick={openGoals} className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline">Edit</button>
             </div>
             <div className="space-y-3">
               {budgetRows.slice(0, 4).map(r => {
@@ -348,65 +415,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </button>
         </div>
       )}
-      {/* Quick Services */}
-      <div className="px-6 py-8 break-inside-avoid">
-        <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight mb-5">Quick Services</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <button
-            onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-sage-light text-sage p-3 rounded-2xl">
-              <span className="material-symbols-outlined">add_box</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal">Add</span>
-          </button>
-          <button
-            onClick={() => onNavigate(AppScreen.EXPORT)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-rose-light text-rose p-3 rounded-2xl">
-              <span className="material-symbols-outlined">description</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal">Report</span>
-          </button>
-          <button
-            onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">
-              <span className="material-symbols-outlined">bubble_chart</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal">Flow</span>
-          </button>
-          <button
-            onClick={() => onNavigate(AppScreen.IMPORT)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-sand-light text-sand p-3 rounded-2xl">
-              <span className="material-symbols-outlined">upload_file</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal">Import</span>
-          </button>
-          <button
-            onClick={() => onNavigate(AppScreen.REWIND)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-lavender/10 text-lavender p-3 rounded-2xl">
-              <span className="material-symbols-outlined">history</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal">Rewind</span>
-          </button>
-          <button
-            onClick={() => onNavigate(AppScreen.LEFT_TO_SPEND)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-ocean-light text-ocean p-3 rounded-2xl">
-              <span className="material-symbols-outlined">account_balance_wallet</span>
-            </div>
-            <span className="text-[12px] font-semibold text-zen-charcoal text-center leading-tight">Left to spend</span>
-          </button>
-        </div>
+      {/* Quick Services (on wide screens they sit beside the wallet instead) */}
+      <div className="px-6 py-8 break-inside-avoid lg:hidden">
+        {quickServices}
       </div>
       {/* Savings Rate + Category Breakdown */}
       {(income > 0 || categoryBreakdown.length > 0) && (
@@ -414,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Savings Rate */}
           {income > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
-              <p className="text-[13px] font-semibold text-premium-charcoal self-start">Savings</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">Savings</p>
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                 <circle
@@ -431,7 +442,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Top Categories */}
           {categoryBreakdown.length > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
-              <p className="text-[13px] font-semibold text-premium-charcoal mb-3">Top spending</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Top Spend</p>
               <div className="space-y-2">
                 {categoryBreakdown.slice(0, income > 0 ? 3 : 5).map((cat, i) => (
                   <div key={cat.name} className="flex items-center gap-1.5">
@@ -451,10 +462,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="px-6 py-2 mb-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[13px] font-semibold text-premium-charcoal">Recent</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recent</p>
               <button
                 onClick={() => onNavigate(AppScreen.HISTORY)}
-                className="text-[12px] text-sage font-semibold hover:underline"
+                className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline"
               >
                 View all
               </button>
@@ -476,7 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     </p>
                   </div>
                   <span className={`text-[13px] font-bold flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'text-sage' : 'text-rose'}`}>
-                    {tx.type === TransactionType.INCOME ? '+' : '-'}{formatAmount(tx.amount).split('.')[0]}
+                    {tx.type === TransactionType.INCOME ? '+' : '-'}{formatWhole(tx.amount)}
                   </span>
                 </div>
               ))}

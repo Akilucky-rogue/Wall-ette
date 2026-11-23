@@ -645,23 +645,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const getTotalExpense = useCallback(() => aggregates.totalExpense, [aggregates]);
 
   const addTransaction = useCallback(async (transaction: Transaction): Promise<boolean> => {
-    // Check Daily Limit (audit Phase 2.8: reuse the aggregate when it is for
-    // today; recompute only across a midnight boundary). Only spending counts:
-    // money moved to family or your own accounts doesn't use up the limit.
-    if (transaction.type === TransactionType.EXPENSE && dailyLimit > 0 && flowOf(transaction).flow === 'spend') {
-        const today = localDay();
-        const todaySpend = aggregates.dayKey === today
-            ? aggregates.todayExpense
-            : counted
-                .filter(t => t.type === TransactionType.EXPENSE && t.date === today)
-                .reduce((acc, t) => acc + t.amount, 0);
-
-        if (todaySpend + transaction.amount > dailyLimit) {
-            alert(`Transaction declined. Exceeds daily limit of ${formatAmount(dailyLimit)}.`);
-            return false;
-        }
-    }
-
+    // The daily limit is a warning, not a gate: New Entry says when an entry
+    // takes today past it, and the bell on Home reports it. A real expense is
+    // always saved.
     const newTxs = [transaction, ...transactions].sort(byNewest);
     setTransactions(newTxs);
     persistTransactions(newTxs);
@@ -671,7 +657,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         void sendToCloud(`tx:${transaction.id}`, 1, () => setDoc(txRef, forCloud(transaction)));
     }
     return true;
-  }, [transactions, counted, flowOf, dailyLimit, aggregates, formatAmount, persistTransactions, user]);
+  }, [transactions, persistTransactions, user]);
 
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
     const transaction = transactions.find(t => t.id === id);

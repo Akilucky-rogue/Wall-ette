@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { byNewest, parseDay } from '../utils/dates';
-import { huntSavings } from '../services/analyticsService';
+import { byNewest, localDay, parseDay } from '../utils/dates';
+import { huntSavings, prettyMerchant } from '../services/analyticsService';
+import { paymentRail } from '../utils/names';
+import { openAt } from '../utils/screenSection';
 import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
 import NotificationCenter from './NotificationCenter';
@@ -15,9 +17,8 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
-    getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
-    getTotalIncome, getTotalExpense, transactions, counted, flowOf, formatAmount,
-    formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance
+    getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount,
+    formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance, budgets,
   } = useWallet();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -102,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   // The balance counts every transaction. Income and expenses count only
   // real income and spending: money moved to your own accounts, family or
   // investments is left out (audit H3), so the savings rate means something.
-  const { income, expenses, balance, periodLabel } = useMemo(() => {
+  const { income, expenses, credits, payments, balance, periodLabel } = useMemo(() => {
     const all = periodMode === 'ALL';
     const month = selectedDate.getMonth();
     const year = selectedDate.getFullYear();
@@ -111,6 +112,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     let net = 0;              // every transaction up to the end of the period
     let periodIncome = 0;
     let periodExpenses = 0;
+    let credits = 0;
+    let payments = 0;
 
     for (const t of transactions) {
       const txDate = parseDay(t.date);
@@ -119,18 +122,38 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const isIncome = t.type === TransactionType.INCOME;
       net += isIncome ? t.amount : -t.amount;
       if (inPeriod && flowOf(t).flow !== 'moved') {
-        if (isIncome) periodIncome += t.amount;
-        else periodExpenses += t.amount;
+        if (isIncome) { periodIncome += t.amount; credits++; }
+        else { periodExpenses += t.amount; payments++; }
       }
     }
 
     return {
       income: periodIncome,
       expenses: periodExpenses,
+      credits,
+      payments,
       balance: openingBalance + net,
       periodLabel: all ? 'All Time' : `${selectedDate.toLocaleString('default', { month: 'short' })} ${year}`,
     };
   }, [transactions, flowOf, openingBalance, periodMode, selectedDate]);
+
+  // Today's figures belong under the cards only while they show this month.
+  const showingThisMonth = periodMode === 'MONTH' && selectedDate.getTime() === currentMonthStart.getTime();
+
+  // --- Budgets: this calendar month's spending against each category's budget ---
+  const budgetRows = useMemo(() => {
+    const month = localDay().slice(0, 7);
+    const spent = new Map<string, number>();
+    for (const t of counted) {
+      if (t.type !== TransactionType.EXPENSE || !t.date.startsWith(month)) continue;
+      spent.set(t.category, (spent.get(t.category) ?? 0) + t.amount);
+    }
+    return Object.entries(budgets)
+      .filter(([, budget]) => budget > 0)
+      .map(([category, budget]) => ({ category, budget, used: spent.get(category) ?? 0 }))
+      .sort((a, b) => b.used / b.budget - a.used / a.budget);
+  }, [counted, budgets]);
+  const openGoals = () => { openAt('goals'); onNavigate(AppScreen.INCOME_INSIGHTS); };
 
   // --- Savings Rate ---
   const savingsRate = useMemo(() => {
@@ -215,7 +238,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <LotusFlower size="sm" color="var(--gold-2)" className="opacity-30" />
         </div>
         <div className="flex items-center gap-3 mb-2">
-          <p className="text-muted-taupe text-xs font-medium uppercase tracking-[0.2em]">Portfolio Balance</p>
+          <p className="text-muted-taupe text-xs font-medium uppercase tracking-[0.2em]">Balance</p>
         </div>
         <div className="flex bg-white/70 border border-sage/10 rounded-full overflow-hidden text-xs font-semibold items-center mb-4">
           <button
@@ -267,69 +290,104 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <h1 className="text-premium-charcoal font-serif text-[40px] leading-tight px-4 text-center">
             {formatAmount(balance)}
         </h1>
+        {/* Sync status: a quiet line under the balance; tap to refresh */}
         <button
-            onClick={handleRefresh}
-            className={`mt-4 flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all cursor-pointer active:scale-95 ${isCloudSyncing ? 'bg-sage-light/50 border-sage/10 hover:bg-sage-light' : 'bg-rose-light/50 border-rose/10 hover:bg-rose-light'}`}
-            title="Tap to refresh data"
+          onClick={handleRefresh}
+          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-muted-taupe hover:bg-white/70 active:scale-95 transition-all"
+          title="Refresh"
         >
-          <span className={`material-symbols-outlined text-sm font-bold ${refreshing ? 'animate-spin' : ''} ${isCloudSyncing ? 'text-sage' : 'text-rose'}`}>
-            {refreshing ? 'progress_activity' : isCloudSyncing ? 'cloud_sync' : 'cloud_off'}
-          </span>
-          <span className={`${isCloudSyncing ? 'text-sage' : 'text-rose'} text-[13px] font-semibold`}>
-            {refreshing ? 'Refreshing…'
-              : isCloudSyncing ? 'Live Updates · Tap to Refresh'
-              : isOnline ? 'Not Syncing · Tap to Retry'
-              : 'Offline · Changes Sync Later'}
-          </span>
+          <span
+            aria-hidden="true"
+            className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sage motion-safe:animate-pulse' : isCloudSyncing ? 'bg-sage' : isOnline ? 'bg-rose' : 'bg-muted-taupe'}`}
+          />
+          {refreshing ? 'Refreshing…'
+            : isCloudSyncing ? 'Synced'
+            : isOnline ? 'Not syncing · Retry'
+            : 'Offline · saved on this phone'}
         </button>
       </div>
       {/* Desktop: cards flow into two columns; phones/APK keep the single
           column (CSS columns are inert below md). */}
       <div className="md:columns-2 md:gap-x-0">
 
-      {/* Income/Expense Summary (Daily, Monthly, All Time) */}
+      {/* Income and spending for the period picked above */}
       <div className="grid grid-cols-2 gap-4 px-6 py-2 break-inside-avoid">
-        {/* Income Card */}
-        <div className="flex flex-col gap-3 rounded-3xl bg-white p-5 shadow-soft border border-black/[0.02]">
-          <div className="text-sage bg-sage-light w-9 h-9 rounded-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px]">add</span>
+        {([
+          { label: 'Income', amount: income, sign: '+', icon: 'add', tint: 'bg-sage-light text-sage', today: getDailyIncome(), count: credits, noun: 'credit' },
+          { label: 'Spending', amount: expenses, sign: '−', icon: 'remove', tint: 'bg-rose-light text-rose', today: getDailyExpense(), count: payments, noun: 'payment' },
+        ] as const).map(card => (
+          <div key={card.label} className="flex flex-col gap-2 rounded-3xl bg-white p-5 shadow-soft border border-black/[0.02] min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${card.tint}`}>
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{card.icon}</span>
+              </span>
+              <span className="text-[12px] font-semibold text-muted-taupe">{card.label}</span>
+            </div>
+            <p className="font-serif text-[22px] leading-tight text-premium-charcoal tabular-nums truncate">
+              {card.sign}{formatAmountCompact(card.amount)}
+            </p>
+            <p className="text-[11px] text-muted-taupe tabular-nums truncate">
+              {showingThisMonth
+                ? `Today ${card.sign}${formatAmountCompact(card.today)}`
+                : `${card.count.toLocaleString('en-IN')} ${card.noun}${card.count === 1 ? '' : 's'}`}
+            </p>
           </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Today</span>
-              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getDailyIncome())}</span>
-            </div>
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Monthly</span>
-              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getMonthlyIncome())}</span>
-            </div>
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">All Time</span>
-              <span className="whitespace-nowrap tabular-nums">+{formatAmountCompact(getTotalIncome())}</span>
-            </div>
-          </div>
-        </div>
-        {/* Expense Card */}
-        <div className="flex flex-col gap-3 rounded-3xl bg-white p-5 shadow-soft border border-black/[0.02]">
-          <div className="text-rose bg-rose-light w-9 h-9 rounded-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px]">remove</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Today</span>
-              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getDailyExpense())}</span>
-            </div>
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">Monthly</span>
-              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getMonthlyExpense())}</span>
-            </div>
-            <div className="flex justify-between gap-2 text-xs text-muted-taupe font-semibold">
-              <span className="shrink-0">All Time</span>
-              <span className="whitespace-nowrap tabular-nums">-{formatAmountCompact(getTotalExpense())}</span>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
+
+      {/* Budgets this month (set in Flow → Goals) */}
+      {budgetRows.length > 0 ? (
+        <div className="px-6 pt-2 break-inside-avoid">
+          <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">
+                Budgets · {new Date().toLocaleString('en-GB', { month: 'long' })}
+              </p>
+              <button onClick={openGoals} className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline">Edit</button>
+            </div>
+            <div className="space-y-3">
+              {budgetRows.slice(0, 4).map(r => {
+                const pct = r.used / r.budget;
+                const over = r.used > r.budget;
+                return (
+                  <button key={r.category} onClick={openGoals} className="block w-full text-left">
+                    <span className="flex items-baseline justify-between gap-2 text-[12px]">
+                      <span className="font-semibold text-premium-charcoal truncate">{r.category}</span>
+                      <span className={`tabular-nums shrink-0 ${over ? 'text-rose font-semibold' : 'text-muted-taupe'}`}>
+                        {over
+                          ? `${formatAmountCompact(r.used - r.budget)} over`
+                          : `${formatAmountCompact(r.used)} of ${formatAmountCompact(r.budget)}`}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <span
+                        className={`block h-full rounded-full ${over ? 'bg-rose' : pct >= 0.8 ? 'bg-sand' : 'bg-sage'}`}
+                        style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }}
+                      />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {budgetRows.length > 4 && (
+              <button onClick={openGoals} className="mt-3 text-[11px] text-muted-taupe hover:text-sage">
+                {budgetRows.length - 4} more in Flow
+              </button>
+            )}
+          </div>
+        </div>
+      ) : transactions.length > 0 && (
+        <div className="px-6 pt-2 break-inside-avoid">
+          <button
+            onClick={openGoals}
+            className="w-full flex items-center gap-3 rounded-2xl border border-dashed border-sage/30 px-4 py-3 text-left hover:bg-white/60 transition-colors"
+          >
+            <span className="material-symbols-outlined text-sage text-[20px] shrink-0" aria-hidden="true">donut_large</span>
+            <span className="flex-1 min-w-0 text-[12px] text-muted-taupe leading-snug">Set monthly budgets, and see how each category is doing here.</span>
+            <span className="material-symbols-outlined text-muted-taupe text-[18px] shrink-0" aria-hidden="true">chevron_right</span>
+          </button>
+        </div>
+      )}
       {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
       <UnsortedTransfers onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
       {/* Hunter + Rewind teasers — the USP, front and center */}
@@ -585,8 +643,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-premium-charcoal truncate">{tx.merchant || tx.category}</p>
-                    <p className="text-[10px] text-muted-taupe">{tx.category} · {parseDay(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal truncate" title={tx.merchant || undefined}>
+                      {tx.merchant ? prettyMerchant(tx.merchant) : tx.category}
+                    </p>
+                    <p className="text-[10px] text-muted-taupe truncate">
+                      {[paymentRail(tx.merchant), tx.category, parseDay(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')}
+                    </p>
                   </div>
                   <span className={`text-[13px] font-bold flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'text-sage' : 'text-rose'}`}>
                     {tx.type === TransactionType.INCOME ? '+' : '-'}{formatAmount(tx.amount).split('.')[0]}

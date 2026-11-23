@@ -368,7 +368,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                       <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
                   </Row>
 
-                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Caps manual entries · tracked live in Pulse's Today card">
+                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Warns when today's spending goes past it · shown in Pulse's Today card">
                       <div className="relative flex items-center">
                         <input
                           id="daily-limit-input"

@@ -9,6 +9,8 @@
 import { Transaction, TransactionType } from '../types';
 import { parseDay } from '../utils/dates';
 import { payeeName } from './spend';
+import { narrationFields } from './narration';
+import { tidyName } from '../utils/names';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -21,15 +23,23 @@ const RAIL_TOKENS = new Set([
 ]);
 
 /**
- * Human-readable payee from a raw bank narration.
- * "NEFT/IN226.../CHOICE EQUITY BROKING PVT LTD/ICIC0099999/…" → "CHOICE EQUITY BROKING PVT LTD"
- * "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"            → "ZOMATO L"
- * Keep the raw string in `title=` tooltips; this is display-only.
+ * The payee as the screens show it, from a raw bank narration. Display only:
+ * keep the raw string for search, export, edit and `title=` tooltips.
+ *   "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"             → "Zomato L"
+ *   "NEFT/IN226…/CHOICE EQUITY BROKING PVT LTD/ICIC0099999/…"   → "Choice Equity Broking Pvt Ltd"
+ *   "UPI-ZOMATO LTD-zomato@axis-UTIB0…-6152…-NOTE" (HDFC)       → "Zomato Ltd"
+ *   "UPI/DR/62…/NETFLIX COM/ICIC/netflix@icici/UPI"             → "Netflix.com"
+ *   "NACH/DR/MF SIP/BLUECHIP FUND"                              → "Bluechip Fund"
+ * The bank writes the payee in the first field after the payment rail
+ * (services/spend.ts payeeName); a field of short codes only ("MF SIP")
+ * gives way to a fuller name after it, and a UPI handle ("x@bank") is never
+ * the name while there's another. Capitals become a name (utils/names.ts).
  */
 export function prettyMerchant(raw: string | undefined | null): string {
   if (!raw) return 'Unknown';
-  const segs = raw.split(/[\/\\|]+/).map(s => s.trim()).filter(Boolean);
-  if (segs.length <= 1) return raw.length > 32 ? raw.slice(0, 31) + '…' : raw;
+  const clip = (s: string) => (s.length > 32 ? s.slice(0, 31) + '…' : s);
+  const fields = narrationFields(raw);
+  if (fields.length <= 1) return clip(tidyName(raw));
 
   const isRef = (s: string) =>
     /^\d{4,}$/.test(s) ||                       // numeric reference
@@ -38,15 +48,20 @@ export function prettyMerchant(raw: string | undefined | null): string {
   const isRail = (s: string) =>
     RAIL_TOKENS.has(s.toUpperCase()) ||
     /^[A-Z]{4}0[A-Z0-9]{5,}$/i.test(s);         // IFSC codes
-
+  const isHandle = (s: string) => s.includes('@');
+  const hasLongWord = (s: string) => s.split(' ').some(w => w.replace(/[^A-Za-z]/g, '').length > 3);
   const score = (s: string) => (s.match(/[A-Za-z ]/g) || []).length;
-  const candidates = segs.filter(s => !isRail(s) && !isRef(s) && score(s) >= 3);
-  if (candidates.length === 0) return raw.slice(0, 28);
 
-  let best = candidates[0];
-  for (const c of candidates) if (score(c) > score(best)) best = c;
-  best = best.replace(/\s{2,}/g, ' ').trim();
-  return best.length > 32 ? best.slice(0, 31) + '…' : best;
+  const candidates = fields.slice(1).filter(s => !isRail(s) && !isRef(s) && !isHandle(s) && score(s) >= 3);
+  const named = payeeName(raw);
+  let best = named && !isHandle(named) ? named : null;
+  if (best && !hasLongWord(best)) best = candidates.find(hasLongWord) ?? best;
+  if (!best && candidates.length) best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
+  if (!best) {
+    const handle = fields.find(isHandle);
+    return handle ? clip(tidyName(handle.split('@')[0])) : clip(raw);
+  }
+  return clip(tidyName(best));
 }
 
 /** Normalize a merchant string for grouping (same rules as import dedup). */

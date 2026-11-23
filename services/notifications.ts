@@ -16,7 +16,6 @@
  */
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { detectRecurringCharges, huntSavings, normalizeMerchant, prettyMerchant } from './analyticsService';
-import { payeeName } from './spend';
 import { walletCopies } from './statementImport';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import type { ScreenSection } from '../utils/screenSection';
@@ -89,8 +88,8 @@ const RANK = {
   due: 30, nearBudget: 31, stale: 40, goal: 50, update: 60, release: 61,
 } as const;
 
-/** Who a narration pays, for a title: the payee field, else the most name-like part. */
-const payee = (raw: string): string => payeeName(raw) ?? prettyMerchant(raw);
+/** Who a narration pays, as the screens show it. */
+const payee = (raw: string): string => prettyMerchant(raw);
 const dayOf = (t: Transaction): string => (isDay(t.date) ? t.date : localDay(parseDay(t.date)));
 const shortDay = (d: Date): string => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 const monthName = (d: Date): string => d.toLocaleString('en-GB', { month: 'long' });

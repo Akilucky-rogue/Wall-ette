@@ -99,7 +99,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
   }).flow === 'spend', [flowOf, type, category, merchant, note]);
 
-  const overLimit = type === TransactionType.EXPENSE && entryCounts && dailyLimit > 0 && numAmount > 0
+  // Only an entry dated today counts toward today's limit.
+  const forToday = localDay(selectedDate) === localDay();
+  const overLimit = type === TransactionType.EXPENSE && entryCounts && forToday && dailyLimit > 0 && numAmount > 0
     && todaySpend + convertToBase(numAmount) > dailyLimit;
 
   const applyMerchant = (value: string) => {
@@ -378,8 +380,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <div className="flex items-center gap-2 bg-rose-light/40 border border-rose/20 rounded-2xl px-4 py-3">
               <span className="material-symbols-outlined text-rose text-[18px]">warning</span>
               <p className="text-rose text-[11px] font-medium leading-relaxed">
-                This would push today past your {formatAmount(dailyLimit).split('.')[0]} daily limit
-                (spent {formatAmount(todaySpend).split('.')[0]} so far) — the save will be blocked.
+                This takes today past your {formatAmount(dailyLimit).split('.')[0]} daily limit
+                ({formatAmount(todaySpend).split('.')[0]} spent so far). It still saves.
               </p>
             </div>
           )}

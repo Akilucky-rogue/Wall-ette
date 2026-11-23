@@ -33,7 +33,8 @@ await build({
   stdin: {
     contents: [
       `export * from ${JSON.stringify(join(root, 'services', 'spend.ts'))};`,
-      `export { analyzeIncome, detectRecurringCharges } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
+      `export { analyzeIncome, detectRecurringCharges, prettyMerchant } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
+      `export { tidyName, paymentRail } from ${JSON.stringify(join(root, 'utils', 'names.ts'))};`,
     ].join('\n'),
     resolveDir: root,
     loader: 'ts',
@@ -44,7 +45,7 @@ await build({
   format: 'esm',
   logLevel: 'error',
 });
-const { analyzeIncome, detectRecurringCharges, flowClassifier, matchText, payeeName, suggestPayees } =
+const { analyzeIncome, detectRecurringCharges, flowClassifier, matchText, payeeName, paymentRail, prettyMerchant, suggestPayees, tidyName } =
   await import(pathToFileURL(bundle).href);
 rmSync(tmp, { recursive: true, force: true });
 
@@ -166,6 +167,22 @@ const pay = r => {
 eq('pay: a guess to confirm', pay([]), ['ACME TECH SOLUTIONS', false]);
 eq('pay: confirmed', pay([{ id: 's', match: 'ACME TECH SOLUTIONS', kind: 'salary' }]), ['ACME TECH SOLUTIONS', true]);
 eq('pay: ruled out', pay([{ id: 's', match: 'ACME TECH SOLUTIONS', kind: 'counts' }]), null);
+
+// ── Names as the screens show them ─────────────────────────────────────────
+eq('show: UPI payee, not the handle', prettyMerchant('UPI/DR/62000000001/NETFLIX COM/ICIC/netflix@icici/UPI'), 'Netflix.com');
+eq('show: UPI payee in capitals', prettyMerchant('UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI'), 'Zomato L');
+eq('show: NEFT company', prettyMerchant('NEFT/CMS123456789/ACME BROKING PVT LTD/ICIC0001234'), 'Acme Broking Pvt Ltd');
+eq('show: HDFC dashes, not the note', prettyMerchant('UPI-RAVI KUMAR-ravi@okicici-ICIC0000000-615200000000-PAYMENT FROM PHONE'), 'Ravi Kumar');
+eq('show: short codes give way to a name', prettyMerchant('NACH/DR/MF SIP/BLUECHIP FUND'), 'Bluechip Fund');
+eq('show: Mr. and capitals', prettyMerchant('IFT/10000123456/Mr. RAVI KUMAR SHAH/912345'), 'Mr. Ravi Kumar Shah');
+eq('show: a bank charge', prettyMerchant('SMS ALERT CHARGES QTR SEP'), 'SMS Alert Charges Qtr Sep');
+eq('show: typed names stay as typed', prettyMerchant('Starbucks Bandra'), 'Starbucks Bandra');
+eq('show: nothing but codes stays raw', prettyMerchant('UPI/DR/123456789012/UPI'), 'UPI/DR/123456789012/UPI');
+eq('show: only a handle', prettyMerchant('UPI/DR/123456789012/kirana@ybl'), 'kirana');
+eq('tidy: acronyms and initials stay', tidyName('SBI LIFE KV TRADERS'), 'SBI Life KV Traders');
+eq('tidy: small words', tidyName('THE BANK OF INDIA'), 'The Bank Of India');
+eq('rail: from the first field', ['UPI/DR/1/X', 'NEFT/2/Y', 'MB/IMPS/3/Z', 'POS 1234 STORE', 'ATW/5/6', 'IFT/7/Z', 'Coffee'].map(paymentRail),
+  ['UPI', 'NEFT', 'IMPS', 'Card', 'ATM', 'Transfer', null]);
 
 console.log(`${checks - failures}/${checks} checks passed.`);
 process.exit(failures > 0 ? 1 : 0);

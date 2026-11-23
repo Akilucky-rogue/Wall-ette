@@ -36,10 +36,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     }, 150);
   }, []);
 
-  // AI Insights State
-  const [aiInsights, setAiInsights] = useState<FinancialInsight | null>(null);
-  const [loadingInsights, setLoadingInsights] = useState(false);
-  const [showAiInsights, setShowAiInsights] = useState(false);
+  // Health check (worked out on the phone)
+  const [health, setHealth] = useState<FinancialInsight | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [showCheck, setShowCheck] = useState(false);
 
   // Auto-detect the month with most recent transactions
   // (single O(n) max scan instead of copy + sort — audit Phase 2.6)
@@ -333,11 +333,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   const currentData = analysisTab === 'EXPENSE' ? filteredExpenses : filteredIncome;
   const chartColor = analysisTab === 'EXPENSE' ? 'var(--rose-strong)' : 'var(--sage)';
 
-  // Fetch AI insights when user requests them
-  const fetchAIInsights = async () => {
-    if (loadingInsights) return;
-    
-    setLoadingInsights(true);
+  // Health check for the selected month, when asked for
+  const runHealthCheck = async () => {
+    if (checking) return;
+    setChecking(true);
     try {
       const monthTransactions = counted.filter(t => {
         const txDate = parseDay(t.date);
@@ -347,14 +346,12 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         ...t,
         merchant: t.merchant || ''
       }));
-      
-      const insights = await analyzeFinancialHealth(monthTransactions, totalIncome);
-      setAiInsights(insights);
-      setShowAiInsights(true);
+      setHealth(await analyzeFinancialHealth(monthTransactions, totalIncome));
+      setShowCheck(true);
     } catch (err) {
-      console.error('AI Analysis failed:', err);
+      console.error('Health check failed:', err);
     } finally {
-      setLoadingInsights(false);
+      setChecking(false);
     }
   };
 
@@ -1083,161 +1080,84 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* AI-Powered Insights */}
+      {/* Health check: worked out on the phone (services/insightsService.ts),
+          no AI service involved, so nothing here says AI. */}
       {currentData.length > 0 && (
         <div className="px-6 py-4 break-inside-avoid">
-          <div className="bg-gradient-to-br from-purple-50 to-lavender/20 rounded-[24px] p-5 border-2 border-purple-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center">
-                  <WallEMascot mood="happy" size="sm" />
+          <div className="bg-white rounded-[24px] p-5 shadow-soft border border-black/[0.02]">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-sage-light text-sage flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px]" aria-hidden="true">monitor_heart</span>
                 </div>
-                <h3 className="text-premium-charcoal text-base font-serif font-semibold">AI Pulse</h3>
+                <h3 className="text-premium-charcoal text-base font-serif font-semibold">Health check</h3>
               </div>
-              
-              {!showAiInsights && (
+              {!showCheck && (
                 <button
-                  onClick={fetchAIInsights}
-                  disabled={loadingInsights}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-lavender text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-md hover:shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  onClick={runHealthCheck}
+                  disabled={checking}
+                  className="px-4 py-2 bg-sage text-white rounded-full text-[12px] font-semibold shadow-soft active:scale-95 transition-all disabled:opacity-50 shrink-0"
                 >
-                  {loadingInsights ? 'Analyzing...' : '✦ Analyze with AI'}
+                  {checking ? 'Checking…' : 'Check this month'}
                 </button>
               )}
             </div>
 
-            {!showAiInsights && !loadingInsights && (
-              <p className="text-[11px] text-muted-taupe leading-relaxed">
-                Get personalized AI-powered recommendations, anomaly detection, and savings opportunities based on your spending patterns.
+            {!showCheck && !checking && (
+              <p className="text-[12px] text-muted-taupe leading-relaxed">
+                What you kept, where most of it went, unusual payments and where you could save. Worked out on your phone.
               </p>
             )}
 
-            {loadingInsights && (
-              <div className="flex flex-col items-center justify-center py-8 gap-3">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-lavender flex items-center justify-center animate-pulse">
-                  <WallEMascot mood="happy" size="sm" />
-                </div>
-                <p className="text-[11px] text-muted-taupe animate-pulse">Analyzing your financial health...</p>
-              </div>
-            )}
-
-            {showAiInsights && aiInsights && (
-              <div className="space-y-4 animate-slide-up">
-                {/* Summary */}
-                <div className="bg-white/80 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="material-symbols-outlined text-[18px] text-purple-600">insights</span>
-                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Summary</h4>
+            {showCheck && health && (() => {
+              const score = Math.max(0, Math.min(100, 100 - health.riskScore));
+              const tone = score >= 70 ? 'text-sage' : score >= 30 ? 'text-amber-600' : 'text-rose';
+              const bar = score >= 70 ? styles.riskScoreLow : score >= 30 ? styles.riskScoreMed : styles.riskScoreHigh;
+              const list = (icon: string, iconCls: string, title: string, items: string[]) => items.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`material-symbols-outlined text-[18px] ${iconCls}`} aria-hidden="true">{icon}</span>
+                    <h4 className="text-[12px] font-semibold text-premium-charcoal">{title}</h4>
                   </div>
-                  <p className="text-[12px] leading-relaxed text-premium-charcoal">{aiInsights.summary}</p>
-                </div>
-
-                {/* Risk Score */}
-                <div className="bg-white/80 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-purple-600">speed</span>
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Financial Health</h4>
-                    </div>
-                    <span className={`text-sm font-bold ${
-                      aiInsights.riskScore < 30 ? 'text-sage' :
-                      aiInsights.riskScore < 70 ? 'text-amber-600' :
-                      'text-rose'
-                    }`}>{aiInsights.riskScore}/100</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={
-                          `${styles.riskScoreBar} ` +
-                          (aiInsights.riskScore < 30
-                            ? styles.riskScoreLow
-                            : aiInsights.riskScore < 70
-                            ? styles.riskScoreMed
-                            : styles.riskScoreHigh) + ' ' + styles[`w${Math.round(aiInsights.riskScore)}p`]
-                        }
-                      />
-                    </div>
-                    {aiInsights.keyFindings.length > 0 && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="material-symbols-outlined text-[18px] text-purple-600">lightbulb</span>
-                          <h4 className="text-[10px] uppercase tracking-widest font-bold text-purple-600">Key Findings</h4>
-                        </div>
-                        {aiInsights.keyFindings.map((finding, i) => (
-                          <div key={i} className="bg-white/60 rounded-xl p-3 flex items-start gap-2">
-                            <span className="text-purple-500 text-[16px]">•</span>
-                            <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{finding}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                {/* Recommendations */}
-                {aiInsights.recommendations.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-sage">check_circle</span>
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-sage">Recommendations</h4>
-                    </div>
-                    {aiInsights.recommendations.map((rec, i) => (
-                      <div key={i} className="bg-sage/10 rounded-xl p-3 flex items-start gap-2 border border-sage/20">
-                        <span className="text-sage text-[16px]">✓</span>
-                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{rec}</p>
-                      </div>
+                  <ul className="space-y-1.5 pl-7">
+                    {items.map((item, i) => (
+                      <li key={i} className="text-[12px] leading-relaxed text-premium-charcoal list-disc marker:text-muted-taupe">{item}</li>
                     ))}
-                  </div>
-                )}
-
-                {/* Anomalies */}
-                {aiInsights.anomalies.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Unusual Patterns</h4>
-                    </div>
-                    {aiInsights.anomalies.map((anomaly, i) => (
-                      <div key={i} className="bg-amber-50 rounded-xl p-3 flex items-start gap-2 border border-amber-200">
-                        <span className="text-amber-600 text-[16px]">⚠</span>
-                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{anomaly}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Savings Opportunities */}
-                {aiInsights.savingsOpportunities.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-sage">savings</span>
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-sage">Savings Opportunities</h4>
-                    </div>
-                    {aiInsights.savingsOpportunities.map((opp, i) => (
-                      <div key={i} className="bg-sage/10 rounded-xl p-3 flex items-start gap-2 border border-sage/20">
-                        <span className="text-sage text-[16px]">💰</span>
-                        <p className="text-[11px] leading-relaxed text-premium-charcoal flex-1">{opp}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Budget Suggestion */}
-                <div className="bg-gradient-to-br from-purple-500 to-lavender rounded-2xl p-4 text-white">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                    <h4 className="text-[10px] uppercase tracking-widest font-bold">Budget Suggestion</h4>
-                  </div>
-                  <p className="text-[11px] leading-relaxed">{aiInsights.budgetSuggestion}</p>
+                  </ul>
                 </div>
-
-                <button
-                  onClick={() => setShowAiInsights(false)}
-                  className="w-full px-4 py-2 bg-purple-100 text-purple-600 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-purple-200 transition-all"
-                >
-                  Close Insights
-                </button>
-              </div>
-            )}
+              );
+              return (
+                <div className="space-y-4 animate-slide-up">
+                  <p className="text-[13px] leading-relaxed text-premium-charcoal">{health.summary}</p>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[12px] font-semibold text-premium-charcoal">Health score</span>
+                      <span className={`text-sm font-bold tabular-nums ${tone}`}>{score}/100</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`${styles.riskScoreBar} ${bar} ${styles[`w${score}p`]}`} />
+                    </div>
+                  </div>
+                  {list('lightbulb', 'text-sage', 'What stands out', health.keyFindings)}
+                  {list('check_circle', 'text-sage', 'Worth doing', health.recommendations)}
+                  {list('warning', 'text-amber-600', 'Unusual payments', health.anomalies)}
+                  {list('savings', 'text-sage', 'Where you could save', health.savingsOpportunities)}
+                  <div className="bg-sage-light rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="material-symbols-outlined text-[18px] text-sage" aria-hidden="true">account_balance_wallet</span>
+                      <h4 className="text-[12px] font-semibold text-premium-charcoal">A budget to try</h4>
+                    </div>
+                    <p className="text-[12px] leading-relaxed text-premium-charcoal">{health.budgetSuggestion}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowCheck(false)}
+                    className="w-full px-4 py-2.5 bg-gray-100 text-muted-taupe rounded-full text-[12px] font-semibold hover:text-premium-charcoal transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

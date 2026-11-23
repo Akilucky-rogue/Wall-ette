@@ -166,14 +166,14 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('copies: body', copies[0]?.body, 'Usually from importing an overlapping statement. They change your balance by ₹15,000. Remove the extra copies in Fee Hunter.');
   const doubles = byPrefix(got, 'double:');
   eq('double: only the recent one, not the rent imported twice', ids(doubles), ['double:2026-11-14|1299.00|upidrmyntradesignsyesbmyntrayblupi']);
-  eq('double: body', doubles[0]?.body, '₹1,299 to MYNTRA DESIGNS appears twice on 14 Nov. If you paid once, ask MYNTRA DESIGNS for a refund.');
+  eq('double: body', doubles[0]?.body, '₹1,299 to Myntra Designs appears twice on 14 Nov. If you paid once, ask Myntra Designs for a refund.');
   eq('double: opens Fee Hunter', doubles[0]?.action, { kind: 'screen', screen: 'HUNTER' });
   const fees = byPrefix(got, 'fees:');
   eq('fees: total of the recent ones', fees[0]?.title, '₹826 in bank charges');
-  eq('fees: body', fees[0]?.body, '2 charges since 6 Oct, such as DEBIT CARD ANNUAL FEE. See them all in Fee Hunter.');
+  eq('fees: body', fees[0]?.body, '2 charges since 6 Oct, such as Debit Card Annual Fee. See them all in Fee Hunter.');
   eq('fees: id has the latest day', fees[0]?.id, 'fees:2026-11-06:826');
   const creep = byPrefix(got, 'creep:');
-  eq('creep: the price rise', creep[0]?.title, 'SPOTIFY INDIA costs more');
+  eq('creep: the price rise', creep[0]?.title, 'Spotify India costs more');
   eq('creep: body', creep[0]?.body, 'Up from ₹119 to ₹139 a month, about ₹240 more a year.');
 
   const stopped = list.filter(t => !(t.merchant.includes('SPOTIFY') && t.date >= '2026-10-01'));
@@ -193,11 +193,11 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   ];
   const due = byPrefix(build_({ transactions: list }), 'due:');
   eq('due: Netflix in two days, not the gym in 11', ids(due), ['due:upidrnetflixcomicicnetflixiciciupi:2026-11-22']);
-  eq('due: title', due[0]?.title, 'NETFLIX COM is due on 22 Nov');
+  eq('due: title', due[0]?.title, 'Netflix.com is due on 22 Nov');
   eq('due: body', due[0]?.body, 'Usually about ₹649 a month.');
   eq('due: opens Pulse at Recurring Charges', due[0]?.action, { kind: 'screen', screen: 'ANALYSIS', section: 'recurring' });
-  eq('due: tomorrow', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 21, 9) }), 'due:')[0]?.title, 'NETFLIX COM is due tomorrow');
-  eq('due: today', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 22, 9) }), 'due:')[0]?.title, 'NETFLIX COM is due today');
+  eq('due: tomorrow', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 21, 9) }), 'due:')[0]?.title, 'Netflix.com is due tomorrow');
+  eq('due: today', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 22, 9) }), 'due:')[0]?.title, 'Netflix.com is due today');
   eq('due: not when it is already past', ids(byPrefix(build_({ transactions: list, now: new Date(2026, 10, 24, 9) }), 'due:')), []);
 }
 

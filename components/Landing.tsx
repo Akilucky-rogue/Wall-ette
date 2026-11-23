@@ -263,24 +263,29 @@ const Landing: React.FC<LandingProps> = ({ onOpenApp }) => (
               </ul>
             </article>
 
-            {/* Fee Hunter */}
+            {/* Left to spend */}
             <article className="flex flex-col rounded-[28px] bg-premium-charcoal p-7 text-zen-bg md:col-span-5">
-              <h3 className="font-serif text-[26px] leading-tight">Fee Hunter</h3>
+              <h3 className="font-serif text-[26px] leading-tight">Left to spend</h3>
               <p className="mt-2 text-[15.5px] leading-relaxed opacity-85">
-                Finds bank charges, double charges and subscriptions that quietly cost more, plus duplicate entries to clean up.
+                What you can still spend before your next pay, once the bills still to come and your savings goal are set aside.
               </p>
-              <ul className="mt-auto pt-6 text-[14px]" aria-label="Example findings">
+              <dl className="mt-auto pt-6 text-[14px]" aria-label="An example, with sample numbers">
                 {[
-                  ['Card annual fee', '₹590.00'],
-                  ['ATM withdrawal charge', '₹23.60'],
-                  ['Music plan, up ₹20 a month', '₹240 a year'],
-                ].map(([what, cost]) => (
-                  <li key={what} className="flex items-baseline justify-between gap-4 border-t border-zen-bg/15 py-2.5">
-                    <span className="opacity-90">{what}</span>
-                    <span className="shrink-0 tabular-nums font-semibold">{cost}</span>
-                  </li>
+                  ['Came in since 1 Nov', '+₹85,000'],
+                  ['Spent and invested', '−₹50,616'],
+                  ['Bills still to come', '−₹649'],
+                  ['Savings goal', '−₹15,000'],
+                ].map(([what, amount]) => (
+                  <div key={what} className="flex items-baseline justify-between gap-4 border-t border-zen-bg/15 py-2.5">
+                    <dt className="opacity-90">{what}</dt>
+                    <dd className="shrink-0 tabular-nums">{amount}</dd>
+                  </div>
                 ))}
-              </ul>
+                <div className="flex items-baseline justify-between gap-4 border-t border-dashed border-zen-bg/40 pt-3 font-semibold">
+                  <dt>Left to spend</dt>
+                  <dd className="shrink-0 tabular-nums">₹18,735</dd>
+                </div>
+              </dl>
             </article>
 
             {/* History */}

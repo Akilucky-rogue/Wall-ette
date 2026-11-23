@@ -171,6 +171,23 @@ function applyPalette(palette: Palette, dark: boolean) {
     const [r, g, b] = hexToRgb(palette[key]);
     root.style.setProperty(`--c-${key}`, `${r} ${g} ${b}`);
   }
+  // Light and depth (styles.css, tailwind shadows): shadows in the page's
+  // own tone, a highlight on top edges, cards a touch lighter at the top, and
+  // the wallet on Home in a deep shade of the accent.
+  const accent = palette['sage'];
+  const depth: Record<string, string> = dark ? {
+    'shadow-rgb': '0 0 0', 'edge-hi': 'rgb(255 255 255 / 0.05)',
+    'card-top': palette['card-alt'], 'card-bottom': palette['card'],
+    'wallet': mix(palette['card-alt'], accent, 0.2), 'wallet-2': mix(palette['card'], accent, 0.1),
+    'wallet-ink': palette['ink'], 'wallet-mut': 'rgb(236 234 228 / 0.72)', 'wallet-stitch': 'rgb(255 255 255 / 0.14)',
+  } : {
+    'shadow-rgb': '62 52 40', 'edge-hi': 'rgb(255 255 255 / 0.9)',
+    'card-top': palette['card'], 'card-bottom': palette['card-alt'],
+    'wallet': mix(accent, '#1A1A18', 0.48), 'wallet-2': mix(accent, '#1A1A18', 0.62),
+    'wallet-ink': '#FBFAF6', 'wallet-mut': 'rgb(251 250 246 / 0.85)', 'wallet-stitch': 'rgb(255 255 255 / 0.24)',
+  };
+  for (const [name, value] of Object.entries(depth)) root.style.setProperty(`--${name}`, value);
+
   root.setAttribute('data-theme-dark', dark ? '1' : '0');
   root.style.colorScheme = dark ? 'dark' : 'light';
 

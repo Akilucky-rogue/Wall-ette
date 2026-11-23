@@ -50,15 +50,19 @@ export interface UserProfile {
 export enum AppScreen {
   LOCK = 'LOCK',
   DASHBOARD = 'DASHBOARD',
+  LEFT_TO_SPEND = 'LEFT_TO_SPEND', // Home's "what's left until pay day"
   HISTORY = 'HISTORY', // Vault
   NEW_ENTRY = 'NEW_ENTRY',
   ANALYSIS = 'ANALYSIS', // Pulse
+  PULSE_TRENDS = 'PULSE_TRENDS',
+  PULSE_CATEGORIES = 'PULSE_CATEGORIES',
+  PULSE_RECURRING = 'PULSE_RECURRING',
+  PULSE_HEALTH = 'PULSE_HEALTH',
   INCOME_INSIGHTS = 'INCOME_INSIGHTS', // Flow
   CATEGORY_SPLIT = 'CATEGORY_SPLIT',
   MONEY_MOVED = 'MONEY_MOVED', // payee rules: what counts as spending
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
-  HUNTER = 'HUNTER', // Fee & Subscription Hunter
   REWIND = 'REWIND', // Time Machine + Wrapped
   SELF = 'SELF' // Profile
 }

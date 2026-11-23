@@ -44,11 +44,19 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   Android app plays the launch splash. Search and link-preview tags live in `index.html`
   (`public/og-image.png` is the store feature graphic).
 - **Gesture navigation** — app-wide swipe handling on the shell div: horizontal swipes move
-  through `TAB_ORDER` (Home → History → Analysis → Self); sub-screens swipe back to their
+  through `TAB_ORDER` (Home → Vault → Pulse → Self); sub-screens swipe back to their
   `BACK_TARGET` parent. Scrollable/interactive elements (`.overflow-x-auto`, inputs, svg,
   canvas) are excluded. Thresholds: ≥70 px, ≤600 ms, dx > 1.5·dy.
 - **Android system back** — Capacitor `backButton` listener mirrors the same map:
   sub-screen → parent, tab → Home, Home → `minimizeApp()`.
+- **Pages, not long scrolls** (1.5.6) — Pulse is a hub (`SpendAnalysis` with no `page`) that
+  links to its own pages, `PULSE_TRENDS`, `PULSE_CATEGORIES`, `PULSE_RECURRING` and
+  `PULSE_HEALTH` (the same component with `page` set); they share the month and the
+  Expenses/Income switch through `components/pulseView.ts`, a small `useSyncExternalStore`
+  store. Home opens `LEFT_TO_SPEND` (§5). `components/Navigation.tsx` lists the screens each tab
+  owns, so a page keeps its tab lit. The screen container is keyed by screen and plays a
+  motion-safe entrance: deeper pages slide in from the right, Back slides the other way, tabs
+  rise into place (`motionFor` in `App.tsx`; tailwind `page-in`, `page-back`, `tab-in`).
 - **Splash & lock flow** — cold start on native boots into `SecurityLock` (biometric prompt)
   before the app renders; 15-minute inactivity and app-backgrounding re-lock the session.
 
@@ -65,6 +73,13 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   show the theme color (see §6, Windowing); Capacitor's `SystemBars` sets their icon colors
   per theme. With a WebView older than 140, Capacitor pads the page instead and the bars
   stay cream with dark icons. A `theme-color` meta keeps browser chrome in sync on web.
+- **Depth** (1.5.6) — one light source, above. `applyPalette` also sets `--shadow-rgb` (a warm
+  shadow tone; black on dark themes), `--edge-hi` (a top-edge highlight), `--card-top`/
+  `--card-bottom` (cards are a touch lighter at the top) and the wallet colours. Tailwind's
+  `shadow-soft`, `shadow-raised`, `shadow-float` and `shadow-pressed` read them; tapping a card
+  presses it in. `styles.css` adds `.icon-fill` (filled symbols), `.wallet` (Home's balance: a
+  stitched card with a fine weave, `.wallet-pocket`, `.wallet-emboss`) and `.receipt` (a
+  zigzag torn edge made with a mask; its shadow is a `drop-shadow` on `.receipt-lift`).
 - Deliberately theme-independent: mascot, splash art, exported statement HTML, and the
   shareable Wrapped card (brand-stable artifacts).
 
@@ -174,9 +189,9 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
     reference, then same narration, then one narration containing the other (or a wallet
     entry with no payee). Rows whose references differ never match, so same-day payments of
     the same amount to different payees aren't swapped;
-  - Fee Hunter's duplicate cleaner groups imported rows by the same key and never removes rows
-    with stable ids (they're all real); typed entries are left alone. Tests and a before/after
-    replay over real statements: `scripts/check-duplicates.mjs`;
+  - Vault's duplicate cleaner (`components/DuplicateEntries.tsx`) groups imported rows by the
+    same key and never removes rows with stable ids (they're all real); typed entries are left
+    alone. Tests and a before/after replay over real statements: `scripts/check-duplicates.mjs`;
   - opening-balance anchoring to the earliest statement (`openingBalanceAsOf`);
   - forward/backward coverage-gap detection with optional single bridge adjustment
     (auto-deleted when a later import fills the window);
@@ -191,29 +206,42 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 
 ## 5. Analytics (all on-device)
 
-- **`analyticsService.ts`** — `prettyMerchant` (strips UPI rails/refs/IFSC noise from
-  narrations), Fee Hunter (`huntSavings`: rail-guarded bank-fee regexes, subscription price-creep
-  with CV ≤ 0.15 stability gate, same-day repeats surfaced for review only), recurring-charge
-  detection, income-stability tiers, daily-spend stats.
+- **`analyticsService.ts`** — `prettyMerchant` (the payee after the payment rail, skipping UPI
+  handles; a short code like "MF SIP" gives way to a fuller name; tidied by `utils/names.ts`
+  `tidyName`, which title-cases but keeps acronyms and initials), `priceRises` (a payee charged
+  a steady amount at least 4 times over 120+ days, CV ≤ 0.15, whose latest charge is up 5% and
+  ₹10 or more), recurring-charge detection, income-stability tiers, daily-spend stats.
+  `utils/names.ts` `paymentRail` names the rail (UPI, NEFT, Card, ATM…) for list rows.
+- **Left to spend** (`services/leftToSpend.ts`, from 1.5.6) — what can still be spent before
+  the next pay. The period runs from the last pay to the next when the pay stream is confirmed
+  and paid within 45 days, else through the calendar month. Left = came in − spent − sent to
+  family and invested − bills still to come − (savings goal − invested this period). Money
+  between your own accounts, payees not counted and adjustments are left out both ways. Bills
+  are recurring charges expected from today to the end of the period (up to 7 days late still
+  counts; weekly and fortnightly ones repeat). When this month's pay day has passed with no pay
+  (a pay up to 5 days early counts), it covers today only. Checked by
+  `scripts/check-left-to-spend.mjs`; shown on Home (`components/LeftToSpendCard.tsx`) and on its
+  own page (`components/LeftToSpend.tsx`).
 - **`insightsService.ts`** — savings rate, anomaly detection (3× median), 50/30/20 budget heuristic.
 - **Moved-vs-spent separation** — Transfer Out / Adjustment / Investment count in cash-flow
   totals but are excluded from every *spending* analysis (reports, Category Split, heatmaps).
-- **Feature screens** — Pulse (daily/heatmap), Category Split (interactive SVG donut with
-  merchant drill-down), Income Insights, Fee Hunter, Rewind (lifetime timeline) with
-  exportable "Wall·ette Wrapped" canvas cards.
+- **Feature screens** — Pulse (a hub and pages: Trends, Categories, Recurring with price rises,
+  Health check), Category Split (interactive SVG donut with merchant drill-down), Income
+  Insights (Flow), Left to spend, Rewind (lifetime timeline) with exportable "Wall·ette
+  Wrapped" canvas cards. Fee Hunter was removed in 1.5.6.
 - **Notifications** (from 1.5.6) — the bell on Home (`components/NotificationCenter.tsx`).
   `services/notifications.ts` builds them on the device from data the app already has:
   failed unlock attempts from the security log (`services/securityLog.ts` reads the latest 30;
   a wrong password followed within 5 minutes by an unlock is a typo and left out), categories
   at 80% and over their budget this month, today's spending over the daily limit, entries
-  imported twice, possible double charges and bank charges from the last 45 days, price rises
-  still being charged, recurring charges due in the next 3 days, an import reminder when the
+  imported twice, price rises still being charged (last charged within 45 days), recurring
+  charges due in the next 3 days, an import reminder when the
   newest entry is 30 days old, last month's savings against the goal (once the data reaches
   this month), a downloaded update and this version's release notes. Each notification's id
   names its subject (`budget:Dining:2026-11:over`, `due:<payee>:<day>`), so new ones stand out;
   seen and dismissed ids are kept in `localStorage` under `walletNotifications_<uid>`, which
-  sign-out removes. Tapping one opens its screen, and `utils/screenSection.ts` opens Flow on
-  Goals or Pulse at Recurring Charges. Nothing new is collected or sent, so the Data safety
+  sign-out removes. Tapping one opens its screen: `utils/screenSection.ts` opens Flow on Goals,
+  and price rises and bills due open Pulse's Recurring page. Nothing new is collected or sent, so the Data safety
   answers don't change. Checked by `scripts/check-notifications.mjs`.
 
 ---

@@ -14,7 +14,7 @@
  *   - import ids are the same for a row in every statement and in either
  *     format, identical rows get different ids, and 20,000 different rows get
  *     20,000 ids
- *   - Fee Hunter's duplicate key groups a PDF and an Excel copy of a row, and
+ *   - the duplicate cleaner's key groups a PDF and an Excel copy of a row, and
  *     leaves typed entries alone
  *
  * Given a folder of real statements, it also replays the audit's tests on
@@ -23,7 +23,7 @@
  *   - re-importing each statement into a wallet holding every other row (L1)
  *   - importing each statement into a wallet holding another that overlaps
  *     it, in the same or the other format
- *   - Fee Hunter's cleaner after importing both formats with "Include Anyway" (L3)
+ *   - the duplicate cleaner after importing both formats with "Include Anyway" (L3)
  *   - id collisions, and how many rows keep their id in the other format (L2)
  *
  * Usage (after `npm ci`):
@@ -190,18 +190,18 @@ eq('dupes: the Excel export against a wallet of PDF rows',
   eq('dupes: same payee, other reference stays new', findDuplicates([otherSwiggy], [swiggy]).size, 0);
 }
 
-// Fee Hunter's cleaner (components/FeeHunter.tsx)
+// Vault's duplicate cleaner (components/DuplicateEntries.tsx)
 const surplus = (list) => walletCopies(list).copies.length;
 // Ids as 1.5.3 and earlier gave them: decimal, and never stable.
 const older = (list, tag) => list.map((t, i) => ({ ...t, id: `import-${tag}${1000 + i}` }));
 {
   const current = await toTransactions(statement);
   const currentExcel = await toTransactions(asExcel);
-  eq('fee hunter: older PDF and Excel copies of each row', surplus([...older(current, 1), ...older(currentExcel, 2)]), statement.length + 1); // + the repeated SMS charge
-  eq('fee hunter: an older copy next to a current row', walletCopies([...current, ...older(current.slice(0, 2), 3)]).copies.map(t => t.id), ['import-31000', 'import-31001']);
-  eq('fee hunter: one current import flags nothing', surplus(current), 0); // the two SMS charges are both real
-  eq('fee hunter: groups counted', walletCopies([...older(current, 1), ...older(currentExcel, 2)]).groups, statement.length - 1);
-  eq('fee hunter: typed entries are left alone', surplus([typed('txn-a', '2026-03-08', 20, 'Tea'), typed('txn-b', '2026-03-08', 20, 'Tea')]), 0);
+  eq('cleaner: older PDF and Excel copies of each row', surplus([...older(current, 1), ...older(currentExcel, 2)]), statement.length + 1); // + the repeated SMS charge
+  eq('cleaner: an older copy next to a current row', walletCopies([...current, ...older(current.slice(0, 2), 3)]).copies.map(t => t.id), ['import-31000', 'import-31001']);
+  eq('cleaner: one current import flags nothing', surplus(current), 0); // the two SMS charges are both real
+  eq('cleaner: groups counted', walletCopies([...older(current, 1), ...older(currentExcel, 2)]).groups, statement.length - 1);
+  eq('cleaner: typed entries are left alone', surplus([typed('txn-a', '2026-03-08', 20, 'Tea'), typed('txn-b', '2026-03-08', 20, 'Tea')]), 0);
 }
 
 console.log(`${checks - failures}/${checks} made-up checks pass`);
@@ -224,7 +224,7 @@ async function replay(dir) {
     try { return await fn(); } finally { console.log = log; }
   }
 
-  // Before this change (components/ImportStatement.tsx and FeeHunter.tsx in 1.5.3)
+  // Before this change (components/ImportStatement.tsx and the cleaner in 1.5.3)
   const legacyNorm = (m) => m.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\d+/g, '').trim();
   const legacyMatch = (a, b) => {
     if (a.length > 3 && b.length > 3) {
@@ -390,7 +390,7 @@ async function replay(dir) {
     `${cross.miss} copies missed (was ${cross.lfp} and ${cross.lmiss})`);
   if (cross.formatRows) {
     console.log(`  across formats: ${cross.sameId} of ${cross.formatRows} shared rows keep their id (was ${cross.legacySameId})`);
-    console.log(`  Fee Hunter after importing both formats: ${fee.found} flagged for ${fee.copies} copies ` +
+    console.log(`  Duplicate cleaner after importing both formats: ${fee.found} flagged for ${fee.copies} copies ` +
       `(was ${fee.legacyFound}); identical rows within one statement: ${fee.repeats} flagged with older ids, ` +
       `${fee.currentRepeats} with current ids`);
     if (fee.found < fee.copies || fee.currentRepeats) failures++;

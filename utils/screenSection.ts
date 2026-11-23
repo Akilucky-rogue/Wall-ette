@@ -1,9 +1,9 @@
 /**
  * Where to open the next screen, set just before navigating to it: a budget
- * notification opens Flow on Goals, a bill due soon opens Pulse at Recurring
- * Charges. The screen takes it once when it appears; anything else ignores it.
+ * notification or Home's budgets open Flow on Goals. The screen takes it once
+ * when it appears; anything else ignores it.
  */
-export type ScreenSection = 'goals' | 'recurring';
+export type ScreenSection = 'goals';
 
 let pending: ScreenSection | null = null;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 
 import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
@@ -25,8 +25,8 @@ const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
-const FeeHunter = React.lazy(() => import('./components/FeeHunter'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
+const LeftToSpend = React.lazy(() => import('./components/LeftToSpend'));
 const Profile = React.lazy(() => import('./components/Profile'));
 const Landing = React.lazy(() => import('./components/Landing'));
 
@@ -46,11 +46,25 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.IMPORT]: AppScreen.DASHBOARD,
   [AppScreen.EXPORT]: AppScreen.DASHBOARD,
   [AppScreen.INCOME_INSIGHTS]: AppScreen.DASHBOARD,
-  [AppScreen.CATEGORY_SPLIT]: AppScreen.ANALYSIS,
+  [AppScreen.CATEGORY_SPLIT]: AppScreen.PULSE_CATEGORIES,
+  [AppScreen.PULSE_TRENDS]: AppScreen.ANALYSIS,
+  [AppScreen.PULSE_CATEGORIES]: AppScreen.ANALYSIS,
+  [AppScreen.PULSE_RECURRING]: AppScreen.ANALYSIS,
+  [AppScreen.PULSE_HEALTH]: AppScreen.ANALYSIS,
   [AppScreen.MONEY_MOVED]: AppScreen.SELF,
-  [AppScreen.HUNTER]: AppScreen.DASHBOARD,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
+  [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
 };
+
+// How a screen enters (tailwind animations, motion-safe only): deeper pages
+// slide in from the right, going back slides in from the left, and tabs rise
+// a little into place.
+function motionFor(prev: AppScreen, next: AppScreen): string {
+  if (prev === next) return '';
+  if (BACK_TARGET[next] === prev || next === AppScreen.NEW_ENTRY || next === AppScreen.IMPORT) return 'motion-safe:animate-page-in';
+  if (BACK_TARGET[prev] === next) return 'motion-safe:animate-page-back';
+  return 'motion-safe:animate-tab-in';
+}
 
 // Sign-out and account deletion clear this device's data and reload the app;
 // that start-up skips the launch splash (services/session.ts). Read once per
@@ -64,6 +78,10 @@ function AppContent() {
   // what makes "biometric login" real — open app → fingerprint → in.
   const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
+  // The screen before this one, for the entrance motion.
+  const shownScreenRef = useRef<AppScreen>(AppScreen.DASHBOARD);
+  const screenMotion = useMemo(() => motionFor(shownScreenRef.current, currentScreen), [currentScreen]);
+  useEffect(() => { shownScreenRef.current = currentScreen; }, [currentScreen]);
   const [showSplash, setShowSplash] = useState(!QUIET_START && !IS_WEB);
   const [showLanding, setShowLanding] = useState(() => IS_WEB && window.location.hash !== SIGN_IN_HASH);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
@@ -310,6 +328,14 @@ function AppContent() {
         return <NewEntry onNavigate={handleNavigate} />;
       case AppScreen.ANALYSIS:
         return <SpendAnalysis onNavigate={handleNavigate} />;
+      case AppScreen.PULSE_TRENDS:
+        return <SpendAnalysis onNavigate={handleNavigate} page="trends" />;
+      case AppScreen.PULSE_CATEGORIES:
+        return <SpendAnalysis onNavigate={handleNavigate} page="categories" />;
+      case AppScreen.PULSE_RECURRING:
+        return <SpendAnalysis onNavigate={handleNavigate} page="recurring" />;
+      case AppScreen.PULSE_HEALTH:
+        return <SpendAnalysis onNavigate={handleNavigate} page="health" />;
       case AppScreen.INCOME_INSIGHTS:
         return <IncomeInsights onNavigate={handleNavigate} />;
       case AppScreen.CATEGORY_SPLIT:
@@ -320,10 +346,10 @@ function AppContent() {
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:
         return <ExportReports onNavigate={handleNavigate} />;
-      case AppScreen.HUNTER:
-        return <FeeHunter onNavigate={handleNavigate} />;
       case AppScreen.REWIND:
         return <Rewind onNavigate={handleNavigate} />;
+      case AppScreen.LEFT_TO_SPEND:
+        return <LeftToSpend onNavigate={handleNavigate} />;
       case AppScreen.SELF:
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} />;
       default:
@@ -339,17 +365,26 @@ function AppContent() {
         onTouchEnd={onTouchEnd}
       >
         <Suspense fallback={<LoadingFallback />}>
+          {/* Keyed by screen, so each change plays its entrance: a page slides
+              in over the one it opens from, going back slides the other way,
+              tabs rise into place (tailwind animations; off with reduced motion). */}
+          <div key={currentScreen} className={screenMotion}>
             {renderScreen()}
+          </div>
         </Suspense>
         {(currentScreen === AppScreen.DASHBOARD ||
           currentScreen === AppScreen.HISTORY ||
           currentScreen === AppScreen.ANALYSIS ||
+          currentScreen === AppScreen.PULSE_TRENDS ||
+          currentScreen === AppScreen.PULSE_CATEGORIES ||
+          currentScreen === AppScreen.PULSE_RECURRING ||
+          currentScreen === AppScreen.PULSE_HEALTH ||
           currentScreen === AppScreen.INCOME_INSIGHTS ||
           currentScreen === AppScreen.CATEGORY_SPLIT ||
           currentScreen === AppScreen.SELF ||
           currentScreen === AppScreen.EXPORT ||
-          currentScreen === AppScreen.HUNTER ||
           currentScreen === AppScreen.REWIND ||
+          currentScreen === AppScreen.LEFT_TO_SPEND ||
           currentScreen === AppScreen.MONEY_MOVED
         ) && (
           <Navigation currentScreen={currentScreen} onNavigate={handleNavigate} />

@@ -21,9 +21,14 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   {
     versionCode: 14,
     version: '1.5.6',
+    // Play allows 500 characters in all (scripts/check-app-updates.mjs).
     items: [
-      'The bell on Home shows what needs a look: budgets running out, bills due soon, bank charges, possible double charges and failed unlock attempts.',
-      "Tap one to go straight to the budget, bill or charge it's about.",
+      'Left to spend, on Home: what you can still spend before your next pay, after bills and your savings goal.',
+      'The bell on Home flags budgets running out, bills due, price rises, entries imported twice and failed unlocks.',
+      'Pulse is now short pages: Trends, Categories, Recurring and Health check.',
+      'Payees show by name instead of bank codes, and Vault is more compact.',
+      'Your daily limit warns instead of blocking, and budgets show on Home.',
+      'Fee Hunter is gone. Remove entries imported twice from Vault.',
     ],
   },
   {
@@ -43,7 +48,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     items: [
       "Wall-ette tells you if a change didn't save to your account, and lets you try again.",
       'Re-imports match payments by bank reference, so same-day payments of the same amount are never mixed up.',
-      'Fee Hunter finds duplicates from importing a statement as both PDF and Excel.',
+      'Entries imported twice, from both the PDF and the Excel of a statement, are found and can be removed.',
       'Signing out or deleting your account also clears your data from this phone.',
       'Screenshots and the recent-apps view no longer show your wallet, and phone backups leave it out.',
     ],

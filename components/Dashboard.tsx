@@ -2,13 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { byNewest, localDay, parseDay } from '../utils/dates';
-import { huntSavings, prettyMerchant } from '../services/analyticsService';
+import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import { openAt } from '../utils/screenSection';
 import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
 import NotificationCenter from './NotificationCenter';
-import { WallEEyes, WallEMascot, FloatingLeaf, LotusFlower, Sprout, RangoliCorner, Diya } from './SplashScreen';
+import LeftToSpendCard from './LeftToSpendCard';
+import { WallEMascot } from './SplashScreen';
 import styles from './Dashboard.module.css';
 
 interface DashboardProps {
@@ -29,8 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setTimeout(() => setRefreshing(false), 900);
   };
 
-  // Hunter teaser (single pass, memoized) + lifetime hook for Rewind.
-  const hunt = useMemo(() => huntSavings(counted), [counted]);
+  // Lifetime hook for Rewind.
   // Sorted desc — the last element is the earliest transaction.
   const sinceYear = transactions.length > 0
     ? parseDay(transactions[transactions.length - 1].date).getFullYear()
@@ -209,12 +209,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
-      {/* Eco decorative elements */}
-      <FloatingLeaf className="top-20 right-4 opacity-40 z-10" delay={0} />
-      <FloatingLeaf className="top-48 left-3 opacity-30" delay={1.2} color="var(--sage-3)" />
-      <Sprout className="absolute bottom-32 right-6 opacity-40" />
-      <RangoliCorner className="absolute top-16 right-2 opacity-20" color="var(--gold-1)" mirror />
-
       {/* Header */}
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 sticky top-0 z-30">
         {/* Left: Logo and Name */}
@@ -229,111 +223,107 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Balance Summary */}
-      <div className="flex flex-col items-center py-10 relative">
-        <div className="absolute top-6 left-8">
-          <LotusFlower size="sm" color="var(--rose-2)" className="opacity-40" />
+      {/* The wallet: the balance for the period picked, with what came in and
+          went out in its two pockets (styles.css .wallet) */}
+      <section className="px-5 pt-3 pb-2" aria-label="Balance">
+        <div className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden">
+          <div className="relative flex items-center justify-between gap-3">
+            <p className="text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>Balance</p>
+            <div className="flex items-center rounded-full bg-black/20 shadow-pressed p-0.5 text-[11px] font-semibold" role="group" aria-label="Period">
+              {(['MONTH', 'ALL'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setPeriodMode(mode);
+                    if (mode === 'MONTH') setSelectedDate(currentMonthStart);
+                  }}
+                  aria-pressed={periodMode === mode}
+                  className={`px-3 py-1 rounded-full transition-all ${periodMode === mode ? 'shadow-sm' : 'opacity-80 hover:opacity-100'}`}
+                  style={periodMode === mode ? { background: 'var(--wallet-ink)', color: 'var(--wallet-2)' } : undefined}
+                >
+                  {mode === 'MONTH' ? 'Month' : 'All time'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <h1 className="relative wallet-emboss font-serif text-[40px] leading-none tabular-nums mt-4 truncate">
+            {formatAmount(balance).split('.')[0]}
+          </h1>
+
+          <div className="relative flex items-center justify-between gap-2 mt-3 min-h-[28px]">
+            {/* Sync status; tap to refresh */}
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-1.5 -ml-1 px-1 py-1 rounded-full text-[11px] font-medium hover:bg-black/10 transition-colors"
+              style={{ color: 'var(--wallet-mut)' }}
+              title="Refresh"
+            >
+              <span
+                aria-hidden="true"
+                className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'motion-safe:animate-pulse' : ''}`}
+                style={{ background: refreshing || isCloudSyncing ? '#BFE3AE' : isOnline ? '#F2B8B5' : 'var(--wallet-mut)' }}
+              />
+              {refreshing ? 'Refreshing…'
+                : isCloudSyncing ? 'Synced'
+                : isOnline ? 'Not syncing · Retry'
+                : 'Offline · saved on this phone'}
+            </button>
+            {periodMode === 'MONTH' && (
+              <div className="flex items-center text-[12px] font-semibold">
+                <button
+                  className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/10"
+                  onClick={() => setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                  aria-label="Previous month"
+                >
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_left</span>
+                </button>
+                <span className="px-1 select-none tabular-nums">{periodLabel}</span>
+                <button
+                  className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/10 disabled:opacity-30"
+                  onClick={() => setSelectedDate(prev => {
+                    const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+                    return next > currentMonthStart ? prev : next;
+                  })}
+                  disabled={showingThisMonth}
+                  aria-label="Next month"
+                >
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_right</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="relative grid grid-cols-2 gap-2.5 mt-4">
+            {([
+              { label: 'Income', amount: income, sign: '+', icon: 'south_west', today: getDailyIncome(), count: credits, noun: 'credit' },
+              { label: 'Spending', amount: expenses, sign: '−', icon: 'north_east', today: getDailyExpense(), count: payments, noun: 'payment' },
+            ] as const).map(pocket => (
+              <div key={pocket.label} className="wallet-pocket rounded-2xl px-3.5 py-3 min-w-0">
+                <p className="flex items-center gap-1 text-[11px] font-medium" style={{ color: 'var(--wallet-mut)' }}>
+                  <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{pocket.icon}</span>
+                  {pocket.label}
+                </p>
+                <p className="font-serif text-[22px] leading-tight tabular-nums mt-1 truncate">
+                  {pocket.sign}{formatAmountCompact(pocket.amount)}
+                </p>
+                <p className="text-[11px] tabular-nums truncate mt-0.5" style={{ color: 'var(--wallet-mut)' }}>
+                  {showingThisMonth
+                    ? `Today ${pocket.sign}${formatAmountCompact(pocket.today)}`
+                    : `${pocket.count.toLocaleString('en-IN')} ${pocket.noun}${pocket.count === 1 ? '' : 's'}`}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="absolute top-8 right-10">
-          <LotusFlower size="sm" color="var(--gold-2)" className="opacity-30" />
-        </div>
-        <div className="flex items-center gap-3 mb-2">
-          <p className="text-muted-taupe text-xs font-medium uppercase tracking-[0.2em]">Balance</p>
-        </div>
-        <div className="flex bg-white/70 border border-sage/10 rounded-full overflow-hidden text-xs font-semibold items-center mb-4">
-          <button
-            className={`px-3 py-1 min-w-[70px] transition-all ${periodMode === 'MONTH' ? 'bg-sage-light text-sage' : 'text-muted-taupe hover:text-sage'}`}
-            onClick={() => {
-              setPeriodMode('MONTH');
-              setSelectedDate(currentMonthStart); // Reset to current month when switching
-            }}
-            disabled={periodMode === 'MONTH'}
-          >
-            Month
-          </button>
-          <button
-            className={`px-3 py-1 min-w-[70px] transition-all ${periodMode === 'ALL' ? 'bg-sage-light text-sage' : 'text-muted-taupe hover:text-sage'}`}
-            onClick={() => setPeriodMode('ALL')}
-            disabled={periodMode === 'ALL'}
-          >
-            All Time
-          </button>
-          {periodMode === 'MONTH' && (
-            <>
-              <button
-                className="ml-2 px-2 py-1 text-muted-taupe hover:text-sage transition-colors"
-                onClick={() => setSelectedDate(prev => {
-                  // Prevent going before earliest transaction month if needed
-                  return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
-                })}
-                title="Previous Month"
-              >
-                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-              </button>
-              <span className="px-2 text-premium-charcoal font-semibold select-none">{periodLabel}</span>
-              <button
-                className="px-2 py-1 text-muted-taupe hover:text-sage transition-colors"
-                onClick={() => setSelectedDate(prev => {
-                  // Prevent going to future months
-                  const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
-                  const now = currentMonthStart;
-                  if (next > now) return prev;
-                  return next;
-                })}
-                title="Next Month"
-              >
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </button>
-            </>
-          )}
-        </div>
-        <h1 className="text-premium-charcoal font-serif text-[40px] leading-tight px-4 text-center">
-            {formatAmount(balance)}
-        </h1>
-        {/* Sync status: a quiet line under the balance; tap to refresh */}
-        <button
-          onClick={handleRefresh}
-          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-muted-taupe hover:bg-white/70 active:scale-95 transition-all"
-          title="Refresh"
-        >
-          <span
-            aria-hidden="true"
-            className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sage motion-safe:animate-pulse' : isCloudSyncing ? 'bg-sage' : isOnline ? 'bg-rose' : 'bg-muted-taupe'}`}
-          />
-          {refreshing ? 'Refreshing…'
-            : isCloudSyncing ? 'Synced'
-            : isOnline ? 'Not syncing · Retry'
-            : 'Offline · saved on this phone'}
-        </button>
-      </div>
+      </section>
+
       {/* Desktop: cards flow into two columns; phones/APK keep the single
           column (CSS columns are inert below md). */}
       <div className="md:columns-2 md:gap-x-0">
 
-      {/* Income and spending for the period picked above */}
-      <div className="grid grid-cols-2 gap-4 px-6 py-2 break-inside-avoid">
-        {([
-          { label: 'Income', amount: income, sign: '+', icon: 'add', tint: 'bg-sage-light text-sage', today: getDailyIncome(), count: credits, noun: 'credit' },
-          { label: 'Spending', amount: expenses, sign: '−', icon: 'remove', tint: 'bg-rose-light text-rose', today: getDailyExpense(), count: payments, noun: 'payment' },
-        ] as const).map(card => (
-          <div key={card.label} className="flex flex-col gap-2 rounded-3xl bg-white p-5 shadow-soft border border-black/[0.02] min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${card.tint}`}>
-                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{card.icon}</span>
-              </span>
-              <span className="text-[12px] font-semibold text-muted-taupe">{card.label}</span>
-            </div>
-            <p className="font-serif text-[22px] leading-tight text-premium-charcoal tabular-nums truncate">
-              {card.sign}{formatAmountCompact(card.amount)}
-            </p>
-            <p className="text-[11px] text-muted-taupe tabular-nums truncate">
-              {showingThisMonth
-                ? `Today ${card.sign}${formatAmountCompact(card.today)}`
-                : `${card.count.toLocaleString('en-IN')} ${card.noun}${card.count === 1 ? '' : 's'}`}
-            </p>
-          </div>
-        ))}
-      </div>
+      {/* What's left until pay day, once something has come in */}
+      <LeftToSpendCard onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
 
       {/* Budgets this month (set in Flow → Goals) */}
       {budgetRows.length > 0 ? (
@@ -390,41 +380,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       )}
       {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
       <UnsortedTransfers onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
-      {/* Hunter + Rewind teasers — the USP, front and center */}
-      {(hunt.totalFound > 0.5 || (sinceYear !== null && transactions.length > 50)) && (
-        <div className="px-6 pt-2 pb-1 space-y-3 break-inside-avoid">
-          {hunt.totalFound > 0.5 && (
-            <button
-              onClick={() => onNavigate(AppScreen.HUNTER)}
-              className="w-full bg-premium-charcoal rounded-3xl p-4 shadow-soft flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[20px]">search_insights</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-[13px] font-semibold whitespace-nowrap">
-                  {formatAmountCompact(hunt.totalFound)} quietly leaking out
-                </p>
-                <p className="text-white/50 text-[10px] truncate">fees · double charges · subscription creep</p>
-              </div>
-              <span className="material-symbols-outlined text-white/40 text-[18px] shrink-0">chevron_right</span>
-            </button>
-          )}
-          {sinceYear !== null && transactions.length > 50 && (
-            <button
-              onClick={() => onNavigate(AppScreen.REWIND)}
-              className="w-full bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-sage-light text-sage flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[20px]">history</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-premium-charcoal text-[13px] font-semibold">Your money since {sinceYear}</p>
-                <p className="text-muted-taupe text-[10px] truncate">{transactions.length.toLocaleString('en-IN')} entries · all-time records · Wrapped</p>
-              </div>
-              <span className="material-symbols-outlined text-muted-taupe/50 text-[18px] shrink-0">chevron_right</span>
-            </button>
-          )}
+      {/* Rewind: the whole history, once there's enough of it */}
+      {sinceYear !== null && transactions.length > 50 && (
+        <div className="px-6 pt-2 pb-1 break-inside-avoid">
+          <button
+            onClick={() => onNavigate(AppScreen.REWIND)}
+            className="w-full bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex items-center gap-3 text-left"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-sage-light text-sage flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">history</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-premium-charcoal text-[13px] font-semibold">Your money since {sinceYear}</p>
+              <p className="text-muted-taupe text-[11px] truncate">{transactions.length.toLocaleString('en-IN')} entries · all-time records · Wrapped</p>
+            </div>
+            <span className="material-symbols-outlined text-muted-taupe/50 text-[18px] shrink-0" aria-hidden="true">chevron_right</span>
+          </button>
         </div>
       )}
       {/* Quick Services */}
@@ -468,15 +439,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Import</span>
           </button>
           <button
-            onClick={() => onNavigate(AppScreen.HUNTER)}
-            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
-          >
-            <div className="bg-amber-50 text-amber-500 p-3 rounded-2xl">
-              <span className="material-symbols-outlined">search_insights</span>
-            </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Hunter</span>
-          </button>
-          <button
             onClick={() => onNavigate(AppScreen.REWIND)}
             className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
           >
@@ -484,6 +446,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined">history</span>
             </div>
             <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Rewind</span>
+          </button>
+          <button
+            onClick={() => onNavigate(AppScreen.LEFT_TO_SPEND)}
+            className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
+          >
+            <div className="bg-ocean-light text-ocean p-3 rounded-2xl">
+              <span className="material-symbols-outlined">account_balance_wallet</span>
+            </div>
+            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter text-center leading-tight">Left to spend</span>
           </button>
         </div>
       </div>

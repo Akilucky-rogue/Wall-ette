@@ -2,40 +2,39 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
-import { takeSection } from '../utils/screenSection';
-import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
+import { WallEMascot } from './SplashScreen';
+import { pulseView, usePulseView, type PulseTab } from './pulseView';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
-import { categoryMovers, detectRecurringCharges, monthDailyStats, spendingPace, prettyMerchant } from '../services/analyticsService';
+import { categoryMovers, detectRecurringCharges, monthDailyStats, priceRises, spendingPace, prettyMerchant } from '../services/analyticsService';
 import UnsortedTransfers from './UnsortedTransfers';
 import styles from './SpendAnalysis.module.css';
 
+/** Pulse is a hub (a summary of the month) with a page for each topic. */
+export type PulsePage = 'hub' | 'trends' | 'categories' | 'recurring' | 'health';
+
 interface SpendAnalysisProps {
   onNavigate: (screen: AppScreen) => void;
+  page?: PulsePage;
 }
+
+const PAGE_TITLE: Record<PulsePage, string> = {
+  hub: 'Pulse', trends: 'Trends', categories: 'Categories', recurring: 'Recurring', health: 'Health check',
+};
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
+const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' }) => {
   // Pulse analyses real spending and income only: money moved to your own
   // accounts, family or investments is left out (audit H3).
   const { counted, formatAmount, formatAmountCompact, dailyLimit } = useWallet();
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [chartMode, setChartMode] = useState<'WEEKLY' | 'DAILY'>('DAILY');
-  const [analysisTab, setAnalysisTab] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  // The month and Expenses/Income, shared with Pulse's pages (pulseView.ts).
+  const view = usePulseView();
+  const analysisTab = view.tab;
+  const setAnalysisTab = (tab: PulseTab) => pulseView.setTab(tab);
   const [heatDay, setHeatDay] = useState<number | null>(null); // selected heatmap day (1-based)
   const [selPoint, setSelPoint] = useState<number | null>(null); // selected trends day/week
   
-  // A notification about a bill due soon opens Pulse at Recurring Charges
-  // (utils/screenSection.ts), once the list has rendered.
-  useEffect(() => {
-    if (!takeSection('recurring')) return;
-    // No cleanup: StrictMode's second run must not cancel it, and after an
-    // unmount the element is gone, so this does nothing.
-    setTimeout(() => {
-      document.getElementById('pulse-recurring')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }, 150);
-  }, []);
-
   // Health check (worked out on the phone)
   const [health, setHealth] = useState<FinancialInsight | null>(null);
   const [checking, setChecking] = useState(false);
@@ -53,12 +52,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
     return new Date(maxTs);
   }, [counted]);
 
-  const [selectedDate, setSelectedDate] = useState(latestTxDate);
-  
-  // Update selectedDate when latestTxDate changes (e.g., new import)
-  useEffect(() => {
-    setSelectedDate(latestTxDate);
-  }, [latestTxDate]);
+  // Until a month is picked, Pulse follows the newest data (a new import moves it).
+  const selectedDate = view.month ?? latestTxDate;
 
   // Helper: Get days in month
   const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -324,14 +319,46 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
   };
 
   const handleMonthChange = (offset: number) => {
-    const newDate = new Date(selectedDate);
-    newDate.setMonth(newDate.getMonth() + offset);
-    setSelectedDate(newDate);
+    pulseView.setMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + offset, 1));
   };
+
+  // Price rises across the whole history (Recurring page)
+  const rises = useMemo(() => (page === 'recurring' ? priceRises(counted) : []), [page, counted]);
 
   const currentTotal = analysisTab === 'EXPENSE' ? totalExpense : totalIncome;
   const currentData = analysisTab === 'EXPENSE' ? filteredExpenses : filteredIncome;
   const chartColor = analysisTab === 'EXPENSE' ? 'var(--rose-strong)' : 'var(--sage)';
+
+  // The hub's rows, each with a line from its page.
+  const pageRows = (() => {
+    const isExp = analysisTab === 'EXPENSE';
+    const busiest = dayStats.maxDaily > 0
+      ? dayStats.daily.reduce((best, v, i) => (v > dayStats.daily[best] ? i : best), 0)
+      : -1;
+    const top = categoryBreakdown[0];
+    return [
+      {
+        screen: AppScreen.PULSE_TRENDS, title: 'Trends', icon: 'show_chart', tint: 'bg-ocean-light text-ocean',
+        preview: busiest >= 0
+          ? `Biggest day ${busiest + 1} ${selectedDate.toLocaleDateString('en-GB', { month: 'short' })} · ${formatAmountCompact(dayStats.daily[busiest])}`
+          : 'Day by day, week by week',
+      },
+      {
+        screen: AppScreen.PULSE_CATEGORIES, title: 'Categories', icon: 'donut_large', tint: 'bg-sage-light text-sage',
+        preview: top ? `${top.name} leads at ${top.percentOfTotal}%` : `Where your ${isExp ? 'money goes' : 'money comes from'}`,
+      },
+      {
+        screen: AppScreen.PULSE_RECURRING, title: 'Recurring', icon: 'autorenew', tint: 'bg-lavender-light text-lavender',
+        preview: recurring.length > 0
+          ? `${recurring.length} ${recurring.length === 1 ? 'charge' : 'charges'} · ${formatAmountCompact(recurringMonthlyTotal)} a month`
+          : 'Bills and subscriptions',
+      },
+      {
+        screen: AppScreen.PULSE_HEALTH, title: 'Health check', icon: 'monitor_heart', tint: 'bg-rose-light text-rose',
+        preview: totalIncome > 0 ? `You kept ${Math.round(Math.max(0, savingsRate))}% of what came in` : 'What stands out this month',
+      },
+    ];
+  })();
 
   // Health check for the selected month, when asked for
   const runHealthCheck = async () => {
@@ -357,89 +384,81 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.6} />
-      <FloatingLeaf className="top-64 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
-      <Paisley className="absolute bottom-40 right-5 opacity-25" color="var(--gold-1)" />
-      <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" />
-      
-      {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-4 justify-between sticky top-0 z-30">
-        <button 
-          onClick={() => onNavigate(AppScreen.DASHBOARD)}
-          className="flex w-10 items-center justify-start text-muted-taupe hover:text-sage transition-colors"
-        >
-          <span className="material-symbols-outlined text-[24px]">chevron_left</span>
-        </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Pulse</h2>
-        <div className="flex w-10 items-center justify-end text-muted-taupe relative">
-          <button 
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            className={`flex items-center justify-center rounded-full h-10 w-10 border border-black/5 transition-colors ${showDatePicker ? 'bg-sage text-white' : 'bg-white/50 hover:bg-white'}`}
+      {/* Header: Pulse, or the page's title with a way back; the month */}
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+        {page !== 'hub' && (
+          <button
+            onClick={() => onNavigate(AppScreen.ANALYSIS)}
+            className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+            aria-label="Back to Pulse"
           >
-            <span className="material-symbols-outlined text-[20px]">calendar_today</span>
+            <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
           </button>
-          
-          {showDatePicker && (
-            <div className="absolute top-12 right-0 bg-white rounded-2xl shadow-xl border border-black/5 p-4 z-[60] animate-slide-up w-48">
-              <div className="flex items-center justify-between mb-2">
-                <button onClick={() => handleMonthChange(-1)} className="p-1 text-muted-taupe hover:text-sage">
-                  <span className="material-symbols-outlined">chevron_left</span>
-                </button>
-                <span className="font-serif font-bold text-premium-charcoal text-sm">
-                  {selectedDate.toLocaleDateString('en-GB')}
-                </span>
-                <button onClick={() => handleMonthChange(1)} className="p-1 text-muted-taupe hover:text-sage">
-                  <span className="material-symbols-outlined">chevron_right</span>
-                </button>
-              </div>
-              <button 
-                onClick={() => { setSelectedDate(latestTxDate); setShowDatePicker(false); }}
-                className="w-full mt-2 text-[10px] uppercase tracking-widest font-bold text-sage py-2 hover:bg-sage-light/30 rounded-lg"
-              >
-                Latest Data
-              </button>
-            </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight truncate">{PAGE_TITLE[page]}</h2>
+          {page !== 'hub' && page !== 'recurring' && (
+            <p className="text-[12px] text-muted-taupe">{analysisTab === 'EXPENSE' ? 'Spending' : 'Income'}</p>
           )}
         </div>
+        {page !== 'recurring' && (
+          <div className="flex items-center rounded-full bg-white shadow-soft border border-black/[0.03] px-1 py-1 shrink-0">
+            <button
+              onClick={() => handleMonthChange(-1)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-taupe hover:text-sage hover:bg-zen-cream"
+              aria-label="Previous month"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_left</span>
+            </button>
+            <button
+              onClick={() => pulseView.setMonth(null)}
+              className="px-1.5 text-[12px] font-semibold text-premium-charcoal tabular-nums"
+              title="Go to the newest data"
+            >
+              {selectedDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+            </button>
+            <button
+              onClick={() => handleMonthChange(1)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-taupe hover:text-sage hover:bg-zen-cream"
+              aria-label="Next month"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_right</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Analysis Tab Switcher */}
-      <div className="px-6 pt-2 pb-4">
-        <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5">
-          <button 
-            onClick={() => setAnalysisTab('EXPENSE')}
-            className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              analysisTab === 'EXPENSE' 
-                ? 'bg-rose/10 text-rose shadow-sm' 
-                : 'text-muted-taupe hover:text-premium-charcoal'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">trending_down</span>
-            Expenses
-          </button>
-          <button 
-            onClick={() => setAnalysisTab('INCOME')}
-            className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              analysisTab === 'INCOME' 
-                ? 'bg-sage/10 text-sage shadow-sm' 
-                : 'text-muted-taupe hover:text-premium-charcoal'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">trending_up</span>
-            Income
-          </button>
+      {/* Expenses / Income: the hub only; its pages follow it */}
+      {page === 'hub' && (
+        <div className="px-6 pt-1 pb-4">
+          <div className="bg-black/[0.04] shadow-pressed rounded-2xl p-1 flex" role="group" aria-label="Show">
+            {(['EXPENSE', 'INCOME'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setAnalysisTab(tab)}
+                aria-pressed={analysisTab === tab}
+                className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  analysisTab === tab ? 'bg-white shadow-soft text-premium-charcoal' : 'text-muted-taupe hover:text-premium-charcoal'
+                }`}
+              >
+                <span className={`material-symbols-outlined icon-fill text-[16px] ${analysisTab === tab ? (tab === 'EXPENSE' ? 'text-rose' : 'text-sage') : ''}`} aria-hidden="true">
+                  {tab === 'EXPENSE' ? 'north_east' : 'south_west'}
+                </span>
+                {tab === 'EXPENSE' ? 'Expenses' : 'Income'}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Stats */}
+      {page === 'hub' && (<>
       <div className="flex flex-col items-center pb-4">
-        <p className="text-muted-taupe text-[10px] font-serif font-medium uppercase tracking-[0.2em] mb-1">
-          {analysisTab === 'EXPENSE' ? 'Total Outflow' : 'Total Inflow'} · {selectedDate.toLocaleDateString('en-GB')}
+        <p className="text-muted-taupe text-[12px] font-medium mb-1">
+          {analysisTab === 'EXPENSE' ? 'Spent in' : 'Came in during'} {selectedDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
         </p>
-        <h1 className={`font-serif text-[38px] leading-tight px-4 text-center ${analysisTab === 'EXPENSE' ? 'text-rose' : 'text-sage'}`}>
-          {formatAmount(currentTotal)}
+        <h1 className={`font-serif text-[40px] leading-tight px-4 text-center tabular-nums ${analysisTab === 'EXPENSE' ? 'text-premium-charcoal' : 'text-sage'}`}>
+          {formatAmount(currentTotal).split('.')[0]}
         </h1>
         
         {/* Comparison Badge */}
@@ -470,12 +489,13 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Transfers to unsorted payees count as spending until sorted (audit H3) */}
       <UnsortedTransfers onNavigate={onNavigate} className="px-6 pb-4" />
+      </>)}
 
       {/* Desktop: sections flow into two columns; phones/APK keep one column */}
       <div className="lg:columns-2 lg:gap-x-0">
 
       {/* TODAY — daily spend analysis, front and center */}
-      {(() => {
+      {page === 'hub' && (() => {
         const now = new Date();
         const isExp = analysisTab === 'EXPENSE';
         const todayTxs = counted
@@ -559,8 +579,33 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         );
       })()}
 
+      {/* Pages: each topic on its own screen */}
+      {page === 'hub' && (
+        <nav className="px-6 pb-4 break-inside-avoid" aria-label="More in Pulse">
+          <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+            {pageRows.map(row => (
+              <li key={row.screen}>
+                <button
+                  onClick={() => onNavigate(row.screen)}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-zen-cream transition-colors"
+                >
+                  <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${row.tint}`}>
+                    <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">{row.icon}</span>
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[14px] font-semibold text-premium-charcoal">{row.title}</span>
+                    <span className="block text-[12px] text-muted-taupe truncate">{row.preview}</span>
+                  </span>
+                  <span className="material-symbols-outlined text-muted-taupe/60 text-[20px] shrink-0" aria-hidden="true">chevron_right</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+
       {/* Quick Stats Row */}
-      {txStats && (
+      {page === 'trends' && txStats && (
         <div className="px-6 pb-4 break-inside-avoid">
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-black/5">
@@ -580,7 +625,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       )}
 
       {/* Net Flow Card — relevant on both tabs */}
-      {totalIncome > 0 && (
+      {page === 'hub' && totalIncome > 0 && (
         <div className="px-6 pb-4 break-inside-avoid">
           <div className={`rounded-2xl p-4 border ${netFlow >= 0 ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex items-center justify-between">
@@ -613,6 +658,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       )}
 
       {/* Interactive Chart Section */}
+      {page === 'trends' && (
       <div className="px-6 py-2 break-inside-avoid">
         <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
           <div className="flex justify-between items-center mb-4">
@@ -762,9 +808,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
           })()}
         </div>
       </div>
+      )}
 
       {/* Budget pace (current month only) */}
-      {analysisTab === 'EXPENSE' && pace && (
+      {page === 'hub' && analysisTab === 'EXPENSE' && pace && (
         <div className="px-6 py-2 break-inside-avoid">
           <div className={`rounded-[28px] p-5 border ${pace.onTrack ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex justify-between items-start mb-2">
@@ -794,7 +841,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Top movers vs last month — both tabs. Colors flip meaning per tab:
           spending up = bad (rose), income up = good (sage). */}
-      {movers.hasPrevData && (movers.up.length > 0 || movers.down.length > 0) && (() => {
+      {page === 'categories' && movers.hasPrevData && (movers.up.length > 0 || movers.down.length > 0) && (() => {
         const upCls = analysisTab === 'EXPENSE' ? 'text-rose bg-rose-light' : 'text-sage bg-sage-light';
         const upText = analysisTab === 'EXPENSE' ? 'text-rose' : 'text-sage';
         const downCls = analysisTab === 'EXPENSE' ? 'text-sage bg-sage-light' : 'text-rose bg-rose-light';
@@ -838,7 +885,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       })()}
 
       {/* Daily heatmap calendar — spend days or income days, per tab */}
-      {dayStats.maxDaily > 0 && (() => {
+      {page === 'trends' && dayStats.maxDaily > 0 && (() => {
         const isExp = analysisTab === 'EXPENSE';
         const rgb = isExp ? '229, 115, 115' : '155, 174, 147'; // rose / sage
         const zeroDays = dayStats.daily.filter(v => v === 0).length;
@@ -924,7 +971,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       })()}
 
       {/* Weekday pattern — per tab (income needs fewer events to qualify) */}
-      {dayStats.txCount >= (analysisTab === 'EXPENSE' ? 5 : 3) && maxWeekdayAvg > 1 && (() => {
+      {page === 'trends' && dayStats.txCount >= (analysisTab === 'EXPENSE' ? 5 : 3) && maxWeekdayAvg > 1 && (() => {
         const isExp = analysisTab === 'EXPENSE';
         return (
           <div className="px-6 py-2 break-inside-avoid">
@@ -958,44 +1005,86 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
         );
       })()}
 
-      {/* Recurring charges / subscriptions */}
-      {analysisTab === 'EXPENSE' && recurring.length > 0 && (
-        <div id="pulse-recurring" className="px-6 py-2 break-inside-avoid scroll-mt-24">
-          <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
-            <div className="flex justify-between items-end mb-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recurring Charges</p>
-                <p className="text-[10px] text-muted-taupe mt-0.5">detected across your history</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[13px] font-serif font-bold text-rose">{formatAmount(recurringMonthlyTotal).split('.')[0]}/mo</p>
-                <p className="text-[9px] text-muted-taupe">≈ {formatAmount(recurringMonthlyTotal * 12).split('.')[0]}/yr</p>
-              </div>
+      {/* Recurring: bills and subscriptions found across the whole history,
+          and the ones that went up in price */}
+      {page === 'recurring' && (
+        <div className="px-6 py-2 space-y-4 break-inside-avoid">
+          {recurring.length === 0 ? (
+            <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] text-center">
+              <span className="material-symbols-outlined icon-fill text-lavender text-[28px]" aria-hidden="true">autorenew</span>
+              <p className="font-serif text-[16px] font-semibold text-premium-charcoal mt-2">No regular charges yet</p>
+              <p className="text-[12px] text-muted-taupe mt-1 leading-relaxed">
+                Bills and subscriptions show up here once a payee charges you about the same amount at least three times.
+              </p>
             </div>
-            <div className="space-y-3">
-              {recurring.map((r, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-2xl bg-lavender-light text-lavender flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[18px]">autorenew</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-premium-charcoal truncate">{r.name}</p>
-                    <p className="text-[9px] text-muted-taupe">
-                      {r.cadence.toLowerCase()} · {r.occurrences}× · next ~{r.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[12px] font-bold text-premium-charcoal">{formatAmount(r.amount).split('.')[0]}</p>
-                    <p className="text-[9px] text-muted-taupe">{formatAmount(r.monthlyCost).split('.')[0]}/mo</p>
-                  </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[12px] text-muted-taupe">Every month, about</p>
+                  <p className="font-serif text-[30px] leading-tight text-premium-charcoal tabular-nums">{formatAmount(recurringMonthlyTotal).split('.')[0]}</p>
                 </div>
-              ))}
+                <p className="text-[12px] text-muted-taupe text-right">
+                  {recurring.length} {recurring.length === 1 ? 'charge' : 'charges'}<br />
+                  {formatAmountCompact(recurringMonthlyTotal * 12)} a year
+                </p>
+              </div>
+              <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+                {[...recurring].sort((a, b) => a.nextExpected.getTime() - b.nextExpected.getTime()).map((r, i) => {
+                  const days = Math.round((new Date(r.nextExpected).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+                  const next = days < 0 ? 'was due ' + r.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                    : days === 0 ? 'due today' : days === 1 ? 'due tomorrow'
+                    : 'next ' + r.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                  return (
+                    <li key={i} className="flex items-center gap-3 px-4 py-3">
+                      <span className="w-9 h-9 rounded-2xl bg-lavender-light text-lavender flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined icon-fill text-[18px]" aria-hidden="true">{getIcon(r.category)}</span>
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[14px] font-semibold text-premium-charcoal truncate" title={r.name}>{prettyMerchant(r.name)}</span>
+                        <span className={`block text-[11px] truncate ${days >= 0 && days <= 3 ? 'text-premium-charcoal font-medium' : 'text-muted-taupe'}`}>
+                          {r.cadence.charAt(0) + r.cadence.slice(1).toLowerCase()} · {next}
+                        </span>
+                      </span>
+                      <span className="text-right shrink-0">
+                        <span className="block text-[14px] font-semibold text-premium-charcoal tabular-nums">{formatAmount(r.amount).split('.')[0]}</span>
+                        {r.cadence !== 'MONTHLY' && (
+                          <span className="block text-[11px] text-muted-taupe tabular-nums">{formatAmountCompact(r.monthlyCost)} a month</span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+          {rises.length > 0 && (
+            <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+              <p className="text-[13px] font-semibold text-premium-charcoal">Gone up in price</p>
+              <p className="text-[12px] text-muted-taupe mb-3">Same payee, same rhythm, a higher amount than before.</p>
+              <ul className="space-y-3">
+                {rises.slice(0, 6).map(rise => (
+                  <li key={rise.key} className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-2xl bg-rose-light text-rose flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined icon-fill text-[18px]" aria-hidden="true">trending_up</span>
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[14px] font-semibold text-premium-charcoal truncate" title={rise.name}>{prettyMerchant(rise.name)}</span>
+                      <span className="block text-[11px] text-muted-taupe tabular-nums">
+                        {formatAmountCompact(rise.from)} → {formatAmountCompact(rise.to)} a month
+                      </span>
+                    </span>
+                    <span className="text-[12px] font-semibold text-rose tabular-nums shrink-0">+{formatAmountCompact(rise.annualExtra)} a year</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* Category Breakdown */}
+      {page === 'categories' && (
       <div className="px-6 py-4 break-inside-avoid">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-premium-charcoal text-base font-serif font-semibold">
@@ -1051,9 +1140,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
           )}
         </div>
       </div>
+      )}
 
       {/* Smart Insights */}
-      {insights.length > 0 && (
+      {page === 'health' && insights.length > 0 && (
         <div className="px-6 py-4 break-inside-avoid">
           <h3 className="text-premium-charcoal text-base font-serif font-semibold mb-3">Smart Insights</h3>
           <div className="space-y-2">
@@ -1082,7 +1172,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
 
       {/* Health check: worked out on the phone (services/insightsService.ts),
           no AI service involved, so nothing here says AI. */}
-      {currentData.length > 0 && (
+      {page === 'health' && currentData.length > 0 && (
         <div className="px-6 py-4 break-inside-avoid">
           <div className="bg-white rounded-[24px] p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -1163,7 +1253,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate }) => {
       )}
 
       {/* Range Stats */}
-      {txStats && (
+      {page === 'trends' && txStats && (
         <div className="px-6 pb-6 break-inside-avoid">
           <div className="bg-gradient-to-br from-premium-charcoal to-premium-charcoal/90 rounded-[24px] p-5 text-white">
             <h4 className="text-[10px] uppercase tracking-widest font-medium text-white/60 mb-3">

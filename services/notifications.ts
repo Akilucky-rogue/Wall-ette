@@ -15,7 +15,7 @@
  * No React or Firebase here, so scripts/check-notifications.mjs runs it in Node.
  */
 import { AppScreen, Transaction, TransactionType } from '../types';
-import { detectRecurringCharges, huntSavings, normalizeMerchant, prettyMerchant } from './analyticsService';
+import { detectRecurringCharges, normalizeMerchant, prettyMerchant, priceRises } from './analyticsService';
 import { walletCopies } from './statementImport';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import type { ScreenSection } from '../utils/screenSection';
@@ -69,7 +69,7 @@ export interface NotificationInput {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Fee Hunter finds older than this stay in Fee Hunter. */
+/** A price rise is news while the charge is this recent. */
 const RECENT_DAYS = 45;
 /** How far ahead a recurring charge counts as due soon. */
 const DUE_AHEAD_DAYS = 3;
@@ -84,7 +84,7 @@ const NEAR_BUDGET = 0.8;
 const MAX_SHOWN = 20;
 
 const RANK = {
-  security: 0, overBudget: 10, overLimit: 11, copies: 20, double: 21, fees: 22, creep: 23,
+  security: 0, overBudget: 10, overLimit: 11, copies: 20, creep: 23,
   due: 30, nearBudget: 31, stale: 40, goal: 50, update: 60, release: 61,
 } as const;
 
@@ -188,12 +188,11 @@ function budgetNotes({ counted, budgets, dailyLimit, now, money }: NotificationI
   return notes;
 }
 
-function hunterNotes({ transactions, counted, now, money }: NotificationInput): AppNotification[] {
+function walletNotes({ transactions, counted, now, money }: NotificationInput): AppNotification[] {
   const notes: AppNotification[] = [];
-  const hunter = { kind: 'screen', screen: AppScreen.HUNTER } as const;
   const from = addDays(localDay(now), -RECENT_DAYS);
 
-  // Entries imported twice: they change the balance, so they come first.
+  // Entries imported twice change the balance; Vault removes the copies.
   const { copies, groups } = walletCopies(transactions);
   if (copies.length > 0) {
     let net = 0;
@@ -205,62 +204,22 @@ function hunterNotes({ transactions, counted, now, money }: NotificationInput): 
       tone: 'warn',
       icon: 'content_copy',
       title: groups === 1 ? `A transaction is in your wallet ${times}` : `${groups} transactions are in your wallet ${times}`,
-      body: `Usually from importing an overlapping statement. ${Math.abs(net) >= 1 ? `They change your balance by ${money(Math.abs(net))}. ` : ''}Remove the extra copies in Fee Hunter.`,
-      action: hunter,
+      body: `Usually from importing an overlapping statement. ${Math.abs(net) >= 1 ? `They change your balance by ${money(Math.abs(net))}. ` : ''}Remove the extra copies in Vault.`,
+      action: { kind: 'screen', screen: AppScreen.HISTORY },
       rank: RANK.copies,
     });
   }
 
-  // Charges and repeats from the last few weeks, copies left out.
-  const copyIds = new Set(copies.map(t => t.id));
-  const recent = counted.filter(t => !copyIds.has(t.id) && dayOf(t) >= from);
-  const found = huntSavings(recent);
-
-  for (const pair of found.doubles.pairs.slice(0, 2)) {
-    const at = parseDay(pair.date);
-    const who = payee(pair.merchant);
-    const times = pair.copies === 2 ? 'twice' : `${pair.copies} times`;
+  // A subscription or bill that went up, while it's still being charged.
+  for (const rise of priceRises(counted).slice(0, 2)) {
+    if (rise.lastDay < from) continue;
     notes.push({
-      id: `double:${pair.date}|${pair.amount.toFixed(2)}|${normalizeMerchant(pair.merchant)}`,
-      tone: 'warn',
-      icon: 'repeat',
-      title: 'Possible double charge',
-      body: `${money(pair.amount)} to ${who} appears ${times} on ${shortDay(at)}. If you paid once, ask ${who} for a refund.`,
-      at,
-      action: hunter,
-      rank: RANK.double,
-    });
-  }
-
-  if (found.fees.count > 0) {
-    const latest = found.fees.items.reduce((d, i) => (i.lastDate > d ? i.lastDate : d), '');
-    const first = payee(found.fees.items[0].merchant);
-    const n = found.fees.count;
-    notes.push({
-      id: `fees:${latest.slice(0, 10)}:${Math.round(found.fees.total)}`,
-      tone: 'warn',
-      icon: 'receipt_long',
-      title: `${money(found.fees.total)} in bank charges`,
-      body: `${n} ${plural(n, 'charge')} since ${shortDay(parseDay(from))}, such as ${first}. See them all in Fee Hunter.`,
-      action: hunter,
-      rank: RANK.fees,
-    });
-  }
-
-  // Price rises need the whole history; only ones still being charged recently.
-  const creep = huntSavings(counted).creep.items;
-  for (const item of creep.slice(0, 2)) {
-    const key = normalizeMerchant(item.name);
-    const lastCharge = counted.reduce((d, t) =>
-      t.type === TransactionType.EXPENSE && normalizeMerchant(t.merchant || '') === key && dayOf(t) > d ? dayOf(t) : d, '');
-    if (lastCharge < from) continue;
-    notes.push({
-      id: `creep:${key}:${Math.round(item.to)}`,
+      id: `creep:${rise.key}:${Math.round(rise.to)}`,
       tone: 'warn',
       icon: 'trending_up',
-      title: `${payee(item.name)} costs more`,
-      body: `Up from ${money(item.from)} to ${money(item.to)} a month, about ${money(item.annualExtra)} more a year.`,
-      action: hunter,
+      title: `${payee(rise.name)} costs more`,
+      body: `Up from ${money(rise.from)} to ${money(rise.to)} a month, about ${money(rise.annualExtra)} more a year.`,
+      action: { kind: 'screen', screen: AppScreen.PULSE_RECURRING },
       rank: RANK.creep,
     });
   }
@@ -287,7 +246,7 @@ function dueNotes({ counted, now, money }: NotificationInput): AppNotification[]
         icon: 'event_upcoming',
         title: `${payee(r.name)} is due ${when}`,
         body: `Usually about ${money(r.amount)} ${CADENCE[r.cadence] ?? ''}`.trim() + '.',
-        action: { kind: 'screen' as const, screen: AppScreen.ANALYSIS, section: 'recurring' as const },
+        action: { kind: 'screen' as const, screen: AppScreen.PULSE_RECURRING },
         rank: RANK.due,
       };
     });
@@ -305,7 +264,7 @@ function dataNotes({ transactions, counted, savingsGoal, now, money }: Notificat
       tone: 'info',
       icon: 'upload_file',
       title: 'Time to import a statement',
-      body: `Your newest entry is from ${shortDay(parseDay(newest))}. Import your latest statement to keep Pulse, Flow and Fee Hunter up to date.`,
+      body: `Your newest entry is from ${shortDay(parseDay(newest))}. Import your latest statement to keep Home, Pulse and Flow up to date.`,
       action: { kind: 'screen', screen: AppScreen.IMPORT },
       rank: RANK.stale,
     });
@@ -375,7 +334,7 @@ export function buildNotifications(input: NotificationInput): AppNotification[] 
   return [
     ...securityNotes(input),
     ...budgetNotes(input),
-    ...hunterNotes(input),
+    ...walletNotes(input),
     ...dueNotes(input),
     ...dataNotes(input),
     ...appNotes(input),

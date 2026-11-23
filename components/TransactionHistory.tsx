@@ -3,7 +3,10 @@ import { AppScreen, Transaction, TransactionType, categoryOptions } from '../typ
 import { useWallet } from '../context/WalletContext';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
-import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
+import { WallEMascot, WallEEyes } from './SplashScreen';
+import { prettyMerchant } from '../services/analyticsService';
+import { paymentRail } from '../utils/names';
+import DuplicateEntries from './DuplicateEntries';
 
 interface TransactionHistoryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -108,23 +111,39 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     return filtered.sort(sortBy === 'DATE_ASC' ? (a, b) => byNewest(b, a) : byNewest);
   }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
 
-  // Group by date (Today, Yesterday, Date String).
-  // Today/Yesterday computed once, not per transaction (audit Phase 2.4).
+  // One group per day, newest first, with the day's net; sorted by amount,
+  // one group in that order instead.
   const groupedTransactions = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
+    if (sortBy === 'AMOUNT_DESC' || sortBy === 'AMOUNT_ASC') {
+      return filteredTransactions.length
+        ? [{ key: 'amount', label: sortBy === 'AMOUNT_DESC' ? 'Largest first' : 'Smallest first', net: null as number | null, items: filteredTransactions }]
+        : [];
+    }
     const todayKey = localDay();
     const yesterdayKey = addDays(todayKey, -1);
-
-    filteredTransactions.forEach(t => {
-      let key = parseDay(t.date).toLocaleDateString('en-GB');
-      if (t.date === todayKey) key = 'Today';
-      else if (t.date === yesterdayKey) key = 'Yesterday';
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(t);
-    });
+    const thisYear = new Date().getFullYear();
+    const groups: { key: string; label: string; net: number | null; items: Transaction[] }[] = [];
+    const byDay = new Map<string, (typeof groups)[number]>();
+    for (const t of filteredTransactions) {
+      const key = isDay(t.date) ? t.date : localDay(parseDay(t.date));
+      let g = byDay.get(key);
+      if (!g) {
+        const d = parseDay(key);
+        const label = key === todayKey ? 'Today'
+          : key === yesterdayKey ? 'Yesterday'
+          : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', ...(d.getFullYear() === thisYear ? {} : { year: 'numeric' }) });
+        g = { key, label, net: 0, items: [] };
+        byDay.set(key, g);
+        groups.push(g);
+      }
+      g.items.push(t);
+      g.net = (g.net ?? 0) + (t.type === TransactionType.INCOME ? t.amount : -t.amount);
+    }
     return groups;
-  }, [filteredTransactions]);
+  }, [filteredTransactions, sortBy]);
+
+  // Exact amounts in the ledger, without ".00".
+  const exact = (n: number) => { const s = formatAmount(n); return s.endsWith('.00') ? s.slice(0, -3) : s; };
 
   // Totals for whatever is currently visible — the "do these filters tally?"
   // strip (single pass, only recomputed when the filtered list changes).
@@ -283,13 +302,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-28 right-4 opacity-35 z-10" delay={0.8} />
-      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2.2} color="var(--sage-3)" />
-      <VineDecoration className="absolute top-20 left-0 opacity-20" />
-      <RangoliCorner className="absolute top-16 right-0 opacity-15" color="var(--gold-1)" mirror />
-      <Paisley className="absolute bottom-36 right-4 opacity-20" />
-      
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
         <div className="flex items-center justify-between mb-5">
@@ -299,7 +311,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
           >
             <span className="material-symbols-outlined text-[28px]">chevron_left</span>
           </button>
-          <h1 className="font-serif text-xl font-semibold tracking-tight">History</h1>
+          <h1 className="font-serif text-xl font-semibold tracking-tight">Vault</h1>
           <div className="flex items-center gap-0.5">
              <button
                 onClick={() => setShowClearConfirm(true)}
@@ -584,40 +596,35 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         </>
       )}
 
-      {/* List */}
-      <main className="px-6 space-y-6 mt-4">
-        {/* Results summary — visible totals for the current filters */}
+      {/* Entries imported twice: remove the extra copies (components/DuplicateEntries.tsx) */}
+      <DuplicateEntries className="px-6 mt-4" />
+
+      {/* List: one card per day, slim rows; tap a row for details */}
+      <main className="px-6 space-y-5 mt-4">
+        {/* Totals for the current filters */}
         {filteredTransactions.length > 0 && (
-          <div className="bg-white rounded-3xl shadow-soft border border-black/[0.02] px-4 py-3 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[10px] text-muted-taupe uppercase tracking-widest font-bold">
-                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'entry' : 'entries'}
-              </p>
-              <p className={`text-[13px] font-serif font-bold whitespace-nowrap ${filteredTotals.net >= 0 ? 'text-sage' : 'text-rose'}`}>
+          <div className="flex items-center justify-between gap-3 px-1 text-[12px]">
+            <p className="text-muted-taupe">
+              {filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'entry' : 'entries'}
+            </p>
+            <p className="flex items-center gap-3 tabular-nums font-semibold">
+              <span className="text-sage">+{formatAmountCompact(filteredTotals.inc)}</span>
+              <span className="text-rose">−{formatAmountCompact(filteredTotals.exp)}</span>
+              <span className={filteredTotals.net >= 0 ? 'text-premium-charcoal' : 'text-rose'}>
                 Net {filteredTotals.net >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(filteredTotals.net))}
-              </p>
-            </div>
-            <div className="flex items-center gap-4 shrink-0 text-right">
-              <div>
-                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">In</p>
-                <p className="text-[12px] font-semibold text-sage whitespace-nowrap tabular-nums">+{formatAmountCompact(filteredTotals.inc)}</p>
-              </div>
-              <div>
-                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Out</p>
-                <p className="text-[12px] font-semibold text-rose whitespace-nowrap tabular-nums">−{formatAmountCompact(filteredTotals.exp)}</p>
-              </div>
-            </div>
+              </span>
+            </p>
           </div>
         )}
-        {Object.entries(groupedTransactions).length === 0 ? (
+        {groupedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-                <WallEMascot 
-                  mood="thinking" 
+                <WallEMascot
+                  mood="thinking"
                   message="Nothing here yet..."
                   size="md"
                 />
                 <p className="mt-4 text-muted-taupe text-sm">No transactions match your filters</p>
-                <button 
+                <button
                   onClick={clearFilters}
                   className="mt-3 text-sage text-xs font-semibold hover:underline"
                 >
@@ -625,104 +632,103 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 </button>
             </div>
         ) : (
-            Object.entries(groupedTransactions).map(([dateLabel, groupTxs]: [string, Transaction[]]) => (
-            <section key={dateLabel}>
-                <h3 className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-4 pl-1">{dateLabel}</h3>
-                <div className="space-y-3">
-                {groupTxs.map(t => (
-                    <div 
-                        key={t.id} 
-                        onClick={() => toggleExpand(t.id)}
-                        className={`bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden transition-all duration-300 ${expandedId === t.id ? 'ring-1 ring-sage/30' : 'active:scale-[0.98]'}`}
-                    >
-                        {/* Main Row */}
-                        <div className="p-4 flex items-center justify-between gap-3 cursor-pointer">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className={`shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center ${t.type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
-                                <span className="material-symbols-outlined text-[22px]">
-                                    {getIconForCategory(t.category)}
+            groupedTransactions.map(group => (
+            <section key={group.key} aria-label={group.label}>
+                <div className="flex items-baseline justify-between px-1 mb-2">
+                  <h3 className="text-[12px] font-semibold text-muted-taupe">{group.label}</h3>
+                  {group.net !== null && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${group.net >= 0 ? 'text-sage' : 'text-muted-taupe'}`}>
+                      {group.net >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(group.net))}
+                    </span>
+                  )}
+                </div>
+                <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+                {group.items.map(t => {
+                    const expanded = expandedId === t.id;
+                    const isExpense = t.type === TransactionType.EXPENSE;
+                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : null;
+                    const sub = [
+                      paymentRail(t.merchant),
+                      t.category && t.category.trim() ? t.category : 'Uncategorized',
+                      group.net === null ? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : null,
+                    ].filter(Boolean).join(' · ');
+                    return (
+                    <li key={t.id}>
+                        <button
+                            type="button"
+                            onClick={() => toggleExpand(t.id)}
+                            aria-expanded={expanded}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${expanded ? 'bg-zen-cream' : 'active:bg-zen-cream'}`}
+                        >
+                            <span className={`shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center ${isExpense ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
+                                <span className="material-symbols-outlined icon-fill text-[18px]" aria-hidden="true">{getIconForCategory(t.category)}</span>
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[14px] font-semibold text-premium-charcoal truncate" title={t.merchant || undefined}>
+                                    {name ?? <span className="italic text-muted-taupe font-normal">Unknown payee</span>}
                                 </span>
-                                </div>
-                                <div className="min-w-0">
-                                  <p
-                                    className="font-serif font-semibold text-[15px] text-premium-charcoal truncate"
-                                    title={t.merchant || "Unknown Merchant"}
-                                  >
-                                    {t.merchant && t.merchant.trim().length > 0 ? t.merchant : <span className="italic text-muted-taupe">Unknown Merchant</span>}
-                                  </p>
-                                  <p
-                                    className="text-[11px] text-muted-taupe uppercase tracking-wider truncate"
-                                    title={t.category && t.category.trim().length > 0 ? t.category : 'Uncategorized'}
-                                  >
-                                    {t.category && t.category.trim().length > 0 ? t.category : <span className="italic text-muted-taupe">Uncategorized</span>}
-                                  </p>
-                                  {t.note && t.note.trim().length > 0 && (
-                                    <p
-                                      className="text-[10px] text-muted-taupe truncate mt-0.5"
-                                      title={t.note}
-                                    >
-                                      {t.note}
-                                    </p>
-                                  )}
-                                </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                                <p className={`font-serif font-bold text-[15px] whitespace-nowrap tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
-                                {t.type === TransactionType.EXPENSE ? '-' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : formatAmount(t.amount)}
-                                </p>
-                            </div>
-                        </div>
+                                <span className="block text-[11px] text-muted-taupe truncate">{sub}</span>
+                            </span>
+                            <span className={`shrink-0 text-[14px] font-semibold tabular-nums whitespace-nowrap ${isExpense ? 'text-premium-charcoal' : 'text-sage'}`}>
+                                {isExpense ? '−' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : exact(t.amount)}
+                            </span>
+                        </button>
 
-                        {/* Expanded Details */}
-                        {expandedId === t.id && (
-                            <div className="px-4 pb-4 pt-0 bg-white">
-                                <div className="pt-4 border-t border-dashed border-gray-100 space-y-3">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">Note</p>
-                                            <p className="text-[13px] text-premium-charcoal font-serif italic">{t.note || "No notes added."}</p>
-                                        </div>
+                        {/* Details */}
+                        {expanded && (
+                            <div className="px-4 pb-4 pt-1 bg-zen-cream space-y-3">
+                                {t.merchant && name !== t.merchant && (
+                                    <div>
+                                        <p className="text-[11px] text-muted-taupe mb-0.5">From the bank</p>
+                                        <p className="text-[12px] text-premium-charcoal break-all leading-snug">{t.merchant}</p>
                                     </div>
-                                    {(() => {
-                                        // Money moved isn't spending or income (audit H3): say why
-                                        const info = flowOf(t);
-                                        if (info.flow !== 'moved' || !info.moved) return null;
-                                        return (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
-                                                className="flex items-center gap-1.5 text-[11px] text-lavender font-semibold"
-                                            >
-                                                <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-                                                Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
-                                            </button>
-                                        );
-                                    })()}
-                                    <div className="flex justify-between items-center pt-1">
-                                         <div>
-                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">{entryTime(t) ? 'Time' : 'Date'}</p>
-                                            <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={(e) => openEditModal(t, e)}
-                                                className="text-[10px] bg-sage-light text-sage px-3 py-1.5 rounded-full font-bold uppercase tracking-wider hover:bg-sage/20 transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button 
-                                                onClick={(e) => requestDelete(t.id, e)}
-                                                className="text-[10px] bg-rose-light text-rose px-3 py-1.5 rounded-full font-bold uppercase tracking-wider hover:bg-rose/20 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
+                                )}
+                                {t.note && t.note.trim() && (
+                                    <div>
+                                        <p className="text-[11px] text-muted-taupe mb-0.5">Note</p>
+                                        <p className="text-[13px] text-premium-charcoal">{t.note}</p>
+                                    </div>
+                                )}
+                                {(() => {
+                                    // Money moved isn't spending or income (audit H3): say why
+                                    const info = flowOf(t);
+                                    if (info.flow !== 'moved' || !info.moved) return null;
+                                    return (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
+                                            className="flex items-center gap-1.5 text-[12px] text-lavender font-semibold"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">swap_horiz</span>
+                                            Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
+                                        </button>
+                                    );
+                                })()}
+                                <div className="flex justify-between items-end gap-3">
+                                    <div>
+                                        <p className="text-[11px] text-muted-taupe mb-0.5">{entryTime(t) ? 'Time' : 'Date'}</p>
+                                        <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => openEditModal(t, e)}
+                                            className="text-[12px] bg-white text-sage px-4 py-1.5 rounded-full font-semibold shadow-soft"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={(e) => requestDelete(t.id, e)}
+                                            className="text-[12px] bg-white text-rose px-4 py-1.5 rounded-full font-semibold shadow-soft"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         )}
-                    </div>
-                ))}
-                </div>
+                    </li>
+                    );
+                })}
+                </ul>
             </section>
             ))
         )}

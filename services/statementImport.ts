@@ -7,7 +7,7 @@
 // RTGS. Rows without one (IFT, NACH, ATM, charges, interest) are known by
 // their narration instead. With the date, direction and amount that gives one
 // key per transaction, the same in the PDF and the Excel export. The import
-// check, the import ids and Fee Hunter's duplicate cleaner all use it
+// check, the import ids and Vault's duplicate cleaner all use it
 // (audit L1–L3).
 
 import { Transaction, TransactionType } from '../types';

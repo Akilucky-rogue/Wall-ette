@@ -7,9 +7,8 @@
  *     moment later, nor old ones; a wrong code reads as a code
  *   - budgets nearly used and over budget, and today's limit, use this
  *     month's spending; a budget going over after nearing is news again
- *   - entries imported twice, possible double charges, bank charges and
- *     price rises from the last few weeks are found, and a double charge is
- *     not also reported for an entry imported twice
+ *   - entries imported twice (removed in Vault) and price rises still
+ *     being charged (Pulse → Recurring) are found
  *   - recurring charges due in the next three days are listed, later ones not
  *   - an import reminder appears once the newest entry is a month old, and
  *     last month's savings goal only once that month is complete
@@ -142,17 +141,14 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('budgets: on the last day', lastDay[0]?.body, '₹900 of ₹1,000 spent, on the last day of November.');
 }
 
-// ── Fee Hunter finds ───────────────────────────────────────────────────────
+// ── Entries imported twice; price rises ────────────────────────────────────
 {
   const myntra = 'UPI/DR/631811223344/MYNTRA DESIGNS/YESB/myntra@ybl/UPI';
   const imported = 'NEFT/N123456789/ACME RENTALS/HDFC0001234';
   const spotify = n => `UPI/DR/61${n}00000000/SPOTIFY INDIA/HDFC/spotify@hdfc/UPI`;
   const list = [
     out('2026-11-14', 1299, 'Clothing', myntra),
-    out('2026-11-14', 1299, 'Clothing', myntra),
-    out('2026-08-02', 2499, 'Clothing', myntra), // a repeat long ago: Fee Hunter only
-    out('2026-08-02', 2499, 'Clothing', myntra),
-    out('2026-10-28', 236, 'Bank Charges', 'SMS ALERT CHARGES QTR SEP'),
+    out('2026-11-14', 1299, 'Clothing', myntra), // the same day twice, typed: not a statement copy
     out('2026-11-06', 590, 'Bank Charges', 'DEBIT CARD ANNUAL FEE'),
     out('2026-11-05', 15000, 'Rent', imported, 'import-1'),
     out('2026-11-05', 15000, 'Rent', imported, 'import-2'), // the same statement row, imported twice
@@ -163,18 +159,13 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   const copies = byPrefix(got, 'copies:');
   eq('copies: found', ids(copies), ['copies:1:-15000']);
   eq('copies: title', copies[0]?.title, 'A transaction is in your wallet twice');
-  eq('copies: body', copies[0]?.body, 'Usually from importing an overlapping statement. They change your balance by ₹15,000. Remove the extra copies in Fee Hunter.');
-  const doubles = byPrefix(got, 'double:');
-  eq('double: only the recent one, not the rent imported twice', ids(doubles), ['double:2026-11-14|1299.00|upidrmyntradesignsyesbmyntrayblupi']);
-  eq('double: body', doubles[0]?.body, '₹1,299 to Myntra Designs appears twice on 14 Nov. If you paid once, ask Myntra Designs for a refund.');
-  eq('double: opens Fee Hunter', doubles[0]?.action, { kind: 'screen', screen: 'HUNTER' });
-  const fees = byPrefix(got, 'fees:');
-  eq('fees: total of the recent ones', fees[0]?.title, '₹826 in bank charges');
-  eq('fees: body', fees[0]?.body, '2 charges since 6 Oct, such as Debit Card Annual Fee. See them all in Fee Hunter.');
-  eq('fees: id has the latest day', fees[0]?.id, 'fees:2026-11-06:826');
+  eq('copies: body', copies[0]?.body, 'Usually from importing an overlapping statement. They change your balance by ₹15,000. Remove the extra copies in Vault.');
+  eq('copies: opens Vault', copies[0]?.action, { kind: 'screen', screen: 'HISTORY' });
+  eq('no double-charge or bank-charge notices', ids(got).filter(id => /^(double|fees):/.test(id)), []);
   const creep = byPrefix(got, 'creep:');
   eq('creep: the price rise', creep[0]?.title, 'Spotify India costs more');
   eq('creep: body', creep[0]?.body, 'Up from ₹119 to ₹139 a month, about ₹240 more a year.');
+  eq('creep: opens Recurring', creep[0]?.action, { kind: 'screen', screen: 'PULSE_RECURRING' });
 
   const stopped = list.filter(t => !(t.merchant.includes('SPOTIFY') && t.date >= '2026-10-01'));
   eq('creep: not once the charges stopped weeks ago', ids(byPrefix(build_({ transactions: stopped, now: new Date(2026, 11, 28) }), 'creep:')), []);
@@ -195,7 +186,7 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('due: Netflix in two days, not the gym in 11', ids(due), ['due:upidrnetflixcomicicnetflixiciciupi:2026-11-22']);
   eq('due: title', due[0]?.title, 'Netflix.com is due on 22 Nov');
   eq('due: body', due[0]?.body, 'Usually about ₹649 a month.');
-  eq('due: opens Pulse at Recurring Charges', due[0]?.action, { kind: 'screen', screen: 'ANALYSIS', section: 'recurring' });
+  eq('due: opens Recurring', due[0]?.action, { kind: 'screen', screen: 'PULSE_RECURRING' });
   eq('due: tomorrow', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 21, 9) }), 'due:')[0]?.title, 'Netflix.com is due tomorrow');
   eq('due: today', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 22, 9) }), 'due:')[0]?.title, 'Netflix.com is due today');
   eq('due: not when it is already past', ids(byPrefix(build_({ transactions: list, now: new Date(2026, 10, 24, 9) }), 'due:')), []);
@@ -206,7 +197,7 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   const old = [out('2026-10-12', 500, 'Dining', 'x'), out('2026-09-30', 200, 'Dining', 'y')];
   const stale = byPrefix(build_({ transactions: old }), 'stale:');
   eq('stale: a month without entries', ids(stale), ['stale:2026-11']);
-  eq('stale: body', stale[0]?.body, 'Your newest entry is from 12 Oct. Import your latest statement to keep Pulse, Flow and Fee Hunter up to date.');
+  eq('stale: body', stale[0]?.body, 'Your newest entry is from 12 Oct. Import your latest statement to keep Home, Pulse and Flow up to date.');
   eq('stale: opens Import', stale[0]?.action, { kind: 'screen', screen: 'IMPORT' });
   eq('stale: not within a month', ids(byPrefix(build_({ transactions: [out('2026-10-25', 500, 'Dining', 'x')] }), 'stale:')), []);
   eq('stale: nothing for an empty wallet', ids(build_({ transactions: [] })), []);

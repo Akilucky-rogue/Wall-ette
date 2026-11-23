@@ -101,12 +101,12 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   const [s] = build_({ unlocks: tries });
   eq('security: id is the latest failed try', s?.id, `security:${at(20, 2, 11).getTime()}`);
   eq('security: title counts the tries', s?.title, '2 failed unlock attempts');
-  eq('security: body', s?.body, "Wrong passwords were entered on the lock screen, most recently today at 02:11. If that wasn't you, change your password in Profile.");
-  eq('security: opens Profile', s?.action, { kind: 'screen', screen: 'SELF' });
+  eq('security: body', s?.body, "Wrong passwords were entered on the lock screen, most recently today at 02:11. If that wasn't you, tap to change your password.");
+  eq('security: opens Account and security', s?.action, { kind: 'screen', screen: 'SELF_ACCOUNT' });
   eq('security: first in the list', s?.rank, 0);
 
   const [code] = build_({ unlocks: [{ at: at(19, 23, 14), ok: false, method: 'MFA' }] });
-  eq('security: a wrong code', code?.body, "A wrong code was entered on the lock screen yesterday at 23:14. If that wasn't you, change your password in Profile.");
+  eq('security: a wrong code', code?.body, "A wrong code was entered on the lock screen yesterday at 23:14. If that wasn't you, tap to change your password.");
   eq('security: one try', code?.title, 'Failed unlock attempt');
 }
 

@@ -26,8 +26,10 @@ import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 export interface UpcomingBill {
   name: string;
   amount: number;
-  /** 'YYYY-MM-DD' */
+  /** 'YYYY-MM-DD'; today for a bill that's a few days late. */
   due: string;
+  /** The day a late bill was expected, 'YYYY-MM-DD'; null when it isn't late. */
+  wasDue: string | null;
 }
 
 export interface LeftToSpend {
@@ -154,9 +156,11 @@ export function leftToSpend({ transactions, flowOf, savingsGoal, now = new Date(
     let due = localDay(r.nextExpected);
     // A few days late is still expected; much later, it has probably stopped.
     if (due < addDays(today, -LATE_BILL_DAYS)) continue;
-    if (due < today) due = today;
+    let wasDue: string | null = null;
+    if (due < today) { wasDue = due; due = today; }
     while (due < until) {
-      bills.push({ name: r.name, amount: r.amount, due });
+      bills.push({ name: r.name, amount: r.amount, due, wasDue });
+      wasDue = null;
       if (!step) break;
       due = addDays(due, step);
     }

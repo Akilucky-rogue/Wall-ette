@@ -126,10 +126,10 @@ function securityNotes({ unlocks, now }: NotificationInput): AppNotification[] {
     icon: 'gpp_maybe',
     title: n === 1 ? 'Failed unlock attempt' : `${n} failed unlock attempts`,
     body: n === 1
-      ? `A wrong ${what} was entered on the lock screen ${whenSaid(last, now)}. If that wasn't you, change your password in Profile.`
-      : `Wrong ${what} were entered on the lock screen, most recently ${whenSaid(last, now)}. If that wasn't you, change your password in Profile.`,
+      ? `A wrong ${what} was entered on the lock screen ${whenSaid(last, now)}. If that wasn't you, tap to change your password.`
+      : `Wrong ${what} were entered on the lock screen, most recently ${whenSaid(last, now)}. If that wasn't you, tap to change your password.`,
     at: last,
-    action: { kind: 'screen', screen: AppScreen.SELF },
+    action: { kind: 'screen', screen: AppScreen.SELF_ACCOUNT },
     rank: RANK.security,
   }];
 }

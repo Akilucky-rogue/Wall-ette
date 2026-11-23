@@ -64,7 +64,12 @@ export enum AppScreen {
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
   REWIND = 'REWIND', // Time Machine + Wrapped
-  SELF = 'SELF' // Profile
+  SELF = 'SELF', // Profile
+  SELF_ACCOUNT = 'SELF_ACCOUNT', // Account and security
+  SELF_ALERTS = 'SELF_ALERTS', // Alerts and limits
+  SELF_DATA = 'SELF_DATA', // Your data
+  SELF_APPEARANCE = 'SELF_APPEARANCE',
+  SELF_ABOUT = 'SELF_ABOUT',
 }
 
 // The one category list: statement parsers (services/categorize.ts), New

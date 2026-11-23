@@ -51,7 +51,12 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.PULSE_CATEGORIES]: AppScreen.ANALYSIS,
   [AppScreen.PULSE_RECURRING]: AppScreen.ANALYSIS,
   [AppScreen.PULSE_HEALTH]: AppScreen.ANALYSIS,
-  [AppScreen.MONEY_MOVED]: AppScreen.SELF,
+  [AppScreen.SELF_ACCOUNT]: AppScreen.SELF,
+  [AppScreen.SELF_ALERTS]: AppScreen.SELF,
+  [AppScreen.SELF_DATA]: AppScreen.SELF,
+  [AppScreen.SELF_APPEARANCE]: AppScreen.SELF,
+  [AppScreen.SELF_ABOUT]: AppScreen.SELF,
+  [AppScreen.MONEY_MOVED]: AppScreen.SELF_DATA,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
   [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
 };
@@ -352,6 +357,16 @@ function AppContent() {
         return <LeftToSpend onNavigate={handleNavigate} />;
       case AppScreen.SELF:
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} />;
+      case AppScreen.SELF_ACCOUNT:
+        return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="account" />;
+      case AppScreen.SELF_ALERTS:
+        return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="alerts" />;
+      case AppScreen.SELF_DATA:
+        return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="data" />;
+      case AppScreen.SELF_APPEARANCE:
+        return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="appearance" />;
+      case AppScreen.SELF_ABOUT:
+        return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="about" />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }
@@ -382,6 +397,11 @@ function AppContent() {
           currentScreen === AppScreen.INCOME_INSIGHTS ||
           currentScreen === AppScreen.CATEGORY_SPLIT ||
           currentScreen === AppScreen.SELF ||
+          currentScreen === AppScreen.SELF_ACCOUNT ||
+          currentScreen === AppScreen.SELF_ALERTS ||
+          currentScreen === AppScreen.SELF_DATA ||
+          currentScreen === AppScreen.SELF_APPEARANCE ||
+          currentScreen === AppScreen.SELF_ABOUT ||
           currentScreen === AppScreen.EXPORT ||
           currentScreen === AppScreen.REWIND ||
           currentScreen === AppScreen.LEFT_TO_SPEND ||

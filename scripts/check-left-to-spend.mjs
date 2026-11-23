@@ -110,6 +110,7 @@ const rent = d => out(d, 22000, 'Rent', 'IMPS/P2A/512000000005/SUNRISE HOMES/ICI
   const r = leftToSpend({ transactions: list, flowOf, savingsGoal: 0, now: NOW });
   eq('bills: weekly twice, late one today, stopped one out', r.bills.map(b => [b.due, b.amount]),
     [['2026-11-23', 1500], ['2026-11-23', 649], ['2026-11-30', 1500]]);
+  eq('bills: the late one says when it was due', r.bills.map(b => b.wasDue), [null, '2026-11-20', null]);
 }
 
 // ── Without a known pay; pay late; nothing in ──────────────────────────────

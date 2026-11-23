@@ -15,7 +15,10 @@ const TABS: { screen: AppScreen; label: string; icon: string; owns: AppScreen[] 
     screen: AppScreen.ANALYSIS, label: 'Pulse', icon: 'query_stats',
     owns: [AppScreen.PULSE_TRENDS, AppScreen.PULSE_CATEGORIES, AppScreen.PULSE_RECURRING, AppScreen.PULSE_HEALTH, AppScreen.CATEGORY_SPLIT],
   },
-  { screen: AppScreen.SELF, label: 'Self', icon: 'account_circle', owns: [AppScreen.MONEY_MOVED] },
+  {
+    screen: AppScreen.SELF, label: 'Self', icon: 'account_circle',
+    owns: [AppScreen.SELF_ACCOUNT, AppScreen.SELF_ALERTS, AppScreen.SELF_DATA, AppScreen.SELF_APPEARANCE, AppScreen.SELF_ABOUT, AppScreen.MONEY_MOVED],
+  },
 ];
 
 /** The bottom dock: a raised bar floating over the page. */

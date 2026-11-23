@@ -53,8 +53,11 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   links to its own pages, `PULSE_TRENDS`, `PULSE_CATEGORIES`, `PULSE_RECURRING` and
   `PULSE_HEALTH` (the same component with `page` set); they share the month and the
   Expenses/Income switch through `components/pulseView.ts`, a small `useSyncExternalStore`
-  store. Home opens `LEFT_TO_SPEND` (§5). `components/Navigation.tsx` lists the screens each tab
-  owns, so a page keeps its tab lit. The screen container is keyed by screen and plays a
+  store. Self is a hub (who you are, sign out) with `SELF_ACCOUNT`, `SELF_ALERTS`, `SELF_DATA`,
+  `SELF_APPEARANCE` and `SELF_ABOUT` (`Profile` with `page` set); Money moved now sits under
+  Your data. Home opens `LEFT_TO_SPEND` (§5); the 12-month balance chart moved from Home to
+  Flow's Story (`components/BalanceTrend.tsx`, ending at the story's month).
+  `components/Navigation.tsx` lists the screens each tab owns, so a page keeps its tab lit. The screen container is keyed by screen and plays a
   motion-safe entrance: deeper pages slide in from the right, Back slides the other way, tabs
   rise into place (`motionFor` in `App.tsx`; tailwind `page-in`, `page-back`, `tab-in`).
 - **Splash & lock flow** — cold start on native boots into `SecurityLock` (biometric prompt)

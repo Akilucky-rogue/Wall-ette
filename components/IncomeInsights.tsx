@@ -4,7 +4,8 @@ import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
-import { WallEMascot, FloatingLeaf, LotusFlower, RangoliCorner, MandalaDots } from './SplashScreen';
+import { WallEMascot } from './SplashScreen';
+import BalanceTrend from './BalanceTrend';
 
 interface IncomeInsightsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -113,6 +114,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   );
 
   const storyKey = storyMonth && monthAgg.has(storyMonth) ? storyMonth : (monthKeys[0] ?? null);
+  // The story's month as a date, for the balance chart (stable while it's picked).
+  const storyEnd = useMemo(() => (storyKey ? new Date(+storyKey.slice(0, 4), +storyKey.slice(5) - 1, 1) : new Date()), [storyKey]);
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -256,23 +259,16 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
-      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="var(--gold-2)" />
-      <MandalaDots className="absolute bottom-44 left-6 opacity-20" />
-
       {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
-          className="flex w-10 items-center justify-start text-muted-taupe hover:text-sage transition-colors"
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Back to Home"
         >
-          <span className="material-symbols-outlined text-[24px]">arrow_back_ios</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Flow</h2>
-        <div className="relative flex w-10 items-center justify-end text-muted-taupe"></div>
+        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Flow</h2>
       </div>
 
       {!hasData ? (
@@ -490,6 +486,11 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   </div>
                 )}
               </div>
+
+              {/* The balance over the 12 months up to the story's month */}
+              {storyKey && (
+                <BalanceTrend endMonth={storyEnd} className="break-inside-avoid" />
+              )}
 
               {/* 12-month income trend */}
               {trend && (

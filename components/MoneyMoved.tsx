@@ -3,7 +3,6 @@ import { AppScreen, PayeeKind, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { flowClassifier, matchText, MIN_MATCH, suggestPayees } from '../services/spend';
 import { parseDay } from '../utils/dates';
-import { FloatingLeaf, RangoliCorner, Paisley } from './SplashScreen';
 
 interface MoneyMovedProps {
   onNavigate: (screen: AppScreen) => void;
@@ -82,22 +81,15 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.5} />
-      <FloatingLeaf className="top-52 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Paisley className="absolute bottom-40 left-6 opacity-25" flip />
-
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
-          onClick={() => onNavigate(AppScreen.SELF)}
-          className="text-muted-taupe flex size-10 shrink-0 items-center justify-start hover:text-sage transition-colors"
-          aria-label="Back to profile"
+          onClick={() => onNavigate(AppScreen.SELF_DATA)}
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Back to Your data"
         >
-          <span className="material-symbols-outlined text-[24px]">arrow_back_ios</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Money Moved</h2>
-        <div className="w-10" />
+        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Money moved</h2>
       </div>
 
       <div className="px-6 pt-6 pb-4">

@@ -14,32 +14,59 @@ import {
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateBiometric, isNative } from '../utils/biometric';
 import { log } from '../utils/log';
 import { PRIVACY_URL, TERMS_URL } from '../utils/site';
-import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
+import { WallEEyes } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
+import { openAt } from '../utils/screenSection';
+
+/** Self is a hub (who you are, and links) and a page for each group of settings. */
+export type SelfPage = 'hub' | 'account' | 'alerts' | 'data' | 'appearance' | 'about';
+
+const PAGE_TITLE: Record<SelfPage, string> = {
+  hub: 'Self',
+  account: 'Account and security',
+  alerts: 'Alerts and limits',
+  data: 'Your data',
+  appearance: 'Appearance',
+  about: 'About',
+};
 
 interface ProfileProps {
   onNavigate: (screen: AppScreen) => void;
   onLogout?: () => void;
+  page?: SelfPage;
 }
 
+/** A setting: icon, name, what it does, and its control. Tappable when it opens something. */
 const Row: React.FC<{ icon: string; iconCls: string; title: string; sub: string; children?: React.ReactNode; onClick?: () => void }> =
-  ({ icon, iconCls, title, sub, children, onClick }) => (
-  <div className={`flex items-center justify-between gap-3 ${onClick ? 'cursor-pointer group' : ''}`} onClick={onClick}>
-    <div className="flex items-center gap-3 min-w-0">
-      <div className={`p-2 rounded-xl shrink-0 ${iconCls}`}>
-        <span className="material-symbols-outlined text-[20px]">{icon}</span>
-      </div>
-      <div className="min-w-0">
-        <p className={`text-premium-charcoal font-serif font-medium text-[15px] ${onClick ? 'group-hover:text-sage transition-colors' : ''}`}>{title}</p>
-        <p className="text-muted-taupe text-[10px] leading-relaxed">{sub}</p>
-      </div>
-    </div>
-    <div className="shrink-0">{children}</div>
+  ({ icon, iconCls, title, sub, children, onClick }) => {
+  const inner = (
+    <>
+      <span className="flex items-center gap-3 min-w-0">
+        <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${iconCls}`}>
+          <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">{icon}</span>
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[14px] font-semibold text-premium-charcoal">{title}</span>
+          <span className="block text-[12px] text-muted-taupe leading-snug">{sub}</span>
+        </span>
+      </span>
+      <span className="shrink-0">{children}</span>
+    </>
+  );
+  return onClick
+    ? <button onClick={onClick} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-zen-cream transition-colors">{inner}</button>
+    : <div className="flex items-center justify-between gap-3 px-4 py-3.5">{inner}</div>;
+};
+
+/** Rows on one card, with hairlines between them. */
+const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
+    {children}
   </div>
 );
 
@@ -59,9 +86,9 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
   { label: 'Special (@$!%*?&)', test: s => /[@$!%*?&]/.test(s) },
 ];
 
-const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
+const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' }) => {
   const { user } = useAuth();
-  const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions } = useWallet();
+  const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions, currency } = useWallet();
 
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -290,219 +317,287 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     ? new Date(user.metadata.creationTime).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
     : '—';
   const monthlyNet = getMonthlyIncome() - getMonthlyExpense();
+  const money = (n: number) => formatAmount(n).split('.')[0];
+  const lastSignIn = lastLoginTime
+    ? `${lastLoginTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${lastLoginTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'just now';
+  const themeName = themeMode === 'auto'
+    ? 'Matches your phone'
+    : `${themeSwatches().find(s => s.id === themeMode)?.name ?? 'Sage'} theme`;
+  const chevron = <span className="material-symbols-outlined text-muted-taupe/60 text-[20px]" aria-hidden="true">chevron_right</span>;
+  const external = <span className="material-symbols-outlined text-muted-taupe/60 text-[18px]" aria-hidden="true">open_in_new</span>;
+
+  const pages: { screen: AppScreen; title: string; icon: string; tint: string; preview: string }[] = [
+    {
+      screen: AppScreen.SELF_ACCOUNT, title: PAGE_TITLE.account, icon: 'shield_person', tint: 'bg-sage-light text-sage',
+      preview: isNative() && bioOn ? 'Biometric unlock is on' : 'Password, unlock and sign-in',
+    },
+    {
+      screen: AppScreen.SELF_ALERTS, title: PAGE_TITLE.alerts, icon: 'notifications', tint: 'bg-rose-light text-rose',
+      preview: dailyLimit > 0 ? `Daily limit ${money(dailyLimit)}` : 'No daily limit set',
+    },
+    {
+      screen: AppScreen.SELF_DATA, title: PAGE_TITLE.data, icon: 'folder_open', tint: 'bg-lavender-light text-lavender',
+      preview: 'Import, export and money moved',
+    },
+    {
+      screen: AppScreen.SELF_APPEARANCE, title: PAGE_TITLE.appearance, icon: 'palette', tint: 'bg-ocean-light text-ocean',
+      preview: `${themeName}, amounts in ${currency}`,
+    },
+    {
+      screen: AppScreen.SELF_ABOUT, title: PAGE_TITLE.about, icon: 'info', tint: 'bg-sand-light text-[#A8844F]',
+      preview: `Version ${__APP_VERSION__}`,
+    },
+  ];
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.5} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.6} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
-      <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" color="var(--gold-2)" />
-      <MandalaDots className="absolute bottom-52 left-6 opacity-20" />
-      <PottedPlant className="absolute bottom-40 right-6 opacity-35" />
-
-      {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
-        <div className="w-10" />
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Self</h2>
-        <div className="w-10" />
-      </div>
-
-      {/* Hero */}
-      <div className="flex flex-col items-center pt-6 pb-4 relative">
-        <div className="relative">
-          <div className="absolute -top-2 -left-6 rotate-45"><LotusFlower size="sm" color="var(--rose-2)" className="opacity-50" /></div>
-          <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center border-4 border-white shadow-lg">
-            <WallEEyes size="lg" />
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 flex items-center justify-center border-2 border-white shadow-md">
-              <span className="text-amber-700 text-xs font-bold">₹</span>
-            </div>
-          </div>
-        </div>
-        <h3 className="text-premium-charcoal font-serif text-xl font-semibold mt-4">{user?.email?.split('@')[0]}</h3>
-        <p className="text-muted-taupe text-xs">{user?.email}</p>
-
-        {/* Quick stats */}
-        <div className="mt-5 grid grid-cols-3 gap-2 px-6 w-full">
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">Entries</span>
-            <span className="text-sm font-serif font-bold text-premium-charcoal mt-0.5">{transactions.length}</span>
-          </div>
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">This Month</span>
-            <span className={`text-sm font-serif font-bold mt-0.5 ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
-              {monthlyNet >= 0 ? '+' : '−'}{formatAmount(Math.abs(monthlyNet)).split('.')[0]}
-            </span>
-          </div>
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">Member Since</span>
-            <span className="text-sm font-serif font-bold text-premium-charcoal mt-0.5">{memberSince}</span>
-          </div>
-        </div>
-        <p className="text-[10px] text-muted-taupe mt-3">
-          Last login: {lastLoginTime ? lastLoginTime.toLocaleDateString('en-GB') + ' ' + lastLoginTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-        </p>
-      </div>
-
-      <div className="px-6 space-y-6 md:columns-2 md:gap-x-5 md:space-y-0">
-          {/* Security */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Security</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  {isNative() && (
-                    <Row icon="fingerprint" iconCls="bg-sage-light text-sage" title="Biometric Unlock"
-                         sub={bioSupported ? 'Use fingerprint/face to unlock the session' : 'No biometrics enrolled on this device'}>
-                      {bioSupported && <Toggle checked={bioOn} onChange={toggleBiometric} label="Biometric unlock" />}
-                    </Row>
-                  )}
-
-                  <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-Factor Auth"
-                       sub="Authenticator-app sign-in — on the roadmap">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-gray-100 text-muted-taupe">
-                        Coming Soon
-                      </span>
-                  </Row>
-
-                  <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change Password"
-                       sub="Re-verify your current password to set a new one" onClick={openPwModal}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-
-                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Warns when today's spending goes past it · shown in Pulse's Today card">
-                      <div className="relative flex items-center">
-                        <input
-                          id="daily-limit-input"
-                          type="number"
-                          min="0"
-                          value={limitInput}
-                          onChange={e => { const val = e.target.value; if (/^\d*$/.test(val) || val === '') setLimitInput(val); setLimitSaved(false); }}
-                          onBlur={handleSaveLimit}
-                          placeholder="No Limit"
-                          title="Daily spend limit"
-                          aria-label="Daily spend limit"
-                          className="w-24 text-right bg-zen-bg border-none rounded-lg py-1.5 px-2 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage transition-colors"
-                        />
-                        {limitSaved && <span className="absolute -left-4 text-sage text-xs" aria-live="polite" title="Saved">✔</span>}
-                      </div>
-                  </Row>
-              </div>
-          </section>
-
-          {/* Preferences */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Preferences</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="currency_exchange" iconCls="bg-sand-light text-sand" title="Display Currency" sub="Live exchange rates, INR base">
-                      <CurrencySelector />
-                  </Row>
-                  {isNative() && (
-                    <Row icon="bug_report" iconCls="bg-blue-zen-light text-blue-zen" title="Crash Reports"
-                         sub="Errors go to Firebase Crashlytics, never your transactions">
-                      <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
-                    </Row>
-                  )}
-              </div>
-          </section>
-
-          {/* Appearance */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Appearance</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-5">
-                  <Row icon="brightness_auto" iconCls="bg-ocean-light text-ocean" title="Match System" sub="Follows your phone's light / dark setting">
-                      <Toggle checked={themeMode === 'auto'} onChange={() => pickTheme(themeMode === 'auto' ? 'sage' : 'auto')} label="Match system theme" />
-                  </Row>
-                  <div className={themeMode === 'auto' ? 'opacity-40 pointer-events-none' : ''}>
-                      <div className="grid grid-cols-3 gap-2.5">
-                          {themeSwatches().map(s => (
-                              <button
-                                key={s.id}
-                                onClick={() => pickTheme(s.id)}
-                                className={`rounded-2xl p-2.5 border text-left transition-all ${themeMode === s.id ? 'border-sage ring-2 ring-sage/40' : 'border-black/[0.08]'}`}
-                                style={{ background: s.bg }}
-                              >
-                                  <div className="flex items-center gap-1 mb-1.5">
-                                      <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: s.accent }} />
-                                      <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
-                                  </div>
-                                  <p className="text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</p>
-                              </button>
-                          ))}
-                      </div>
-                      {themeMode === 'custom' && (
-                          <div className="mt-4 flex items-center justify-between gap-3">
-                              <label className="flex items-center gap-2.5 cursor-pointer">
-                                  <input
-                                    type="color"
-                                    value={customTheme.accent}
-                                    onChange={e => updateCustom({ accent: e.target.value })}
-                                    className="w-9 h-9 rounded-xl border border-black/10 bg-transparent cursor-pointer p-0.5"
-                                    aria-label="Custom accent color"
-                                  />
-                                  <span className="text-[12px] text-muted-taupe">Accent color</span>
-                              </label>
-                              <div className="flex rounded-xl overflow-hidden border border-black/[0.08] text-[11px] font-semibold">
-                                  <button onClick={() => updateCustom({ dark: false })} className={`px-3 py-1.5 transition-colors ${!customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Light</button>
-                                  <button onClick={() => updateCustom({ dark: true })} className={`px-3 py-1.5 transition-colors ${customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Dark</button>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-              </div>
-          </section>
-
-          {/* Data */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Data & Privacy</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="Bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money Moved" sub="Your accounts, family, investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="policy" iconCls="bg-sand-light text-sand" title="Privacy Policy" sub="How your data is handled"
-                       onClick={() => window.open(PRIVACY_URL, '_blank')}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
-                  </Row>
-                  <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms & Conditions" sub="The agreement you accepted"
-                       onClick={() => window.open(TERMS_URL, '_blank')}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
-                  </Row>
-              </div>
-          </section>
-
-          {/* Account */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Account</h4>
-              <div className="space-y-3">
-                  <button
-                    onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
-                    className="w-full bg-white border border-rose/20 text-rose py-4 rounded-3xl font-serif font-medium shadow-sm hover:bg-rose-light/20 transition-all flex items-center justify-center gap-2"
-                  >
-                      <span className="material-symbols-outlined">logout</span>
-                      Sign Out
-                  </button>
-                  <button
-                    onClick={() => { setDelOpen(true); setDelConfirm(''); setDelPassword(''); setDelTotp(''); setDelResolver(null); setDelError(''); }}
-                    className="w-full text-muted-taupe/70 py-2 text-[11px] font-medium uppercase tracking-wider hover:text-rose transition-colors"
-                  >
-                      Delete account & all data
-                  </button>
-              </div>
-          </section>
-      </div>
-
-      <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v{__APP_VERSION__} ({__APP_BUILD__})</p>
-        {isNative() && (
-          <button onClick={() => setNotesOpen(true)} className="mt-2 px-3 py-1 text-[11px] font-medium text-sage hover:text-sage/80 transition-colors">
-            What's new
+      {/* Header: Self, or the page's title with a way back */}
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+        {page !== 'hub' && (
+          <button
+            onClick={() => onNavigate(AppScreen.SELF)}
+            className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+            aria-label="Back to Self"
+          >
+            <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
           </button>
         )}
+        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight truncate">{PAGE_TITLE[page]}</h2>
       </div>
+
+      {page === 'hub' && (
+        <div className="px-6 pt-2 space-y-4">
+          {/* You */}
+          <div className="bg-white rounded-[28px] p-5 shadow-raised border border-black/[0.02]">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-soft shrink-0">
+                <WallEEyes size="md" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-serif text-[20px] font-semibold text-premium-charcoal truncate">{user?.email?.split('@')[0]}</p>
+                <p className="text-[12px] text-muted-taupe truncate">{user?.email}</p>
+              </div>
+            </div>
+            <dl className="mt-5 grid grid-cols-3 divide-x divide-premium-charcoal/[0.08] rounded-2xl bg-zen-bg/70 shadow-pressed py-3">
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">Entries</dt>
+                <dd className="font-serif text-[17px] font-semibold text-premium-charcoal tabular-nums">{transactions.length.toLocaleString('en-IN')}</dd>
+              </div>
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">This month</dt>
+                <dd className={`font-serif text-[17px] font-semibold tabular-nums truncate ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
+                  {monthlyNet >= 0 ? '+' : '−'}{money(Math.abs(monthlyNet))}
+                </dd>
+              </div>
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">Member since</dt>
+                <dd className="font-serif text-[17px] font-semibold text-premium-charcoal">{memberSince}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-[11px] text-muted-taupe text-center">Last signed in {lastSignIn}</p>
+          </div>
+
+          {/* Pages */}
+          <nav aria-label="Settings">
+            <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
+              {pages.map(row => (
+                <li key={row.screen}>
+                  <button
+                    onClick={() => onNavigate(row.screen)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-zen-cream transition-colors"
+                  >
+                    <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${row.tint}`}>
+                      <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">{row.icon}</span>
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[14px] font-semibold text-premium-charcoal">{row.title}</span>
+                      <span className="block text-[12px] text-muted-taupe truncate">{row.preview}</span>
+                    </span>
+                    {chevron}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <button
+            onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
+            className="w-full bg-white text-rose py-3.5 rounded-3xl font-semibold text-[14px] shadow-soft border border-rose/15 flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">logout</span>
+            Sign out
+          </button>
+        </div>
+      )}
+
+      {page === 'account' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            {isNative() && (
+              <Row icon="fingerprint" iconCls="bg-sage-light text-sage" title="Biometric unlock"
+                   sub={bioSupported ? 'Use your fingerprint or face to unlock Wall-ette' : 'No fingerprint or face is set up on this phone'}>
+                {bioSupported && <Toggle checked={bioOn} onChange={toggleBiometric} label="Biometric unlock" />}
+              </Row>
+            )}
+            <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change password"
+                 sub="Enter your current password, then a new one" onClick={openPwModal}>
+              {chevron}
+            </Row>
+            <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-factor sign-in"
+                 sub="A code from an authenticator app">
+              <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-zen-bg text-muted-taupe shadow-pressed">Coming soon</span>
+            </Row>
+          </Card>
+          <p className="text-[12px] text-muted-taupe px-1">Signed in as {user?.email}. Last signed in {lastSignIn}.</p>
+
+          <div className="pt-4">
+            <button
+              onClick={() => { setDelOpen(true); setDelConfirm(''); setDelPassword(''); setDelTotp(''); setDelResolver(null); setDelError(''); }}
+              className="w-full rounded-3xl border border-rose/25 px-5 py-4 text-left hover:bg-rose-light/30 transition-colors"
+            >
+              <span className="block text-[14px] font-semibold text-rose">Delete account and all data</span>
+              <span className="block text-[12px] text-muted-taupe mt-0.5 leading-snug">
+                Erases your entries, settings and sign-in history from the cloud and this phone, then deletes the account.
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {page === 'alerts' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            <Row icon="speed" iconCls="bg-rose-light text-rose" title="Daily spend limit"
+                 sub="The bell warns you when today's spending goes past it">
+              <div className="relative flex items-center">
+                <input
+                  id="daily-limit-input"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={limitInput}
+                  onChange={e => { const val = e.target.value; if (/^\d*$/.test(val) || val === '') setLimitInput(val); setLimitSaved(false); }}
+                  onBlur={handleSaveLimit}
+                  placeholder="No limit"
+                  title="Daily spend limit"
+                  aria-label="Daily spend limit"
+                  className="w-24 text-right bg-zen-bg shadow-pressed border-none rounded-xl py-2 px-3 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage transition-colors"
+                />
+                {limitSaved && <span className="absolute -left-5 text-sage text-xs" aria-live="polite" title="Saved">✔</span>}
+              </div>
+            </Row>
+            <Row icon="donut_large" iconCls="bg-sage-light text-sage" title="Budgets and savings goal"
+                 sub="Set in Flow. The bell tells you when a budget is nearly used up."
+                 onClick={() => { openAt('goals'); onNavigate(AppScreen.INCOME_INSIGHTS); }}>
+              {chevron}
+            </Row>
+          </Card>
+        </div>
+      )}
+
+      {page === 'data' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            <Row icon="upload_file" iconCls="bg-sage-light text-sage" title="Import a statement" sub="A bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
+              {chevron}
+            </Row>
+            <Row icon="description" iconCls="bg-blue-zen-light text-blue-zen" title="Export and reports" sub="Statements, CSV and a full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
+              {chevron}
+            </Row>
+            <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money moved" sub="Your own accounts, family and investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
+              {chevron}
+            </Row>
+          </Card>
+          {isNative() && (
+            <Card>
+              <Row icon="bug_report" iconCls="bg-sand-light text-[#A8844F]" title="Crash reports"
+                   sub="Errors go to Firebase Crashlytics, never your transactions">
+                <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
+              </Row>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {page === 'appearance' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            <Row icon="brightness_auto" iconCls="bg-ocean-light text-ocean" title="Match your phone" sub="Light or dark, as your phone is set">
+              <Toggle checked={themeMode === 'auto'} onChange={() => pickTheme(themeMode === 'auto' ? 'sage' : 'auto')} label="Match system theme" />
+            </Row>
+            <div className={`px-4 py-4 ${themeMode === 'auto' ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-3 gap-2.5">
+                {themeSwatches().map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => pickTheme(s.id)}
+                    aria-pressed={themeMode === s.id}
+                    className={`rounded-2xl p-2.5 border text-left transition-all shadow-soft ${themeMode === s.id ? 'border-sage ring-2 ring-sage/40' : 'border-black/[0.08]'}`}
+                    style={{ background: s.bg }}
+                  >
+                    <span className="flex items-center gap-1 mb-1.5">
+                      <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: s.accent }} />
+                      <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
+                    </span>
+                    <span className="block text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</span>
+                  </button>
+                ))}
+              </div>
+              {themeMode === 'custom' && (
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="color"
+                      value={customTheme.accent}
+                      onChange={e => updateCustom({ accent: e.target.value })}
+                      className="w-9 h-9 rounded-xl border border-black/10 bg-transparent cursor-pointer p-0.5"
+                      aria-label="Custom accent color"
+                    />
+                    <span className="text-[12px] text-muted-taupe">Accent color</span>
+                  </label>
+                  <div className="flex rounded-xl overflow-hidden border border-black/[0.08] text-[11px] font-semibold">
+                    <button onClick={() => updateCustom({ dark: false })} className={`px-3 py-1.5 transition-colors ${!customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Light</button>
+                    <button onClick={() => updateCustom({ dark: true })} className={`px-3 py-1.5 transition-colors ${customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Dark</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+          <Card>
+            <Row icon="currency_exchange" iconCls="bg-sand-light text-[#A8844F]" title="Show amounts in" sub="Converted at live exchange rates; saved in INR">
+              <CurrencySelector />
+            </Row>
+          </Card>
+        </div>
+      )}
+
+      {page === 'about' && (
+        <div className="px-6 pt-2 space-y-4">
+          <div className="bg-white rounded-[28px] p-6 shadow-raised border border-black/[0.02] flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-soft">
+              <WallEEyes size="md" />
+            </div>
+            <p className="font-serif text-[20px] font-semibold text-premium-charcoal mt-3">Wall-ette</p>
+            <p className="text-[12px] text-muted-taupe tabular-nums">Version {__APP_VERSION__} ({__APP_BUILD__})</p>
+            {isNative() && (
+              <button onClick={() => setNotesOpen(true)} className="mt-4 px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft">
+                What's new
+              </button>
+            )}
+          </div>
+          <Card>
+            <Row icon="policy" iconCls="bg-sand-light text-[#A8844F]" title="Privacy policy" sub="How your data is handled"
+                 onClick={() => window.open(PRIVACY_URL, '_blank')}>
+              {external}
+            </Row>
+            <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms and conditions" sub="The agreement you accepted"
+                 onClick={() => window.open(TERMS_URL, '_blank')}>
+              {external}
+            </Row>
+          </Card>
+        </div>
+      )}
 
       {notesOpen && <WhatsNewSheet notes={latestNotes(__APP_BUILD__)} onClose={() => setNotesOpen(false)} />}
 

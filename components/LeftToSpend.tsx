@@ -166,7 +166,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-[14px] font-semibold text-premium-charcoal truncate" title={b.name}>{prettyMerchant(b.name)}</span>
-                      <span className="block text-[11px] text-muted-taupe">{dueLabel(b.due)}</span>
+                      <span className="block text-[11px] text-muted-taupe">{b.wasDue ? `Was due ${shortDay(b.wasDue)}` : dueLabel(b.due)}</span>
                     </span>
                     <span className="text-[14px] font-semibold text-premium-charcoal tabular-nums shrink-0">{money(b.amount)}</span>
                   </li>

@@ -330,6 +330,14 @@ function appNotes({ updateReady, release }: NotificationInput): AppNotification[
 }
 
 /** Every notification that applies now, most important first. */
+/**
+ * Budgets nearly used or over this month, and today's spending over the
+ * daily limit: the notes the phone can also show as alerts
+ * (services/phoneNotifications.ts).
+ */
+export const budgetAlerts = (input: Pick<NotificationInput, 'counted' | 'budgets' | 'dailyLimit' | 'now' | 'money'>): AppNotification[] =>
+  budgetNotes(input as NotificationInput);
+
 export function buildNotifications(input: NotificationInput): AppNotification[] {
   return [
     ...securityNotes(input),

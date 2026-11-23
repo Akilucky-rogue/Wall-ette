@@ -5,6 +5,7 @@ import { byNewest, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import { openAt } from '../utils/screenSection';
+import { tick } from '../utils/haptics';
 import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
 import NotificationCenter from './NotificationCenter';
@@ -182,6 +183,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <button
                   key={mode}
                   onClick={() => {
+                    if (mode !== periodMode) tick();
                     setPeriodMode(mode);
                     if (mode === 'MONTH') setSelectedDate(currentMonthStart);
                   }}

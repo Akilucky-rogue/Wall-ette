@@ -24,8 +24,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     // Play allows 500 characters in all (scripts/check-app-updates.mjs).
     items: [
       'Left to spend, on Home: what you can still spend before your next pay, after bills and your savings goal.',
-      'The bell on Home flags budgets running out, bills due, price rises, entries imported twice and failed unlocks.',
-      'Pulse is now short pages: Trends, Categories, Recurring and Health check.',
+      'The bell flags budgets, bills due, price rises and failed unlocks. Turn on phone reminders in Self.',
+      'Pulse and Self are now short pages instead of long scrolls.',
       'Payees show by name instead of bank codes, and Vault is more compact.',
       'Your daily limit warns instead of blocking, and budgets show on Home.',
       'Fee Hunter is gone. Remove entries imported twice from Vault.',

@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { prettyMerchant } from '../services/analyticsService';
 import { walletCopies } from '../services/statementImport';
 import { parseDay } from '../utils/dates';
+import { removed } from '../utils/haptics';
 
 /**
  * Statement rows in the wallet more than once, usually from importing an
@@ -40,6 +41,7 @@ const DuplicateEntries: React.FC<{ className?: string }> = ({ className = '' }) 
   const remove = () => {
     if (!confirming) { setConfirming(true); return; }
     deleteTransactions(found.copies.map(t => t.id));
+    removed();
     setConfirming(false);
     setDone(`Removed ${n} extra ${n === 1 ? 'copy' : 'copies'}. Your balance is corrected.`);
   };

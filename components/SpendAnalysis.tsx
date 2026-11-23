@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
 import { WallEMascot } from './SplashScreen';
 import { pulseView, usePulseView, type PulseTab } from './pulseView';
+import { tick } from '../utils/haptics';
 import { analyzeFinancialHealth, FinancialInsight } from '../services/insightsService';
 import { categoryMovers, detectRecurringCharges, monthDailyStats, priceRises, spendingPace, prettyMerchant } from '../services/analyticsService';
 import UnsortedTransfers from './UnsortedTransfers';
@@ -31,7 +32,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
   // The month and Expenses/Income, shared with Pulse's pages (pulseView.ts).
   const view = usePulseView();
   const analysisTab = view.tab;
-  const setAnalysisTab = (tab: PulseTab) => pulseView.setTab(tab);
+  const setAnalysisTab = (tab: PulseTab) => { if (tab !== analysisTab) tick(); pulseView.setTab(tab); };
   const [heatDay, setHeatDay] = useState<number | null>(null); // selected heatmap day (1-based)
   const [selPoint, setSelPoint] = useState<number | null>(null); // selected trends day/week
   

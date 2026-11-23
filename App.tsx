@@ -4,6 +4,7 @@ import SecurityLock from './components/SecurityLock';
 import AndroidInstallBanner from './components/AndroidInstallBanner';
 import AppUpdates from './components/AppUpdates';
 import CloudSaveBanner from './components/CloudSaveBanner';
+import PhoneNotifications from './components/PhoneNotifications';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -13,6 +14,8 @@ import { WalletProvider } from './context/WalletContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { consumeQuietStart, signOutOfDevice } from './services/session';
 import { breadcrumb } from './services/crashReports';
+import { onPhoneNoteTap } from './services/phoneNotifier';
+import { openAt } from './utils/screenSection';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -171,6 +174,17 @@ function AppContent() {
         backHandle.remove();
       }
     };
+  }, [user]);
+
+  // A tapped phone notification opens its screen, behind the lock when the
+  // app was in the background (services/phoneNotifier.ts).
+  useEffect(() => {
+    if (!user) return;
+    return onPhoneNoteTap((screen, section) => {
+      if (section) openAt(section);
+      setCurrentScreen(screen);
+      window.scrollTo(0, 0);
+    });
   }, [user]);
 
   // Inactivity Lock Timer (throttled — mousemove fires continuously, so only
@@ -414,6 +428,7 @@ function AppContent() {
       {/* Outside the shell so swipes on its sheet or screen don't change tabs. */}
       <AppUpdates signedInThisRun={signedInThisRun} />
       <CloudSaveBanner />
+      <PhoneNotifications />
     </WalletProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import QRCode from 'qrcode';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, type MultiFactorResolver } from 'firebase/auth';
 import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
@@ -22,6 +22,11 @@ import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 import { openAt } from '../utils/screenSection';
+import {
+  currentAlerts, loadShown, markShown, phoneNotificationsOn, saveShown, setPhoneNotificationsOn, subscribePhoneSwitch,
+} from '../services/phoneNotifications';
+import { askPhonePermission, clearPhoneNotes, phonePermission } from '../services/phoneNotifier';
+import { hapticsOn, setHapticsOn, tick } from '../utils/haptics';
 
 /** Self is a hub (who you are, and links) and a page for each group of settings. */
 export type SelfPage = 'hub' | 'account' | 'alerts' | 'data' | 'appearance' | 'about';
@@ -72,7 +77,7 @@ const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 const Toggle: React.FC<{ checked: boolean; onChange: () => void; label: string }> = ({ checked, onChange, label }) => (
   <label className="relative inline-flex items-center cursor-pointer">
-    <input type="checkbox" className="sr-only peer" checked={checked} onChange={onChange} aria-label={label} />
+    <input type="checkbox" className="sr-only peer" checked={checked} onChange={() => { tick(); onChange(); }} aria-label={label} />
     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sage"></div>
   </label>
 );
@@ -88,7 +93,10 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
 
 const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' }) => {
   const { user } = useAuth();
-  const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions, currency } = useWallet();
+  const {
+    dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
+    clearAllTransactions, currency, counted, budgets,
+  } = useWallet();
 
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -102,6 +110,41 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     else { if (val < 0) val = 0; setDailyLimit(val); setLimitInput(val === 0 ? '' : val.toString()); }
     setLimitSaved(true);
     setTimeout(() => setLimitSaved(false), 1200);
+  };
+
+  // ── Phone notifications (Android, this device; services/phoneNotifications.ts) ──
+  const uid = user?.uid ?? null;
+  const phoneOn = useSyncExternalStore(subscribePhoneSwitch, () => (uid ? phoneNotificationsOn(uid) : false));
+  const [phoneMsg, setPhoneMsg] = useState('');
+  useEffect(() => {
+    // Switched on here, but Android's permission was taken away since.
+    if (!phoneOn) return;
+    let live = true;
+    phonePermission().then(p => {
+      if (live) setPhoneMsg(p === 'granted' || p === 'unavailable' ? '' : "Android isn't letting Wall-ette show notifications. Allow them for Wall-ette in your phone's settings.");
+    });
+    return () => { live = false; };
+  }, [phoneOn]);
+  const togglePhone = async () => {
+    if (!uid) return;
+    if (phoneOn) {
+      setPhoneNotificationsOn(uid, false);
+      setPhoneMsg('');
+      void clearPhoneNotes();
+      return;
+    }
+    if (!(await askPhonePermission())) {
+      setPhoneMsg("Android didn't allow notifications. Allow them for Wall-ette in your phone's settings, then switch this on.");
+      return;
+    }
+    // Budgets and limits already past count as shown, so switching on
+    // doesn't bring a burst of old news; new ones come from now on.
+    const now = new Date();
+    const money = (n: number) => formatAmount(n).split('.')[0];
+    const already = currentAlerts({ counted, budgets, dailyLimit, now, money }).map(a => a.key);
+    saveShown(uid, markShown(loadShown(uid), already, now.getTime()));
+    setPhoneMsg('');
+    setPhoneNotificationsOn(uid, true);
   };
 
   // ── Change password (reauthenticate, then update) ──
@@ -189,6 +232,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       if (ok) { setBiometricEnabled(user.uid, true); setBioOn(true); }
     }
   };
+
+  // ── Vibration on taps (Android, this device) ──
+  const [buzz, setBuzz] = useState(hapticsOn);
+  const toggleBuzz = () => { setHapticsOn(!buzz); setBuzz(!buzz); };
 
   // ── Crash reports (Android, device-local) ──
   const [crashOn, setCrashOn] = useState(crashReportsOn);
@@ -334,7 +381,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     },
     {
       screen: AppScreen.SELF_ALERTS, title: PAGE_TITLE.alerts, icon: 'notifications', tint: 'bg-rose-light text-rose',
-      preview: dailyLimit > 0 ? `Daily limit ${money(dailyLimit)}` : 'No daily limit set',
+      preview: isNative()
+        ? `Notifications ${phoneOn ? 'on' : 'off'}, ${dailyLimit > 0 ? `daily limit ${money(dailyLimit)}` : 'no daily limit'}`
+        : dailyLimit > 0 ? `Daily limit ${money(dailyLimit)}` : 'No daily limit set',
     },
     {
       screen: AppScreen.SELF_DATA, title: PAGE_TITLE.data, icon: 'folder_open', tint: 'bg-lavender-light text-lavender',
@@ -467,6 +516,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
 
       {page === 'alerts' && (
         <div className="px-6 pt-2 space-y-4">
+          {isNative() && (
+            <Card>
+              <Row icon="notifications_active" iconCls="bg-ocean-light text-ocean" title="Phone notifications"
+                   sub="Bills due tomorrow, budgets and your daily limit. Made on this phone; nothing is sent.">
+                <Toggle checked={phoneOn} onChange={() => { void togglePhone(); }} label="Phone notifications" />
+              </Row>
+              {phoneMsg && <p className="px-4 py-3 text-[12px] text-rose leading-snug" role="status">{phoneMsg}</p>}
+            </Card>
+          )}
           <Card>
             <Row icon="speed" iconCls="bg-rose-light text-rose" title="Daily spend limit"
                  sub="The bell warns you when today's spending goes past it">
@@ -568,6 +626,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             <Row icon="currency_exchange" iconCls="bg-sand-light text-[#A8844F]" title="Show amounts in" sub="Converted at live exchange rates; saved in INR">
               <CurrencySelector />
             </Row>
+            {isNative() && (
+              <Row icon="vibration" iconCls="bg-lavender-light text-lavender" title="Vibration" sub="A light tap when you switch tabs, save or remove">
+                <Toggle checked={buzz} onChange={toggleBuzz} label="Vibration" />
+              </Row>
+            )}
           </Card>
         </div>
       )}

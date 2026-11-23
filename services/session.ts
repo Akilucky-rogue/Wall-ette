@@ -4,7 +4,8 @@
  *
  * The device holds a user's data twice: WalletContext's localStorage mirror
  * (keys ending in `_<uid>`, with the fingerprint flag) and Firestore's offline
- * cache in IndexedDB. Both go on sign-out and after account deletion. The
+ * cache in IndexedDB. Both go on sign-out and after account deletion, with
+ * any waiting or shown phone notifications (services/phoneNotifier.ts). The
  * cache also queues changes that haven't reached the cloud, so sign-out only
  * clears it once those have synced; offline, it stays, and they sync at this
  * user's next sign-in on the device.
@@ -15,6 +16,7 @@
 import { signOut } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { clearPhoneNotes } from './phoneNotifier';
 import { log } from '../utils/log';
 
 const QUIET_START_KEY = 'walletQuietStart';
@@ -74,6 +76,8 @@ export async function signOutOfDevice(): Promise<void> {
   // Checked before signing out: the queue belongs to the signed-in user.
   const synced = uid ? await changesSynced() : true;
   await signOut(auth);
+  // Bill reminders and alerts are this user's; none may show after sign-out.
+  await clearPhoneNotes();
   if (uid) removeUserKeys(uid);
   if (synced) {
     await clearOfflineCache();
@@ -83,6 +87,7 @@ export async function signOutOfDevice(): Promise<void> {
 
 /** After the account is deleted: removes what's left of it on this device, then reloads. */
 export async function forgetDeletedAccount(uid: string): Promise<void> {
+  await clearPhoneNotes();
   removeUserKeys(uid);
   await clearOfflineCache();
   reloadQuietly();

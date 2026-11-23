@@ -4,6 +4,7 @@ import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
+import { done } from '../utils/haptics';
 import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
 
 interface NewEntryProps {
@@ -153,6 +154,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
     });
 
     if (success) {
+      done();
       if (saveAndAdd) {
         setAmount('0.00'); setNote(''); setMerchant(''); setCategory(''); setAutoCat(false);
         setSelectedDate(new Date());

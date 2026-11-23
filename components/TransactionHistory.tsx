@@ -7,6 +7,7 @@ import { WallEMascot, WallEEyes } from './SplashScreen';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import DuplicateEntries from './DuplicateEntries';
+import { removed } from '../utils/haptics';
 
 interface TransactionHistoryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -196,6 +197,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const confirmDelete = () => {
     if (deleteId) {
         deleteTransaction(deleteId);
+        removed();
         setDeleteId(null);
         setToastMsg('Transaction deleted');
         setShowToast(true);

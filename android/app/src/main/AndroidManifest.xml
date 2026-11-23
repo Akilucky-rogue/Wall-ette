@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- No Google backups or phone-to-phone copies of the wallet data: it comes
          back from the cloud on sign-in (audit M11). The two rules files cover
@@ -49,4 +50,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Phone notifications (@capacitor/local-notifications) are reminders a
+         few minutes either way is fine for, so they use inexact alarms and the
+         app doesn't ask for "Alarms & reminders" (services/phoneNotifier.ts). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

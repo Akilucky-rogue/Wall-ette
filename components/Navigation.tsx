@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppScreen } from '../types';
+import { tick } from '../utils/haptics';
 
 interface NavigationProps {
   currentScreen: AppScreen;
@@ -30,7 +31,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
         return (
           <button
             key={tab.screen}
-            onClick={() => onNavigate(tab.screen)}
+            onClick={() => { if (currentScreen !== tab.screen) tick(); onNavigate(tab.screen); }}
             aria-current={active ? 'page' : undefined}
             className={`relative flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-2xl transition-colors ${active ? 'text-sage' : 'text-muted-taupe hover:text-sage'}`}
           >

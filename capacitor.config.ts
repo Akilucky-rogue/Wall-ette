@@ -14,6 +14,12 @@ const config: CapacitorConfig = {
       // layout jump while Capacitor checks the page.
       initialViewportFitValueHint: 'cover',
     },
+    // Phone notifications (services/phoneNotifier.ts): the white wallet in
+    // android/app/src/main/res/drawable, tinted the theme's deep sage.
+    LocalNotifications: {
+      smallIcon: 'ic_stat_wallette',
+      iconColor: '#7D937A',
+    },
   },
 };
 

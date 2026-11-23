@@ -246,6 +246,19 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   sign-out removes. Tapping one opens its screen: `utils/screenSection.ts` opens Flow on Goals,
   and price rises and bills due open Pulse's Recurring page. Nothing new is collected or sent, so the Data safety
   answers don't change. Checked by `scripts/check-notifications.mjs`.
+- **Phone notifications** (from 1.5.6, Android, off until switched on in Self → Alerts and
+  limits) — `services/phoneNotifications.ts` plans them, `services/phoneNotifier.ts` posts
+  them, `components/PhoneNotifications.tsx` re-plans 2.5 s after the wallet changes. Bills: a
+  reminder at 18:00 the evening before a recurring charge is due (09:00 that day once the
+  evening has passed), for the next 7 days, at most 8; each re-plan replaces the waiting ones,
+  so a paid or stopped bill loses its reminder. Alerts: the bell's budget and daily-limit notes,
+  each shown once (ids remembered in `walletPhoneShown_<uid>` for 60 days); switching on counts
+  the ones already there as shown. Tapping one opens its screen (after the lock). Sign-out and
+  account deletion cancel waiting reminders and clear shown ones. Checked by
+  `scripts/check-phone-notifications.mjs`.
+- **Haptics** (`utils/haptics.ts`, from 1.5.6) — a light tick on tab changes and switches, a
+  success buzz on saving an entry, a warning buzz on removing; Android only, off with Self →
+  Appearance → Vibration (`walletHaptics`, per device).
 
 ---
 
@@ -253,7 +266,7 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 
 | Item | Value |
 |---|---|
-| Capacitor plugins | core 8.6.2 (its `SystemBars` styles the bars) · app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) · `@capacitor-firebase/crashlytics` 8.6.0 (crash reports; Gradle: `firebase-crashlytics-gradle` 3.0.8, `google-services` 4.4.4) |
+| Capacitor plugins | core 8.6.2 (its `SystemBars` styles the bars) · app 8.0.1 · filesystem 8.1.2 · share 8.0.1 · haptics 8.0.2 · local-notifications 8.3.1 · `@aparajita/capacitor-biometric-auth` 10.0 · `@capawesome/capacitor-app-update` 8.1.1 (Play in-app updates) · `@capacitor-firebase/crashlytics` 8.6.0 (crash reports; Gradle: `firebase-crashlytics-gradle` 3.0.8, `google-services` 4.4.4) |
 | Firebase (native) | Android app `com.wallette.app`, registered 20 Nov 2026 (`1:881370415293:android:b9d1da6f023d700e1877d4`). Its `android/app/google-services.json` is gitignored, and the build stops with the command to download it if it's missing |
 | SDK levels | minSdk 24 · target/compileSdk 36 (Play's minimum from 31 Aug 2026) |
 | Toolchain | Gradle 8.14.3 · AGP 8.13 · JDK 21 (Temurin); `patch-capacitor-gradle.ps1` pins plugin modules to Java 17 |
@@ -261,7 +274,8 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 | Windowing | Edge to edge on every version: `MainActivity` calls `EdgeToEdge.enable` with transparent bars (Android 15+ is edge to edge anyway). Capacitor's `SystemBars` passes the bar insets to CSS on WebView 140+; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Older WebViews get the insets as padding and the cream window background shows behind the bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off. No `statusBarColor`/`navigationBarColor` in `styles.xml` and no StatusBar plugin (Android 15 deprecated those calls); Play may still list androidx's own `EdgeToEdge`, which uses them below Android 15 |
 | Code shrinking | Release builds run R8 (`proguard-android-optimize.txt`): shrinking, optimisation and obfuscation of the Java/Kotlin side, for Play's DEX optimisation check. Capacitor's consumer rules keep the plugin classes the bridge finds by name; `proguard-rules.pro` keeps `@JavascriptInterface` methods and line numbers. The Crashlytics Gradle plugin uploads the mapping file on each release build (needs network), and the bundle carries it for Play. Debug builds aren't minified |
 | Backups & screen | `allowBackup="false"`, plus `res/xml/data_extraction_rules.xml` (Android 12+) and `backup_rules.xml` (11 and earlier) excluding every domain, so neither Google backups nor phone-to-phone transfers copy the WebView's data (mirror, Firestore cache, sign-in). `MainActivity` sets `FLAG_SECURE` in release builds: no screenshots, recordings or recent-apps preview. Debug builds leave capture on for store screenshots (audit M11) |
-| Versioning | versionCode 13 · versionName 1.5.5, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Phone notifications | `@capacitor/local-notifications` (from 1.5.6): one channel, "Bills and budgets" (importance default, private on the lock screen), the status-bar icon `res/drawable/ic_stat_wallette.xml`. Inexact alarms only (`isExactNotification: false`); the manifest removes the plugin's `SCHEDULE_EXACT_ALARM`, so Android never shows the "Alarms & reminders" screen. `POST_NOTIFICATIONS` is asked for when the switch in Self → Alerts and limits is turned on |
+| Versioning | versionCode 14 · versionName 1.5.6, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
 | Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger

@@ -59,7 +59,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 ## 4. Privacy policy and account deletion (prepared)
 
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
-- Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Profile → Delete account & all data) and by email.
+- Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Self → Delete account & all data up to 1.5.5; Self → Account and security → Delete account and all data from 1.5.6) and by email.
 - [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
 - [x] **Website deployed again on 20 Nov** (hosting only): the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import.
 - [x] **Data safety form and full description updated in Play Console on 20 Nov** to match sections 5 and 6, and saved. Not sent yet, so 1.5.5's review isn't pushed back.
@@ -75,15 +75,17 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 | Financial info → "Other financial info" | Collected (user-entered/imported transactions) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
-| App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Profile → Crash Reports turns it off |
+| App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Self → Crash reports (Self → Your data from 1.5.6) turns it off |
 | App info and performance → "Diagnostics" (from 1.5.5) | Collected (device details at the time of a crash, such as model, Android version, free memory and storage) · Analytics · Not shared · Optional |
 | Device or other IDs (from 1.5.5) | Collected (the Crashlytics installation ID, which counts how many installs a crash affects; no user ID is set) · Analytics · Not shared · Optional |
 | Account creation | **Username and password** only (two-factor sign-in is still Coming Soon; the fingerprint unlock is on the device, not a way to sign in) |
 | Personal info | **Email address** only. No name or phone number is asked for, and statement files are read on the phone, so Files and docs isn't collected either |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
-| Can users request deletion? | **Yes** — in the app (Profile → Delete account & all data), or by email to akshatbvora@gmail.com; URL in section 4 |
+| Can users request deletion? | **Yes** — in the app (Self → Account and security → Delete account and all data from 1.5.6), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |
 | Ads / advertising ID | **None** |
+
+From 1.5.6 the app can show phone notifications (bill reminders, budget and daily-limit alerts), switched on in Self → Alerts and limits. They are made on the device from data the app already holds, so nothing new is collected and these answers don't change. The manifest gains `POST_NOTIFICATIONS` (asked for on Android 13+ when switched on), `RECEIVE_BOOT_COMPLETED` and `WAKE_LOCK` (reminders survive a restart) and `VIBRATE` (taps); `SCHEDULE_EXACT_ALARM`, which the notifications plugin declares, is removed, so there is no exact-alarm declaration to make.
 
 ## 6. Store listing — ready to paste
 
@@ -110,6 +112,9 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 > 💱 MULTI-CURRENCY — INR, USD, EUR and GBP with live exchange rates.
 >
 > Wall-ette — your mindful money companion.
+
+Proposed for 1.5.6, not yet in Play Console (add after "KNOW YOUR INCOME"):
+> 💸 KNOW WHAT'S LEFT — Left to spend shows what you can still spend before your next pay, once bills still to come and your savings goal are set aside. Optional reminders the evening before a bill is due.
 
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`
@@ -139,7 +144,7 @@ Later, paid memberships go through Google Play's billing: set up a merchant paym
 
 ## 9. Shipping an update
 
-Play installs updates by itself. From 1.5.3 the app also offers them (Google's prompt, then an **Update ready · Restart** banner) and shows **What's new** once after an update (also under Profile → What's new). For each release:
+Play installs updates by itself. From 1.5.3 the app also offers them (Google's prompt, then an **Update ready · Restart** banner) and shows **What's new** once after an update (also under Self → About → What's new from 1.5.6). For each release:
 
 1. Bump `versionCode` (+1) and `versionName` in `android/app/build.gradle`. The web code reads both from there (Profile, splash screen, What's new).
 2. Add an entry at the top of `RELEASE_NOTES` in `services/releaseNotes.ts`: the new versionCode and versionName, one short sentence per change. Leave it out if there's nothing to announce; the card then stays hidden.

@@ -280,10 +280,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="px-6 pt-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">
-                Budgets · {new Date().toLocaleString('en-GB', { month: 'long' })}
+              <p className="text-[13px] font-semibold text-premium-charcoal">
+                Budgets for {new Date().toLocaleString('en-GB', { month: 'long' })}
               </p>
-              <button onClick={openGoals} className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline">Edit</button>
+              <button onClick={openGoals} className="text-[12px] text-sage font-semibold hover:underline">Edit</button>
             </div>
             <div className="space-y-3">
               {budgetRows.slice(0, 4).map(r => {
@@ -359,7 +359,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-sage-light text-sage p-3 rounded-2xl">
               <span className="material-symbols-outlined">add_box</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Add</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal">Add</span>
           </button>
           <button
             onClick={() => onNavigate(AppScreen.EXPORT)}
@@ -368,7 +368,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-rose-light text-rose p-3 rounded-2xl">
               <span className="material-symbols-outlined">description</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Report</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal">Report</span>
           </button>
           <button
             onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
@@ -377,7 +377,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">
               <span className="material-symbols-outlined">bubble_chart</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Flow</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal">Flow</span>
           </button>
           <button
             onClick={() => onNavigate(AppScreen.IMPORT)}
@@ -386,7 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-sand-light text-sand p-3 rounded-2xl">
               <span className="material-symbols-outlined">upload_file</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Import</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal">Import</span>
           </button>
           <button
             onClick={() => onNavigate(AppScreen.REWIND)}
@@ -395,7 +395,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-lavender/10 text-lavender p-3 rounded-2xl">
               <span className="material-symbols-outlined">history</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Rewind</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal">Rewind</span>
           </button>
           <button
             onClick={() => onNavigate(AppScreen.LEFT_TO_SPEND)}
@@ -404,7 +404,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-ocean-light text-ocean p-3 rounded-2xl">
               <span className="material-symbols-outlined">account_balance_wallet</span>
             </div>
-            <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter text-center leading-tight">Left to spend</span>
+            <span className="text-[12px] font-semibold text-zen-charcoal text-center leading-tight">Left to spend</span>
           </button>
         </div>
       </div>
@@ -414,7 +414,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Savings Rate */}
           {income > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">Savings</p>
+              <p className="text-[13px] font-semibold text-premium-charcoal self-start">Savings</p>
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                 <circle
@@ -431,7 +431,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Top Categories */}
           {categoryBreakdown.length > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Top Spend</p>
+              <p className="text-[13px] font-semibold text-premium-charcoal mb-3">Top spending</p>
               <div className="space-y-2">
                 {categoryBreakdown.slice(0, income > 0 ? 3 : 5).map((cat, i) => (
                   <div key={cat.name} className="flex items-center gap-1.5">
@@ -451,12 +451,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="px-6 py-2 mb-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Recent</p>
+              <p className="text-[13px] font-semibold text-premium-charcoal">Recent</p>
               <button
                 onClick={() => onNavigate(AppScreen.HISTORY)}
-                className="text-[10px] text-sage font-semibold uppercase tracking-wider hover:underline"
+                className="text-[12px] text-sage font-semibold hover:underline"
               >
-                View All
+                View all
               </button>
             </div>
             <div className="space-y-3">

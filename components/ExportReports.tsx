@@ -6,7 +6,7 @@ import { analyzeFinancialHealth } from '../services/insightsService';
 import { detectRecurringCharges, analyzeIncome } from '../services/analyticsService';
 import { exportFile } from '../utils/exportFile';
 import { log } from '../utils/log';
-import { WallEEyes, FloatingLeaf, PottedPlant, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
+import { WallEEyes } from './SplashScreen';
 
 interface ExportReportsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -15,9 +15,9 @@ interface ExportReportsProps {
 type Period = 'MONTH' | 'QUARTER' | 'ALL';
 
 const PERIOD_LABELS: Record<Period, string> = {
-  MONTH: 'This Month',
-  QUARTER: 'Last 3 Months',
-  ALL: 'All Time',
+  MONTH: 'This month',
+  QUARTER: 'Last 3 months',
+  ALL: 'All time',
 };
 
 const escapeHtml = (s: string): string =>
@@ -457,7 +457,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       id: 'statement',
       icon: 'description',
       iconCls: 'bg-sage-light text-sage',
-      title: 'Statement Report',
+      title: 'Statement report',
       desc: 'Readable report: totals, categories, recurring charges, insights. Open anywhere, print to PDF.',
       meta: `${PERIOD_LABELS[period]} · HTML`,
       action: exportStatement,
@@ -466,7 +466,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       id: 'csv',
       icon: 'table_view',
       iconCls: 'bg-blue-zen-light text-blue-zen',
-      title: 'Transactions Spreadsheet',
+      title: 'Transactions spreadsheet',
       desc: 'Every transaction in the period — opens in Excel and Google Sheets.',
       meta: `${PERIOD_LABELS[period]} · ${stats.count} rows · CSV`,
       action: exportCsv,
@@ -475,7 +475,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       id: 'backup',
       icon: 'cloud_download',
       iconCls: 'bg-sand-light text-sand',
-      title: 'Full Backup',
+      title: 'Full backup',
       desc: 'Complete machine-readable copy of all data, including opening balance.',
       meta: `All time · ${transactions.length} transactions · JSON`,
       action: exportBackup,
@@ -484,37 +484,30 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-cream">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-52 left-4 opacity-30" delay={1.6} color="#A8B89E" />
-      <PottedPlant className="absolute bottom-40 right-6 opacity-40" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute bottom-52 left-8 opacity-35" size="sm" />
-      <Diya className="absolute top-48 right-4 opacity-40" />
 
-      <header className="flex items-center bg-zen-cream/90 backdrop-blur-md p-6 pt-8 pb-4 justify-between sticky top-0 z-30">
+      <header className="flex items-center gap-2 bg-zen-cream/90 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
-          className="flex w-10 h-10 items-center justify-center text-zen-taupe hover:text-sage transition-colors"
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Back to Home"
         >
-          <span className="material-symbols-outlined text-[28px]">chevron_left</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h1 className="text-zen-charcoal text-2xl font-serif font-medium tracking-tight">Data Studio</h1>
-        <div className="w-10"></div>
+        <h1 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">Data Studio</h1>
       </header>
 
       {/* Import / Export slider */}
       <div className="px-8 pt-2 pb-4">
-        <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5">
+        <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-premium-charcoal/[0.08]">
           <button
             onClick={() => onNavigate(AppScreen.IMPORT)}
-            className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 text-muted-taupe hover:text-premium-charcoal"
+            className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2 text-muted-taupe hover:text-premium-charcoal"
           >
             <span className="material-symbols-outlined text-[16px]">download</span>
             Import
           </button>
           <button
-            className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-sage/10 text-sage shadow-sm"
+            className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2 bg-sage/10 text-sage shadow-sm"
           >
             <span className="material-symbols-outlined text-[16px]">upload</span>
             Export
@@ -529,7 +522,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
             <WallEEyes size="sm" />
           </div>
           <div className="flex-1">
-            <h2 className="text-zen-charcoal font-serif text-2xl font-medium leading-tight mb-1">Mindful Archives</h2>
+            <h2 className="text-zen-charcoal font-serif text-2xl font-medium leading-tight mb-1">Reports and backups</h2>
             <p className="text-zen-taupe text-[13px] leading-relaxed font-light">
               Reports save to your downloads on the web, and open the share sheet on Android.
             </p>
@@ -539,13 +532,13 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
 
       {/* Period selector */}
       <div className="px-8 pb-6">
-        <h3 className="text-zen-taupe text-[11px] font-semibold uppercase tracking-[0.25em] mb-3 ml-1">Report Period</h3>
-        <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5">
+        <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-3 ml-1">Report period</h3>
+        <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-premium-charcoal/[0.08]">
           {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
+              className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${
                 period === p ? 'bg-sage/10 text-sage shadow-sm' : 'text-muted-taupe hover:text-premium-charcoal'
               }`}
             >
@@ -575,7 +568,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
             <div className="flex-1 min-w-0">
               <p className="font-serif text-[16px] font-semibold text-zen-charcoal">{card.title}</p>
               <p className="text-[11px] text-zen-taupe leading-relaxed mt-0.5">{card.desc}</p>
-              <p className="text-[9px] text-sage font-bold uppercase tracking-wider mt-1.5">{card.meta}</p>
+              <p className="text-[11px] text-sage font-semibold mt-1.5">{card.meta}</p>
             </div>
             <span className="material-symbols-outlined text-muted-taupe text-[20px] shrink-0">arrow_forward</span>
           </button>

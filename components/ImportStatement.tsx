@@ -7,7 +7,7 @@ import { findDuplicates, fromExcel, toTransactions, type StatementRow } from '..
 import { getSymbol } from '../utils/currencyUtils';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
-import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
+import { WallEEyes } from './SplashScreen';
 import styles from './ImportStatement.module.css';
 
 // Pagination settings
@@ -448,27 +448,16 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-24 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.5} />
-      <FloatingLeaf className="top-48 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
-      <Sprout className="absolute top-36 left-6 opacity-40" />
-      <PottedPlant className="absolute bottom-32 right-6 opacity-35" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Diya className="absolute bottom-40 left-8 opacity-30" />
       
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
-        <button 
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+        <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
-          className="text-muted-taupe flex size-10 shrink-0 items-center justify-start hover:text-sage transition-colors"
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Back to Home"
         >
-          <span className="material-symbols-outlined text-[24px]">chevron_left</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Import Statement</h2>
-        <div className="flex w-10 items-center justify-end text-muted-taupe">
-          <button className="flex items-center justify-center rounded-full h-10 w-10 bg-white/50 border border-black/5 hover:bg-white transition-colors">
-            <span className="material-symbols-outlined text-[20px]">help_outline</span>
-          </button>
-        </div>
+        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">Import a statement</h2>
       </div>
 
       <div className="flex flex-col px-6 py-6 flex-1">
@@ -476,16 +465,16 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         {stage === 'IDLE' && (
             <>
                 {/* Import / Export slider (matches Data Studio) */}
-                <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5 mb-6">
+                <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-premium-charcoal/[0.08] mb-6">
                     <button
-                        className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-sage/10 text-sage shadow-sm"
+                        className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2 bg-sage/10 text-sage shadow-sm"
                     >
                         <span className="material-symbols-outlined text-[16px]">download</span>
                         Import
                     </button>
                     <button
                         onClick={() => onNavigate(AppScreen.EXPORT)}
-                        className="flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 text-muted-taupe hover:text-premium-charcoal"
+                        className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2 text-muted-taupe hover:text-premium-charcoal"
                     >
                         <span className="material-symbols-outlined text-[16px]">upload</span>
                         Export
@@ -626,13 +615,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                             duplicateIds.forEach(id => newSelected.add(id));
                                             setSelectedIds(newSelected);
                                         }}
-                                        className="text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800"
+                                        className="text-[12px] font-semibold text-blue-600 hover:text-blue-800"
                                     >
-                                        Include Anyway
+                                        Include anyway
                                     </button>
                                     <button
                                         onClick={() => setShowDuplicateInfo(false)}
-                                        className="text-[10px] font-bold uppercase tracking-wider text-blue-400 hover:text-blue-600"
+                                        className="text-[12px] font-semibold text-blue-400 hover:text-blue-600"
                                     >
                                         Dismiss
                                     </button>
@@ -653,16 +642,16 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             }`}>
                                 {tallyTone === 'ok' ? 'task_alt' : 'error'}
                             </span>
-                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-taupe">Balance Check</p>
+                            <p className="text-[12px] font-semibold text-muted-taupe">Balance check</p>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <div>
-                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">Statement closing</p>
+                                <p className="text-[12px] text-muted-taupe">Statement closing</p>
                                 <p className="text-[15px] font-serif font-bold text-premium-charcoal">{formatAmount(tally.closing)}</p>
                             </div>
                             <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
                             <div className="text-right">
-                                <p className="text-[10px] text-muted-taupe uppercase tracking-wider">
+                                <p className="text-[12px] text-muted-taupe">
                                     {tally.hasNewer ? `Wallet on ${tally.endDate}` : 'Wallet after import'}
                                 </p>
                                 <p className={`text-[15px] font-serif font-bold ${
@@ -703,7 +692,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
                 <div className="flex justify-between items-end mb-6 px-2">
                     <div>
-                        <h3 className="text-premium-charcoal text-lg font-serif font-semibold">Review Transactions</h3>
+                        <h3 className="text-premium-charcoal text-lg font-serif font-semibold">Review transactions</h3>
                         <p className="text-muted-taupe text-xs mt-1">
                             {selectedIds.size} of {extractedData.length} selected
                             {duplicateIds.size > 0 && (
@@ -729,7 +718,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                     <button 
                         onClick={handleDiscard}
-                        className="text-rose text-xs font-bold uppercase tracking-widest border-b border-rose/30 pb-1"
+                        className="text-rose text-[12px] font-semibold border-b border-rose/30 pb-1"
                     >
                         Discard
                     </button>
@@ -739,17 +728,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                      <div className="flex items-center gap-4">
                          <button 
                             onClick={toggleAll}
-                            className="text-[10px] font-bold uppercase tracking-wider text-sage hover:text-sage/80"
+                            className="text-[12px] font-semibold text-sage hover:text-sage/80"
                          >
                             {selectedIds.size === extractedData.length ? 'Deselect All' : 'Select All'}
                          </button>
                          <button 
                             onClick={flipAllTypes}
-                            className="text-[10px] font-bold uppercase tracking-wider text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                            className="text-[12px] font-semibold text-blue-500 hover:text-blue-600 flex items-center gap-1"
                             title="If balance looks wrong, flip Income/Expense types"
                          >
                             <span className="material-symbols-outlined text-[12px]">swap_vert</span>
-                            Flip Types
+                            Flip types
                          </button>
                      </div>
                      
@@ -776,7 +765,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         >
                             {/* Duplicate badge */}
                             {isDuplicate && (
-                                <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                                <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
                                     Duplicate
                                 </div>
                             )}
@@ -798,7 +787,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 <div className="min-w-0">
                                     <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate">{t.merchant}</p>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[10px] bg-gray-100 text-muted-taupe px-2 py-0.5 rounded-full uppercase tracking-wide">{t.category}</span>
+                                        <span className="text-[12px] bg-gray-100 text-muted-taupe px-2 py-0.5 rounded-full">{t.category}</span>
                                         <span className="text-[10px] text-muted-taupe">{t.date}</span>
                                     </div>
                                 </div>
@@ -829,7 +818,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Edit Transaction</h3>
+                                <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Edit transaction</h3>
                                 <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
                                     <span className="material-symbols-outlined text-muted-taupe">close</span>
                                 </button>
@@ -837,7 +826,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             
                             {/* Merchant Name */}
                             <div className="mb-4">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Merchant</label>
+                                <label className="block text-[12px] font-semibold text-muted-taupe mb-2">Merchant</label>
                                 <input
                                     type="text"
                                     value={editingTx.merchant}
@@ -851,7 +840,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             
                             {/* Amount */}
                             <div className="mb-4">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Amount</label>
+                                <label className="block text-[12px] font-semibold text-muted-taupe mb-2">Amount</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-taupe">{getSymbol(currency)}</span>
                                     <input
@@ -870,7 +859,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             
                             {/* Type Toggle */}
                             <div className="mb-4">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Type</label>
+                                <label className="block text-[12px] font-semibold text-muted-taupe mb-2">Type</label>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setEditingTx({...editingTx, type: TransactionType.EXPENSE})}
@@ -889,7 +878,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             
                             {/* Category Dropdown */}
                             <div className="mb-4">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Category</label>
+                                <label className="block text-[12px] font-semibold text-muted-taupe mb-2">Category</label>
                                                                 <select
                                                                         value={editingTx.category}
                                                                         onChange={e => setEditingTx({...editingTx, category: e.target.value})}
@@ -905,7 +894,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             
                             {/* Date */}
                             <div className="mb-6">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-taupe mb-2">Date</label>
+                                <label className="block text-[12px] font-semibold text-muted-taupe mb-2">Date</label>
                                 <input
                                     type="date"
                                     value={editingTx.date}
@@ -923,7 +912,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 className="w-full bg-sage text-white font-serif font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-[20px]">check</span>
-                                Save Changes
+                                Save changes
                             </button>
                         </div>
                     </div>
@@ -990,6 +979,5 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
     </div>
   );
 };
-
 
 export default ImportStatement;

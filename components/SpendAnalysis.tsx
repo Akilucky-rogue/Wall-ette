@@ -432,7 +432,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
       {/* Expenses / Income: the hub only; its pages follow it */}
       {page === 'hub' && (
         <div className="px-6 pt-1 pb-4">
-          <div className="bg-black/[0.04] shadow-pressed rounded-2xl p-1 flex" role="group" aria-label="Show">
+          <div className="bg-premium-charcoal/[0.06] shadow-pressed rounded-2xl p-1 flex" role="group" aria-label="Show">
             {(['EXPENSE', 'INCOME'] as const).map(tab => (
               <button
                 key={tab}
@@ -517,8 +517,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           <div className="px-6 pb-4 break-inside-avoid">
             <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
               <div className="flex items-baseline justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">
-                  Today · {now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                <p className="text-[13px] font-semibold text-premium-charcoal">
+                  Today, {now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                 </p>
                 <p className={`text-[16px] font-serif font-bold ${isExp ? 'text-rose' : 'text-sage'}`}>
                   {isExp ? '-' : '+'}{formatAmount(todayTotal).split('.')[0]}
@@ -541,7 +541,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                         <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>
                           {prettyMerchant(t.merchant || t.category)}
                         </span>
-                        <span className="text-[9px] text-muted-taupe shrink-0 uppercase tracking-wide">{t.category}</span>
+                        <span className="text-[11px] text-muted-taupe shrink-0">{t.category}</span>
                         <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${isExp ? 'text-rose' : 'text-sage'}`}>
                           {isExp ? '-' : '+'}{formatAmount(t.amount).split('.')[0]}
                         </span>
@@ -555,9 +555,9 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
               )}
               {/* Daily spend limit usage — the limit set in Self, tracked live */}
               {isExp && dailyLimit > 0 && (
-                <div className="mt-3 pt-3 border-t border-black/5">
-                  <div className="flex justify-between text-[10px] text-muted-taupe mb-1.5">
-                    <span className="uppercase tracking-wider font-bold">Daily limit</span>
+                <div className="mt-3 pt-3 border-t border-premium-charcoal/[0.08]">
+                  <div className="flex justify-between text-[11px] text-muted-taupe mb-1.5">
+                    <span className="font-semibold text-premium-charcoal">Daily limit</span>
                     <span className={`tabular-nums ${todayTotal > dailyLimit ? 'text-rose font-bold' : ''}`}>
                       {formatAmount(todayTotal).split('.')[0]} / {formatAmount(dailyLimit).split('.')[0]}
                     </span>
@@ -583,7 +583,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
       {/* Pages: each topic on its own screen */}
       {page === 'hub' && (
         <nav className="px-6 pb-4 break-inside-avoid" aria-label="More in Pulse">
-          <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+          <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
             {pageRows.map(row => (
               <li key={row.screen}>
                 <button
@@ -609,16 +609,16 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
       {page === 'trends' && txStats && (
         <div className="px-6 pb-4 break-inside-avoid">
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-black/5">
-              <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-medium mb-1">Transactions</p>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-premium-charcoal/[0.08]">
+              <p className="text-[11px] text-muted-taupe mb-1">Entries</p>
               <p className="text-lg font-serif font-bold text-premium-charcoal">{txStats.count}</p>
             </div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-black/5">
-              <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-medium mb-1">Daily Avg</p>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-premium-charcoal/[0.08]">
+              <p className="text-[11px] text-muted-taupe mb-1">Daily average</p>
               <p className="text-lg font-serif font-bold text-premium-charcoal">{formatAmount(txStats.dailyAvg)}</p>
             </div>
-            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-black/5">
-              <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-medium mb-1">Per Txn</p>
+            <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-premium-charcoal/[0.08]">
+              <p className="text-[11px] text-muted-taupe mb-1">Per entry</p>
               <p className="text-lg font-serif font-bold text-premium-charcoal">{formatAmount(txStats.avg)}</p>
             </div>
           </div>
@@ -631,13 +631,13 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           <div className={`rounded-2xl p-4 border ${netFlow >= 0 ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-medium mb-0.5">Net Cash Flow</p>
+                <p className="text-[12px] text-muted-taupe mb-0.5">Net cash flow</p>
                 <p className={`text-xl font-serif font-bold ${netFlow >= 0 ? 'text-sage' : 'text-rose'}`}>
                   {netFlow >= 0 ? '+' : ''}{formatAmount(netFlow)}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-medium mb-0.5">Savings Rate</p>
+                <p className="text-[12px] text-muted-taupe mb-0.5">Savings rate</p>
                 <p className={`text-xl font-serif font-bold ${savingsRate >= 20 ? 'text-sage' : savingsRate >= 0 ? 'text-amber-600' : 'text-rose'}`}>
                   {savingsRate.toFixed(0)}%
                 </p>
@@ -664,19 +664,19 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-serif text-base font-semibold text-premium-charcoal">Trends</h3>
-            <div className="flex bg-zen-bg rounded-xl p-1">
+            <div className="flex bg-premium-charcoal/[0.06] shadow-pressed rounded-xl p-1">
               <button 
                 onClick={() => setChartMode('DAILY')}
-                className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
-                  chartMode === 'DAILY' ? 'bg-white shadow-sm text-premium-charcoal' : 'text-muted-taupe'
+                className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${
+                  chartMode === 'DAILY' ? 'bg-white shadow-soft text-premium-charcoal' : 'text-muted-taupe'
                 }`}
               >
                 Daily
               </button>
               <button 
                 onClick={() => setChartMode('WEEKLY')}
-                className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
-                  chartMode === 'WEEKLY' ? 'bg-white shadow-sm text-premium-charcoal' : 'text-muted-taupe'
+                className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${
+                  chartMode === 'WEEKLY' ? 'bg-white shadow-soft text-premium-charcoal' : 'text-muted-taupe'
                 }`}
               >
                 Weekly
@@ -708,7 +708,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                     {/* Gridlines */}
                     <div className="absolute inset-x-0 top-0 border-t border-black/[0.06]" />
                     <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-black/[0.06]" />
-                    <div className="absolute inset-x-0 bottom-0 border-t border-black/10" />
+                    <div className="absolute inset-x-0 bottom-0 border-t border-premium-charcoal/[0.12]" />
                     {/* Average reference line */}
                     {maxVal > 0 && (
                       <div
@@ -775,12 +775,12 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                         <span key={i} className="text-[8px] font-semibold text-muted-taupe">{chartData[di]?.label}</span>
                       ))
                     : chartData.map((d, i) => (
-                        <span key={i} className={`flex-1 text-center text-[8px] font-bold uppercase ${selPoint === i ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{d.label}</span>
+                        <span key={i} className={`flex-1 text-center text-[9px] font-semibold ${selPoint === i ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{d.label}</span>
                       ))}
                 </div>
 
                 {/* Readout: selected point, or peak + average summary */}
-                <div className="mt-3 pt-3 border-t border-black/5 text-[10px] text-muted-taupe leading-relaxed">
+                <div className="mt-3 pt-3 border-t border-premium-charcoal/[0.08] text-[10px] text-muted-taupe leading-relaxed">
                   {selPoint !== null && sel ? (
                     <span>
                       <span className="font-bold text-premium-charcoal">
@@ -817,7 +817,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           <div className={`rounded-[28px] p-5 border ${pace.onTrack ? 'bg-sage/5 border-sage/20' : 'bg-rose/5 border-rose/20'}`}>
             <div className="flex justify-between items-start mb-2">
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Month Pace</p>
+                <p className="text-[13px] font-semibold text-premium-charcoal">Month pace</p>
                 <p className="text-[11px] text-muted-taupe mt-0.5">
                   Day {pace.elapsedDays} of {pace.daysInMonth} · {formatAmount(pace.spentSoFar).split('.')[0]} spent
                 </p>
@@ -850,7 +850,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         return (
           <div className="px-6 py-2 break-inside-avoid">
             <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">What Changed</p>
+              <p className="text-[13px] font-semibold text-premium-charcoal mb-1">What changed</p>
               <p className="text-[10px] text-muted-taupe mb-3">
                 {analysisTab === 'EXPENSE' ? 'spending' : 'income'} vs {prevMonthData.monthName} · biggest category shifts
               </p>
@@ -894,7 +894,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           <div className="px-6 py-2 break-inside-avoid">
             <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
               <div className="flex justify-between items-center mb-3">
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">Daily Heatmap</p>
+                <p className="text-[13px] font-semibold text-premium-charcoal">Day by day</p>
                 {heatDay !== null && (
                   <p className="text-[11px] font-semibold text-premium-charcoal">
                     {heatDay} {selectedDate.toLocaleString('default', { month: 'short' })}: <span className={`font-bold ${isExp ? 'text-rose' : 'text-sage'}`}>{formatAmount(dayStats.daily[heatDay - 1]).split('.')[0]}</span>
@@ -903,7 +903,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
               </div>
               <div className="grid grid-cols-7 gap-1 mb-1">
                 {WEEKDAY_LABELS.map((d, i) => (
-                  <span key={i} className="text-center text-[8px] font-bold text-muted-taupe uppercase">{d}</span>
+                  <span key={i} className="text-center text-[9px] font-semibold text-muted-taupe">{d}</span>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -936,20 +936,20 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                   .sort((a, b) => b.amount - a.amount);
                 if (dayTxs.length === 0) {
                   return (
-                    <p className="text-[10px] text-muted-taupe mt-3 pt-3 border-t border-black/5 italic">
+                    <p className="text-[10px] text-muted-taupe mt-3 pt-3 border-t border-premium-charcoal/[0.08] italic">
                       No {isExp ? 'spending' : 'income'} on this day.
                     </p>
                   );
                 }
                 return (
-                  <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
+                  <div className="mt-3 pt-3 border-t border-premium-charcoal/[0.08] space-y-2">
                     {dayTxs.slice(0, 6).map(t => (
                       <div key={t.id} className="flex items-center gap-2 min-w-0">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isExp ? 'bg-rose' : 'bg-sage'}`} />
                         <span className="text-[11px] text-premium-charcoal truncate flex-1" title={t.merchant || t.category}>
                           {prettyMerchant(t.merchant || t.category)}
                         </span>
-                        <span className="text-[9px] text-muted-taupe shrink-0 uppercase tracking-wide">{t.category}</span>
+                        <span className="text-[11px] text-muted-taupe shrink-0">{t.category}</span>
                         <span className={`text-[11px] font-semibold shrink-0 tabular-nums ${isExp ? 'text-rose' : 'text-sage'}`}>
                           {isExp ? '-' : '+'}{formatAmount(t.amount).split('.')[0]}
                         </span>
@@ -977,7 +977,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         return (
           <div className="px-6 py-2 break-inside-avoid">
             <div className="bg-white rounded-[28px] p-5 shadow-soft border border-black/[0.02]">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Weekday Pattern</p>
+              <p className="text-[13px] font-semibold text-premium-charcoal mb-3">Weekdays</p>
               <div className="flex items-end justify-between gap-2 h-20">
                 {dayStats.weekdayAvg.map((v, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -991,7 +991,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                         }}
                       />
                     </div>
-                    <span className={`text-[9px] font-bold uppercase ${i === dayStats.busiestWeekday ? (isExp ? 'text-rose' : 'text-sage') : 'text-muted-taupe'}`}>{WEEKDAY_LABELS[i]}</span>
+                    <span className={`text-[10px] font-semibold ${i === dayStats.busiestWeekday ? (isExp ? 'text-rose' : 'text-sage') : 'text-muted-taupe'}`}>{WEEKDAY_LABELS[i]}</span>
                   </div>
                 ))}
               </div>
@@ -1030,7 +1030,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                   {formatAmountCompact(recurringMonthlyTotal * 12)} a year
                 </p>
               </div>
-              <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+              <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
                 {[...recurring].sort((a, b) => a.nextExpected.getTime() - b.nextExpected.getTime()).map((r, i) => {
                   const days = Math.round((new Date(r.nextExpected).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
                   const next = days < 0 ? 'was due ' + r.nextExpected.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -1103,7 +1103,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         
         <div className="space-y-3">
           {categoryBreakdown.length > 0 ? categoryBreakdown.slice(0, 5).map((cat, i) => (
-            <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-black/5">
+            <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-premium-charcoal/[0.08]">
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2">
                   <div className={`p-2 rounded-xl ${analysisTab === 'EXPENSE' ? 'bg-rose/10 text-rose' : 'bg-sage/10 text-sage'}`}>
@@ -1257,12 +1257,12 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
       {page === 'trends' && txStats && (
         <div className="px-6 pb-6 break-inside-avoid">
           <div className="bg-gradient-to-br from-premium-charcoal to-premium-charcoal/90 rounded-[24px] p-5 text-white">
-            <h4 className="text-[10px] uppercase tracking-widest font-medium text-white/60 mb-3">
-              {analysisTab === 'EXPENSE' ? 'Spending' : 'Income'} Range
+            <h4 className="text-[12px] font-semibold text-white/70 mb-3">
+              {analysisTab === 'EXPENSE' ? 'Spending' : 'Income'} range
             </h4>
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-[9px] uppercase tracking-wider text-white/50 mb-0.5">Minimum</p>
+                <p className="text-[11px] text-white/60 mb-0.5">Smallest</p>
                 <p className="text-lg font-serif font-bold">{formatAmount(txStats.min)}</p>
               </div>
               <div className="flex-1 mx-4 h-px bg-white/20 relative">
@@ -1271,7 +1271,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[9px] uppercase tracking-wider text-white/50 mb-0.5">Maximum</p>
+                <p className="text-[11px] text-white/60 mb-0.5">Largest</p>
                 <p className="text-lg font-serif font-bold">{formatAmount(txStats.max)}</p>
               </div>
             </div>

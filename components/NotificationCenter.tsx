@@ -154,7 +154,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
         aria-label={count > 0 ? `Notifications, ${count} new` : 'Notifications'}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={`relative flex items-center justify-center rounded-full h-10 w-10 border border-black/5 transition-colors cursor-pointer ${open ? 'bg-white text-sage shadow-sm' : 'bg-white/50 text-muted-taupe hover:bg-white'}`}
+        className={`relative flex items-center justify-center rounded-full h-10 w-10 border border-premium-charcoal/[0.08] transition-colors cursor-pointer ${open ? 'bg-white text-sage shadow-sm' : 'bg-white/50 text-muted-taupe hover:bg-white'}`}
       >
         <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notifications</span>
         {count > 0 && (
@@ -172,7 +172,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
             aria-modal="true"
             aria-labelledby="notifications-title"
             style={place}
-            className="fixed z-[60] flex flex-col bg-white rounded-3xl shadow-2xl border border-black/5 overflow-hidden motion-safe:animate-slide-down"
+            className="fixed z-[60] flex flex-col bg-white rounded-3xl shadow-2xl border border-premium-charcoal/[0.08] overflow-hidden motion-safe:animate-slide-down"
           >
             <div className="flex items-center justify-between pl-5 pr-3 pt-4 pb-1 shrink-0">
               <h2 id="notifications-title" ref={titleRef} tabIndex={-1} className="font-serif text-[18px] font-semibold text-premium-charcoal outline-none">

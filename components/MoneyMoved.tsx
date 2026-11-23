@@ -100,7 +100,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
         </p>
         {(movedOut > 0 || movedIn > 0) && (
           <div className="mt-4 bg-white rounded-2xl px-4 py-3 shadow-soft border border-black/[0.02] flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider text-muted-taupe font-bold">Not counted</span>
+            <span className="text-[12px] text-muted-taupe font-semibold">Not counted</span>
             <span className="text-[13px] text-premium-charcoal font-semibold tabular-nums">
               {formatAmountCompact(movedOut)} out · {formatAmountCompact(movedIn)} in
             </span>
@@ -111,7 +111,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
       {/* To sort: transfers to and from payees no rule covers yet */}
       {suggestions.length > 0 && (
         <section className="px-6 pb-2">
-          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To sort</h3>
+          <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-1 pl-1">To sort</h3>
           <p className="text-muted-taupe text-[12px] mb-3 pl-1">
             These transfers count as spending or income until you sort them.
           </p>
@@ -137,7 +137,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                   ))}
                   <button
                     onClick={() => savePayeeRule(s.name, 'counts')}
-                    className="bg-gray-50 text-premium-charcoal border border-black/5 py-2 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
+                    className="bg-gray-50 text-premium-charcoal border border-premium-charcoal/[0.08] py-2 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
                     title={s.out >= s.in ? 'Keep counting these as spending' : 'Keep counting these as income'}
                   >
                     {s.out >= s.in ? 'Spending' : 'Income'}
@@ -149,7 +149,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
           {suggestions.length > SHOW_FIRST && (
             <button
               onClick={() => setShowAll(v => !v)}
-              className="w-full mt-3 text-[11px] font-semibold text-sage uppercase tracking-wider py-2"
+              className="w-full mt-3 text-[12px] font-semibold text-sage py-2"
             >
               {showAll ? 'Show fewer' : `Show ${suggestions.length - SHOW_FIRST} more`}
             </button>
@@ -159,13 +159,13 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
 
       {/* Your rules */}
       <section className="px-6 pt-6">
-        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-3 pl-1">Your rules</h3>
+        <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-3 pl-1">Your rules</h3>
         {rules.length === 0 ? (
           <p className="text-muted-taupe text-[13px] italic pl-1">
             No rules yet. Sort a payee above, or add a word that appears in its payments below.
           </p>
         ) : (
-          <div className="bg-white rounded-3xl border border-black/[0.02] shadow-soft divide-y divide-black/5">
+          <div className="bg-white rounded-3xl border border-black/[0.02] shadow-soft divide-y divide-premium-charcoal/[0.06]">
             {rules.map(rule => {
               const info = KIND_INFO[rule.kind];
               const stats = perRule.get(rule.id);
@@ -183,7 +183,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                   <select
                     value={rule.kind}
                     onChange={e => savePayeeRule(rule.match, e.target.value as PayeeKind)}
-                    className="text-[11px] font-semibold text-premium-charcoal bg-gray-50 border border-black/5 rounded-lg px-2 py-1.5"
+                    className="text-[11px] font-semibold text-premium-charcoal bg-gray-50 border border-premium-charcoal/[0.08] rounded-lg px-2 py-1.5"
                     aria-label={`How payments matching ${rule.match} count`}
                   >
                     {RULE_KINDS.map(k => <option key={k} value={k}>{KIND_INFO[k].label}</option>)}
@@ -204,7 +204,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
 
       {/* Add a rule by hand */}
       <section className="px-6 pt-6">
-        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-3 pl-1">Add a rule</h3>
+        <h3 className="font-sans text-premium-charcoal text-[13px] font-semibold mb-3 pl-1">Add a rule</h3>
         <div className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft space-y-3">
           <input
             type="text"
@@ -219,7 +219,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
             <select
               value={newKind}
               onChange={e => setNewKind(e.target.value as PayeeKind)}
-              className="flex-1 text-[13px] font-semibold text-premium-charcoal bg-gray-50 border border-black/5 rounded-xl px-3 py-2.5"
+              className="flex-1 text-[13px] font-semibold text-premium-charcoal bg-gray-50 border border-premium-charcoal/[0.08] rounded-xl px-3 py-2.5"
               aria-label="How matching payments count"
             >
               {RULE_KINDS.map(k => <option key={k} value={k}>{KIND_INFO[k].label}</option>)}

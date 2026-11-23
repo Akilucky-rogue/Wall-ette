@@ -39,7 +39,7 @@ const CloudSaveBanner: React.FC = () => {
         <button
           onClick={retryUnsaved}
           disabled={unsaved.retrying}
-          className="bg-sage text-white text-[11px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-2xl shrink-0 active:scale-95 transition-transform disabled:opacity-60"
+          className="bg-sage text-white text-[12px] font-semibold px-3.5 py-2.5 rounded-2xl shrink-0 active:scale-95 transition-transform disabled:opacity-60"
         >
           {unsaved.retrying ? 'Sending…' : 'Try again'}
         </button>

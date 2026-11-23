@@ -199,7 +199,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         deleteTransaction(deleteId);
         removed();
         setDeleteId(null);
-        setToastMsg('Transaction deleted');
+        setToastMsg('Entry deleted');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
     }
@@ -306,30 +306,27 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
-        <div className="flex items-center justify-between mb-5">
-          <button
-            onClick={() => onNavigate(AppScreen.DASHBOARD)}
-            className="w-10 h-10 flex items-center justify-start text-premium-charcoal hover:text-sage transition-colors"
-          >
-            <span className="material-symbols-outlined text-[28px]">chevron_left</span>
-          </button>
-          <h1 className="font-serif text-xl font-semibold tracking-tight">Vault</h1>
-          <div className="flex items-center gap-0.5">
+        <div className="flex items-center justify-between mb-5 -mt-0.5">
+          <h1 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Vault</h1>
+          <div className="flex items-center gap-0.5 -mr-2">
              <button
                 onClick={() => setShowClearConfirm(true)}
                 className="w-10 h-10 flex items-center justify-center text-rose hover:bg-rose-light/20 rounded-full transition-colors"
-                title="Clear All History"
+                title="Clear all history"
+                aria-label="Clear all history"
              >
-                <span className="material-symbols-outlined text-[22px]">delete_sweep</span>
+                <span className="material-symbols-outlined text-[22px]" aria-hidden="true">delete_sweep</span>
              </button>
              <button
                 onClick={handleExportCSV}
-                className="w-10 h-10 flex items-center justify-center text-muted-taupe hover:text-sage transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-muted-taupe hover:text-sage transition-colors"
                 title="Export CSV"
+                aria-label="Export CSV"
              >
-                <span className="material-symbols-outlined text-[22px]">download</span>
+                <span className="material-symbols-outlined text-[22px]" aria-hidden="true">download</span>
              </button>
              <button 
+                aria-label="Filters"
                 onClick={() => setShowFilters(true)}
                 className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-colors ${activeFilterCount > 0 ? 'bg-sage text-white' : 'text-muted-taupe hover:text-sage hover:bg-sage-light/30'}`}
              >
@@ -347,21 +344,21 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           <button 
             onClick={() => setActiveType('ALL')}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === 'ALL' ? 'bg-sage text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === 'ALL' ? 'bg-sage text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">apps</span>
-            All Activity
+            All activity
           </button>
           <button 
             onClick={() => setActiveType(TransactionType.INCOME)}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.INCOME ? 'bg-sage text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.INCOME ? 'bg-sage text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
             Income
           </button>
           <button 
             onClick={() => setActiveType(TransactionType.EXPENSE)}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.EXPENSE ? 'bg-rose/90 text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.EXPENSE ? 'bg-rose/90 text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
             Expenses
@@ -391,7 +388,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         {/* Active Filters Summary */}
         {activeFilterCount > 0 && (
           <div className="flex items-center gap-2 pt-2 overflow-x-auto no-scrollbar">
-            <span className="text-[10px] text-muted-taupe uppercase tracking-wider flex-shrink-0">Active:</span>
+            <span className="text-[12px] text-muted-taupe flex-shrink-0">Active:</span>
             {dateFilter !== 'ALL' && (
               <span className="px-2 py-1 bg-sage/10 text-sage text-[10px] font-medium rounded-full flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">calendar_today</span>
@@ -427,7 +424,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
             <div className="fixed inset-0 bg-premium-charcoal/30 z-50 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
             <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 pb-4 border-b border-black/5">
+                <div className="flex justify-between items-center p-6 pb-4 border-b border-premium-charcoal/[0.08]">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-sage/10 flex items-center justify-center">
                         <WallEEyes size="sm" />
@@ -439,7 +436,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     </div>
                     <button 
                       onClick={clearFilters} 
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-rose uppercase tracking-wider hover:bg-rose-light/20 rounded-full transition-colors"
+                      className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-semibold text-rose hover:bg-rose-light/20 rounded-full transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">restart_alt</span>
                       Reset
@@ -452,15 +449,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-sage text-[18px]">calendar_month</span>
-                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Time Period</p>
+                          <p className="text-[12px] font-semibold text-muted-taupe">Time period</p>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             {[
-                              { value: 'ALL', label: 'All Time', icon: 'all_inclusive' },
-                              { value: 'THIS_MONTH', label: 'This Month', icon: 'today' },
-                              { value: '7_DAYS', label: '7 Days', icon: 'date_range' },
-                              { value: '30_DAYS', label: '30 Days', icon: 'calendar_view_month' },
-                              { value: '90_DAYS', label: '90 Days', icon: 'calendar_view_week' },
+                              { value: 'ALL', label: 'All time', icon: 'all_inclusive' },
+                              { value: 'THIS_MONTH', label: 'This month', icon: 'today' },
+                              { value: '7_DAYS', label: '7 days', icon: 'date_range' },
+                              { value: '30_DAYS', label: '30 days', icon: 'calendar_view_month' },
+                              { value: '90_DAYS', label: '90 days', icon: 'calendar_view_week' },
                             ].map((opt) => (
                                 <button
                                     key={opt.value}
@@ -482,14 +479,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-lavender text-[18px]">sort</span>
-                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Sort By</p>
+                          <p className="text-[12px] font-semibold text-muted-taupe">Sort by</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
-                              { value: 'DATE_DESC', label: 'Newest First', icon: 'arrow_downward' },
-                              { value: 'DATE_ASC', label: 'Oldest First', icon: 'arrow_upward' },
-                              { value: 'AMOUNT_DESC', label: 'Highest Amount', icon: 'trending_up' },
-                              { value: 'AMOUNT_ASC', label: 'Lowest Amount', icon: 'trending_down' },
+                              { value: 'DATE_DESC', label: 'Newest first', icon: 'arrow_downward' },
+                              { value: 'DATE_ASC', label: 'Oldest first', icon: 'arrow_upward' },
+                              { value: 'AMOUNT_DESC', label: 'Highest amount', icon: 'trending_up' },
+                              { value: 'AMOUNT_ASC', label: 'Lowest amount', icon: 'trending_down' },
                             ].map((opt) => (
                                 <button
                                     key={opt.value}
@@ -511,11 +508,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-ocean text-[18px]">payments</span>
-                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Amount Range</p>
+                          <p className="text-[12px] font-semibold text-muted-taupe">Amount range</p>
                         </div>
                         <div className="flex gap-3">
                             <div className="flex-1">
-                              <label className="text-[10px] text-muted-taupe mb-1 block">Min Amount</label>
+                              <label className="text-[10px] text-muted-taupe mb-1 block">Min amount</label>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
                                 <input
@@ -529,7 +526,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             </div>
                             <div className="flex items-end pb-3 text-muted-taupe">—</div>
                             <div className="flex-1">
-                              <label className="text-[10px] text-muted-taupe mb-1 block">Max Amount</label>
+                              <label className="text-[10px] text-muted-taupe mb-1 block">Max amount</label>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
                                 <input
@@ -549,7 +546,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-rose text-[18px]">category</span>
-                            <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Category</p>
+                            <p className="text-[12px] font-semibold text-muted-taupe">Category</p>
                           </div>
                           <span className="text-[10px] text-muted-taupe">{categories.length - 1} categories</span>
                         </div>
@@ -569,7 +566,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                       {cat === 'ALL' ? (
                                         <span className="material-symbols-outlined text-[14px]">select_all</span>
                                       ) : null}
-                                      <span>{cat === 'ALL' ? 'All Categories' : cat}</span>
+                                      <span>{cat === 'ALL' ? 'All categories' : cat}</span>
                                       {cat !== 'ALL' && stats && (
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                                           categoryFilter === cat ? 'bg-white/20' : 'bg-black/5'
@@ -585,7 +582,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 pt-4 border-t border-black/5 bg-white">
+                <div className="p-6 pt-4 border-t border-premium-charcoal/[0.08] bg-white">
                     <button 
                         onClick={() => setShowFilters(false)}
                         className="w-full bg-premium-charcoal text-white py-4 rounded-3xl font-serif text-lg font-medium active:scale-95 transition-transform flex items-center justify-center gap-2"
@@ -644,7 +641,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     </span>
                   )}
                 </div>
-                <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-black/[0.05]">
+                <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
                 {group.items.map(t => {
                     const expanded = expandedId === t.id;
                     const isExpense = t.type === TransactionType.EXPENSE;
@@ -744,14 +741,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-12 h-12 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4">
                         <span className="material-symbols-outlined text-[24px]">delete</span>
                     </div>
-                    <h3 className="text-premium-charcoal font-serif text-xl font-semibold mb-2">Delete Transaction?</h3>
+                    <h3 className="text-premium-charcoal font-serif text-xl font-semibold mb-2">Delete this entry?</h3>
                     <p className="text-muted-taupe text-xs mb-6 leading-relaxed">
                         This action cannot be undone. The transaction will be permanently removed.
                     </p>
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => setDeleteId(null)}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -775,24 +772,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-14 h-14 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4 animate-pulse">
                         <span className="material-symbols-outlined text-[32px]">warning</span>
                     </div>
-                    <h3 className="text-rose font-serif text-xl font-bold mb-2">Clear All History?</h3>
+                    <h3 className="text-rose font-serif text-xl font-bold mb-2">Clear all history?</h3>
                     <p className="text-premium-charcoal text-xs mb-4 leading-relaxed font-medium">
                         This will permanently delete <span className="underline decoration-rose">ALL</span> transactions. This action is irreversible.
                     </p>
                     
-                    <p className="text-[10px] text-muted-taupe uppercase tracking-widest mb-2">Type "DELETE" to confirm</p>
+                    <p className="text-[12px] text-muted-taupe mb-2">Type "DELETE" to confirm</p>
                     <input 
                         type="text" 
                         value={clearInput}
                         onChange={(e) => setClearInput(e.target.value)}
-                        className="w-full bg-zen-bg border border-rose/20 rounded-xl px-4 py-3 text-center text-sm font-bold text-rose outline-none focus:ring-2 focus:ring-rose/30 mb-6 uppercase"
+                        className="w-full bg-zen-bg border border-rose/20 rounded-xl px-4 py-3 text-center text-sm font-semibold text-rose outline-none focus:ring-2 focus:ring-rose/30 mb-6"
                         placeholder="DELETE"
                     />
 
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => { setShowClearConfirm(false); setClearInput(''); }}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -801,7 +798,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             disabled={clearInput.toUpperCase() !== 'DELETE'}
                             className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-rose text-white shadow-soft hover:bg-rose/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Clear All
+                            Clear all
                         </button>
                     </div>
                 </div>
@@ -819,7 +816,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             <div className="w-12 h-12 bg-sage-light text-sage rounded-full flex items-center justify-center">
                                 <span className="material-symbols-outlined text-[24px]">edit</span>
                             </div>
-                            <h3 className="text-premium-charcoal font-serif text-xl font-semibold">Edit Transaction</h3>
+                            <h3 className="text-premium-charcoal font-serif text-xl font-semibold">Edit entry</h3>
                         </div>
                         <button onClick={closeEditModal} className="text-muted-taupe hover:text-premium-charcoal">
                             <span className="material-symbols-outlined">close</span>
@@ -828,7 +825,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Transaction Type Toggle */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Type</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Type</label>
                         <div className="flex gap-2">
                             <button
                                 type="button"
@@ -836,7 +833,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                 className={`flex-1 py-3 rounded-2xl text-[13px] font-semibold transition-all ${
                                     editForm.type === TransactionType.EXPENSE 
                                         ? 'bg-rose text-white' 
-                                        : 'bg-white border border-black/5 text-muted-taupe hover:bg-gray-50'
+                                        : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-gray-50'
                                 }`}
                             >
                                 Expense
@@ -847,7 +844,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                 className={`flex-1 py-3 rounded-2xl text-[13px] font-semibold transition-all ${
                                     editForm.type === TransactionType.INCOME 
                                         ? 'bg-sage text-white' 
-                                        : 'bg-white border border-black/5 text-muted-taupe hover:bg-gray-50'
+                                        : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-gray-50'
                                 }`}
                             >
                                 Income
@@ -857,19 +854,19 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Merchant */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Merchant / Description</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Merchant / Description</label>
                         <input
                             type="text"
                             value={editForm.merchant}
                             onChange={(e) => setEditForm(prev => ({ ...prev, merchant: e.target.value }))}
                             placeholder="Enter merchant name"
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
                     {/* Amount */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Amount</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Amount</label>
                         <input
                             type="number"
                             step="0.01"
@@ -877,17 +874,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.amount}
                             onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
                             placeholder="0.00"
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
                     {/* Category */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Category</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Category</label>
                         <select
                             value={editForm.category}
                             onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30 appearance-none cursor-pointer"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30 appearance-none cursor-pointer"
                             title="Category"
                             aria-label="Category"
                           >
@@ -899,12 +896,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Date */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Date</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Date</label>
                         <input
                             type="date"
                             value={editForm.date}
                             onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
                             title="Date"
                             aria-label="Date"
                           />
@@ -912,13 +909,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
                     {/* Note */}
                     <div className="mb-6">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Note</label>
+                        <label className="text-[12px] text-muted-taupe font-semibold mb-2 block">Note</label>
                         <textarea
                             value={editForm.note}
                             onChange={(e) => setEditForm(prev => ({ ...prev, note: e.target.value }))}
                             placeholder="Add a note (optional)"
                             rows={2}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
                         />
                     </div>
 
@@ -926,7 +923,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="flex gap-3">
                         <button 
                             onClick={closeEditModal}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>

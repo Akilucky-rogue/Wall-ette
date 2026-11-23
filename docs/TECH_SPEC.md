@@ -83,6 +83,10 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   presses it in. `styles.css` adds `.icon-fill` (filled symbols), `.wallet` (Home's balance: a
   stitched card with a fine weave, `.wallet-pocket`, `.wallet-emboss`) and `.receipt` (a
   zigzag torn edge made with a mask; its shadow is a `drop-shadow` on `.receipt-lift`).
+  Every screen uses the same page header (a back arrow, the title on the left); labels are
+  sentence case, with no all-caps eyebrows; hairlines, dividers and switch tracks use the ink
+  colour at low opacity (`border-premium-charcoal/[0.08]`), so they show on dark themes too.
+  The decorative leaves, lotuses and rangoli stay on the sign-in, lock and update screens only.
 - Deliberately theme-independent: mascot, splash art, exported statement HTML, and the
   shareable Wrapped card (brand-stable artifacts).
 

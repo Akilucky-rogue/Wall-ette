@@ -5,7 +5,6 @@ import { useWallet } from '../context/WalletContext';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { done } from '../utils/haptics';
-import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
 
 interface NewEntryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -181,27 +180,23 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden">
-      <FloatingLeaf className="top-20 right-5 opacity-35" delay={0.3} />
-      <Sprout className="absolute top-32 left-4 opacity-40" />
-      <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="var(--gold-1)" mirror />
 
       {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
-          className="text-muted-taupe flex items-center justify-center h-10 w-10 hover:text-sage transition-colors"
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Close without saving"
         >
-          <span className="material-symbols-outlined text-[28px]">close</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">New Entry</h2>
-        <div className="w-10"></div>
+        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">New entry</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pt-2 flex flex-col gap-6 pb-4">
         {/* Amount hero */}
         <div className="text-center py-4 relative">
-          <div className="absolute top-2 right-8"><Diya className="opacity-50" /></div>
-          <p className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-2">Amount</p>
+          <p className="text-muted-taupe text-[12px] font-medium mb-2">Amount</p>
           <div className="flex items-center justify-center gap-1">
             <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/50'}`}>{getSymbol(currency)}</span>
             <span className={`font-serif leading-none ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/40'}`}>{amount}</span>
@@ -212,7 +207,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <button
                 key={q}
                 onClick={() => setAmount(String(q))}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${amount === String(q) ? 'bg-sage text-white border-sage' : 'bg-white text-muted-taupe border-black/5 hover:border-sage/30'}`}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${amount === String(q) ? 'bg-sage text-white border-sage' : 'bg-white text-muted-taupe border-premium-charcoal/[0.08] hover:border-sage/30'}`}
               >
                 {getSymbol(currency)}{q.toLocaleString('en-IN')}
               </button>
@@ -246,7 +241,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 <span className="material-symbols-outlined text-[20px]">storefront</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Merchant / Payee</p>
+                <p className="text-[12px] text-muted-taupe font-semibold">Merchant or payee</p>
                 <input
                   type="text"
                   value={merchant}
@@ -262,7 +257,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   <button
                     key={s}
                     onClick={() => applyMerchant(s)}
-                    className="px-3 py-1.5 rounded-full text-[10px] font-semibold bg-zen-bg text-premium-charcoal border border-black/5 whitespace-nowrap shrink-0 hover:border-sage/40"
+                    className="px-3 py-1.5 rounded-full text-[10px] font-semibold bg-zen-bg text-premium-charcoal border border-premium-charcoal/[0.08] whitespace-nowrap shrink-0 hover:border-sage/40"
                   >
                     {s}
                   </button>
@@ -274,12 +269,12 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           {/* Category — visual chip grid */}
           <div className="bg-white rounded-[24px] p-4 shadow-soft border border-black/[0.01]">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">
+              <p className="text-[12px] text-muted-taupe font-semibold">
                 Category{autoCat && category ? <span className="text-sage normal-case tracking-normal"> · auto: {category}</span> : ''}
               </p>
               <button
                 onClick={() => setShowAllCats(v => !v)}
-                className="text-[10px] font-bold uppercase tracking-wider text-sage"
+                className="text-[12px] font-semibold text-sage"
               >
                 {showAllCats ? 'Less' : 'More'}
               </button>
@@ -292,7 +287,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   className={`px-3 py-2 rounded-2xl text-[11px] font-medium border transition-all flex items-center gap-1.5 ${
                     category === cat
                       ? (type === TransactionType.EXPENSE ? 'bg-rose text-white border-rose shadow-sm' : 'bg-sage text-white border-sage shadow-sm')
-                      : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-black/10'
+                      : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-premium-charcoal/[0.12]'
                   }`}
                 >
                   <span className="material-symbols-outlined text-[14px]">{CAT_ICON(cat)}</span>
@@ -311,7 +306,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined text-[20px]">calendar_today</span>
             </div>
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
+              <p className="text-[12px] text-muted-taupe font-semibold">Date</p>
               <p className="text-premium-charcoal text-[15px] font-serif font-semibold">{dateLabel}</p>
             </div>
             <span className="material-symbols-outlined text-muted-taupe opacity-40">expand_more</span>
@@ -338,7 +333,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   </button>
                 ))}
               </div>
-              <div className="border-t border-black/5 pt-4">
+              <div className="border-t border-premium-charcoal/[0.08] pt-4">
                 <input
                   type="date"
                   value={localDay(selectedDate)}
@@ -364,7 +359,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
               <span className="material-symbols-outlined text-[20px]">notes</span>
             </div>
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
+              <p className="text-[12px] text-muted-taupe font-semibold">Note</p>
               <input
                 className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif placeholder:text-muted-taupe/40"
                 placeholder="Add details..."
@@ -412,7 +407,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           >
             <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-5' : 'translate-x-0'}`} />
           </div>
-          <span className="text-[12px] text-muted-taupe font-medium">Save & Add Another</span>
+          <span className="text-[12px] text-muted-taupe font-medium">Save and add another</span>
         </label>
 
         <button
@@ -421,7 +416,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] font-serif text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-[22px]">{saveAndAdd ? 'add' : 'check'}</span>
-          {saveAndAdd ? 'Save & Add Another' : 'Save Transaction'}
+          {saveAndAdd ? 'Save and add another' : 'Save entry'}
         </button>
       </div>
 

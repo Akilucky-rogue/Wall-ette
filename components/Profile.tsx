@@ -595,7 +595,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                     style={{ background: s.bg }}
                   >
                     <span className="flex items-center gap-1 mb-1.5">
-                      <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: s.accent }} />
+                      <span className="w-4 h-4 rounded-full border border-premium-charcoal/[0.12]" style={{ background: s.accent }} />
                       <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
                     </span>
                     <span className="block text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</span>
@@ -609,7 +609,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                       type="color"
                       value={customTheme.accent}
                       onChange={e => updateCustom({ accent: e.target.value })}
-                      className="w-9 h-9 rounded-xl border border-black/10 bg-transparent cursor-pointer p-0.5"
+                      className="w-9 h-9 rounded-xl border border-premium-charcoal/[0.12] bg-transparent cursor-pointer p-0.5"
                       aria-label="Custom accent color"
                     />
                     <span className="text-[12px] text-muted-taupe">Accent color</span>
@@ -698,11 +698,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                 </p>
                 {qrDataUrl && (
                   <div className="flex justify-center mb-4">
-                    <img src={qrDataUrl} alt="2FA QR code" className="rounded-xl border border-black/5" width={200} height={200} />
+                    <img src={qrDataUrl} alt="2FA QR code" className="rounded-xl border border-premium-charcoal/[0.08]" width={200} height={200} />
                   </div>
                 )}
                 <div className="bg-zen-bg rounded-xl px-4 py-3 mb-5">
-                  <p className="text-[9px] uppercase tracking-wider text-muted-taupe font-bold mb-1">Manual key</p>
+                  <p className="text-[11px] text-muted-taupe font-semibold mb-1">Manual key</p>
                   <p className="text-[12px] font-mono text-premium-charcoal break-all select-all">{enrollment.secretKey}</p>
                 </div>
                 <p className="text-[12px] text-muted-taupe leading-relaxed mb-2">2. Enter the 6-digit code the app shows:</p>
@@ -727,7 +727,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change Password</h3>
+              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change password</h3>
               <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
                 <span className="material-symbols-outlined text-muted-taupe">close</span>
               </button>
@@ -745,21 +745,21 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Current password</label>
+                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Current password</label>
                     <input type="password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
                            autoComplete="current-password" autoFocus
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                            placeholder="••••••••" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">New password</label>
+                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">New password</label>
                     <input type="password" value={pwNew} onChange={e => setPwNew(e.target.value)}
                            autoComplete="new-password"
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
                            placeholder="••••••••" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Confirm new password</label>
+                    <label className="block text-[12px] font-semibold text-muted-taupe mb-1.5 ml-2">Confirm new password</label>
                     <input type="password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
                            autoComplete="new-password"
                            className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-premium-charcoal text-sm outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all"
@@ -805,7 +805,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       {delOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !delBusy && setDelOpen(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete Account</h3>
+            <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete account</h3>
             <p className="text-[12px] text-muted-taupe leading-relaxed mb-4">
               This permanently erases your account and every transaction from the cloud. There is no undo.
               Consider exporting a backup first.
@@ -839,7 +839,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
               {delBusy ? 'Deleting…' : 'Permanently Delete Everything'}
             </button>
             <button onClick={() => setDelOpen(false)} disabled={delBusy}
-                    className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal">
+                    className="w-full text-muted-taupe py-2 text-[12px] font-medium hover:text-premium-charcoal">
               Cancel
             </button>
           </div>

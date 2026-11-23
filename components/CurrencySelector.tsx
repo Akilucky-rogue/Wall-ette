@@ -21,13 +21,13 @@ const CurrencySelector: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1.5 bg-white border border-black/5 rounded-full px-3 py-1.5 shadow-sm hover:bg-white/80 transition-all min-w-[64px] min-h-[40px]"
+                className="flex items-center gap-1.5 bg-white border border-premium-charcoal/[0.08] rounded-full px-3 py-1.5 shadow-sm hover:bg-white/80 transition-all min-w-[64px] min-h-[40px]"
             >
                 <span className="text-[12px] font-bold text-premium-charcoal">{currency}</span>
                 <span className="material-symbols-outlined text-[16px] text-muted-taupe">expand_more</span>
             </button>
             {isOpen && (
-                <div className="absolute top-full mt-2 right-0 bg-white rounded-xl shadow-xl border border-black/5 py-1 w-24 z-50 animate-slide-up">
+                <div className="absolute top-full mt-2 right-0 bg-white rounded-xl shadow-xl border border-premium-charcoal/[0.08] py-1 w-24 z-50 animate-slide-up">
                     {(Object.keys(CURRENCIES) as Array<keyof typeof CURRENCIES>).map((c) => (
                         <button 
                             key={c}

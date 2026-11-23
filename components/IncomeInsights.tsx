@@ -6,6 +6,7 @@ import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { WallEMascot } from './SplashScreen';
 import BalanceTrend from './BalanceTrend';
+import { tick } from '../utils/haptics';
 
 interface IncomeInsightsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -288,24 +289,22 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
       ) : (
         <div className="px-6 pt-2">
           {/* Story / Goals switch */}
-          <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5 mb-4">
-            <button
-              onClick={() => setTab('STORY')}
-              className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${tab === 'STORY' ? 'bg-sage/10 text-sage shadow-sm' : 'text-muted-taupe hover:text-premium-charcoal'}`}
-            >
-              <span className="material-symbols-outlined text-[16px]">auto_stories</span>
-              Story
-            </button>
-            <button
-              onClick={() => setTab('GOALS')}
-              className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${tab === 'GOALS' ? 'bg-sage/10 text-sage shadow-sm' : 'text-muted-taupe hover:text-premium-charcoal'}`}
-            >
-              <span className="material-symbols-outlined text-[16px]">flag</span>
-              Goals
-            </button>
-            <div className="hidden sm:flex items-center px-3 text-[9px] uppercase tracking-widest text-muted-taupe/60 font-bold whitespace-nowrap">
-              Forecast · soon
-            </div>
+          <div className="bg-premium-charcoal/[0.06] shadow-pressed rounded-2xl p-1 flex mb-4" role="group" aria-label="Show">
+            {(['STORY', 'GOALS'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => { if (t !== tab) tick(); setTab(t); }}
+                aria-pressed={tab === t}
+                className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  tab === t ? 'bg-white shadow-soft text-premium-charcoal' : 'text-muted-taupe hover:text-premium-charcoal'
+                }`}
+              >
+                <span className={`material-symbols-outlined icon-fill text-[16px] ${tab === t ? 'text-sage' : ''}`} aria-hidden="true">
+                  {t === 'STORY' ? 'auto_stories' : 'flag'}
+                </span>
+                {t === 'STORY' ? 'Story' : 'Goals'}
+              </button>
+            ))}
           </div>
 
           {tab === 'STORY' && (
@@ -316,7 +315,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   <button
                     key={k}
                     onClick={() => setStoryMonth(k)}
-                    className={`px-4 py-2 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${storyKey === k ? 'bg-premium-charcoal text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:text-premium-charcoal'}`}
+                    className={`px-4 py-2 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${storyKey === k ? 'bg-premium-charcoal text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:text-premium-charcoal'}`}
                   >
                     {monthLabel(k, 'short')} {k.slice(2, 4)}
                   </button>
@@ -327,8 +326,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {story && storyKey && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid mt-4 lg:mt-0">
                   <div className="flex items-baseline justify-between mb-1">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">The {monthLabel(storyKey)} story</p>
-                    {story.isCurrent && <span className="text-[9px] text-sage font-bold uppercase tracking-wider">In progress</span>}
+                    <p className="text-[13px] font-semibold text-premium-charcoal">The {monthLabel(storyKey)} story</p>
+                    {story.isCurrent && <span className="text-[11px] text-sage font-semibold">In progress</span>}
                   </div>
                   <p className={`font-serif text-2xl font-bold mb-4 ${story.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
                     {story.saved >= 0 ? '+' : '−'}{formatAmount(Math.abs(story.saved)).split('.')[0]}
@@ -350,7 +349,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {/* Money flow diagram for the story month */}
               {story && flowSvg && storyKey && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                  <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Money Flow</p>
+                  <p className="text-[13px] font-semibold text-premium-charcoal mb-1">Money flow</p>
                   <p className="text-[10px] text-muted-taupe mb-3">
                     {monthLabel(storyKey)} · in {formatAmountCompact(story.m.inc)} → out {formatAmountCompact(story.m.out)}{story.saved > 0 ? ` → saved ${formatAmountCompact(story.saved)}` : ''}
                   </p>
@@ -396,9 +395,9 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-black/5 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div className="mt-4 pt-3 border-t border-premium-charcoal/[0.08] grid grid-cols-2 gap-x-4 gap-y-1.5">
                     <div className="space-y-1.5">
-                      <p className="text-[8px] uppercase tracking-widest text-muted-taupe font-bold">In</p>
+                      <p className="text-[11px] font-semibold text-muted-taupe">In</p>
                       {flowSvg.leftNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: n.color }} />
@@ -408,7 +407,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       ))}
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-[8px] uppercase tracking-widest text-muted-taupe font-bold">Out</p>
+                      <p className="text-[11px] font-semibold text-muted-taupe">Out</p>
                       {flowSvg.rightNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${n.name === 'Saved' ? 'bg-sage' : 'bg-[var(--mut)]/60'}`} />
@@ -425,7 +424,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               <div className="grid grid-cols-2 gap-4 break-inside-avoid">
                 {stability && (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col items-center">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start mb-2">Stability</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal self-start mb-2">Stability</p>
                     <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                       <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                       <circle
@@ -442,7 +441,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                 )}
                 {salary && !salary.confirmed && salary.payee ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Your pay?</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Your pay?</p>
                     <p className="text-[11px] text-premium-charcoal font-semibold truncate" title={salary.streamName}>
                       {prettyMerchant(salary.streamName)}
                     </p>
@@ -456,7 +455,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       </button>
                       <button
                         onClick={() => savePayeeRule(salary.payee!, 'counts')}
-                        className="bg-gray-50 text-premium-charcoal border border-black/5 py-1.5 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
+                        className="bg-gray-50 text-premium-charcoal border border-premium-charcoal/[0.08] py-1.5 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
                       >
                         No
                       </button>
@@ -464,7 +463,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   </div>
                 ) : salary?.confirmed ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02]">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Next Pay</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Next pay</p>
                     <p className="text-premium-charcoal font-serif text-2xl font-bold">
                       {salary.daysUntil === 0 ? 'Today' : `${salary.daysUntil}d`}
                     </p>
@@ -478,7 +477,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                   </div>
                 ) : (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col justify-center">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Avg / Month</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal mb-2">Average a month</p>
                     <p className="text-premium-charcoal font-serif text-xl font-bold">
                       {formatAmount(stability?.avgMonthly ?? 0).split('.')[0]}
                     </p>
@@ -496,7 +495,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {trend && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
                   <div className="flex justify-between items-center mb-3">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">12-Month Income</p>
+                    <p className="text-[13px] font-semibold text-premium-charcoal">Income, 12 months</p>
                     {selectedMonthIdx !== null && (
                       <p className="text-[11px] font-semibold text-sage">
                         {trend[selectedMonthIdx].label}: {formatAmount(trend[selectedMonthIdx].value).split('.')[0]}
@@ -518,7 +517,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                           />
                         </div>
                         {i % 3 === 0 || i === trend.length - 1 ? (
-                          <span className="text-[8px] font-bold text-muted-taupe uppercase">{m.label}</span>
+                          <span className="text-[10px] text-muted-taupe">{m.label}</span>
                         ) : (
                           <span className="text-[8px]">&nbsp;</span>
                         )}
@@ -531,7 +530,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
               {/* Income streams */}
               {streams.length > 0 && (
                 <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                  <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-4">Income Streams · last 12 months</p>
+                  <p className="text-[13px] font-semibold text-premium-charcoal mb-4">Income streams, last 12 months</p>
                   <div className="space-y-3">
                     {streams.map((s, i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -543,7 +542,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-[13px] font-semibold text-premium-charcoal truncate" title={s.name}>{prettyMerchant(s.name)}</p>
-                            <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${BADGE_STYLES[s.badge].cls}`}>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${BADGE_STYLES[s.badge].cls}`}>
                               {BADGE_STYLES[s.badge].label}
                             </span>
                           </div>
@@ -568,7 +567,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
             <div className="space-y-4 lg:columns-2 lg:gap-x-5">
               {/* Savings goal */}
               <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-3">Savings goal · {monthLabel(currentKey, 'long')}</p>
+                <p className="text-[13px] font-semibold text-premium-charcoal mb-3">Savings goal for {monthLabel(currentKey, 'long')}</p>
                 <div className="flex items-center gap-5">
                   <div className="relative w-20 h-20 shrink-0">
                     <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
@@ -594,7 +593,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       {goalData.saved >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(goalData.saved))} saved
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="text-[10px] text-muted-taupe uppercase tracking-wider shrink-0">Target</span>
+                      <span className="text-[12px] text-muted-taupe shrink-0">Target</span>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -621,7 +620,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     )}
                   </div>
                 </div>
-                <p className="text-[9px] text-muted-taupe mt-3 pt-3 border-t border-black/5 leading-relaxed">
+                <p className="text-[9px] text-muted-taupe mt-3 pt-3 border-t border-premium-charcoal/[0.08] leading-relaxed">
                   Tracked live: this month's income minus spending, recalculated with every entry,
                   import, and sync. Resets on the 1st of each month.
                 </p>
@@ -629,7 +628,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
 
               {/* Category budgets */}
               <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] break-inside-avoid">
-                <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Category budgets</p>
+                <p className="text-[13px] font-semibold text-premium-charcoal mb-1">Category budgets</p>
                 <p className="text-[10px] text-muted-taupe mb-4">
                   Spending this month vs your monthly cap. Bars fill automatically as you spend —
                   sand at 80%, red when over. Caps reset every month.

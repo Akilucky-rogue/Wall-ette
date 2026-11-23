@@ -5,7 +5,11 @@ apply plugin: 'com.android.application'
 // npm run android:bundle runs) use the upload key in android/upload.properties:
 // the old key was in a pull request, so Play gets a new one (audit C2). Both
 // files are gitignored; copy the .example next to each and fill it in.
-def forPlay = project.hasProperty('play')
+// An app bundle only ever goes to Play, so building one any other way
+// (Android Studio's Build > Build App Bundle, the Gradle panel) also signs it
+// with the upload key.
+def forPlay = project.hasProperty('play') ||
+    gradle.startParameter.taskNames.any { it.toLowerCase().contains('bundle') }
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file(forPlay ? "upload.properties" : "key.properties")
 if (keystorePropertiesFile.exists()) {

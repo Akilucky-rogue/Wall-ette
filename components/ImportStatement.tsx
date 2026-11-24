@@ -889,7 +889,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
 
-                <div className="fixed bottom-0 left-0 right-0 lg:left-[240px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] bg-gradient-to-t from-zen-bg via-zen-bg to-transparent z-50 max-w-[430px] md:max-w-2xl mx-auto">
+                {/* The page shows solid behind the pager and the button, fading
+                    out only above them, so rows scrolling underneath don't
+                    show through between the page numbers. */}
+                <div className="fixed bottom-0 left-0 right-0 lg:left-[240px] px-6 pt-10 pb-[calc(1.5rem_+_var(--sab))] bg-gradient-to-t from-zen-bg via-zen-bg via-75% to-transparent z-50 max-w-[430px] md:max-w-2xl mx-auto">
                     {/* Pagination controls */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-center gap-3 mb-4">

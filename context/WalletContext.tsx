@@ -9,6 +9,7 @@ import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spen
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
 import { mergeImport } from '../services/statementImport';
+import type { BackupSettings } from '../services/backup';
 
 // Firestore refuses fields set to undefined; leave them out.
 const forCloud = <T extends object,>(t: T): T =>
@@ -106,6 +107,12 @@ interface WalletContextType {
    * balance when this is now the earliest statement. One step, one list.
    */
   importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string, removeIds?: string[]) => void;
+  /**
+   * Data Studio → Restore: puts back a backup's settings. The opening balance,
+   * and each budget, goal and limit the file holds, replace the ones here;
+   * Money moved rules are added unless one with the same match is here.
+   */
+  restoreSettings: (settings: BackupSettings) => void;
   /** Adds a rule, or changes the kind of the rule with the same match. */
   savePayeeRule: (match: string, kind: PayeeKind) => void;
   deletePayeeRule: (id: string) => void;
@@ -867,6 +874,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     persistPayeeRules(payeeRules.filter(r => r.id !== id));
   }, [payeeRules, persistPayeeRules]);
 
+  const restoreSettings = useCallback((s: BackupSettings) => {
+    if (s.openingBalance !== undefined) setOpeningBalance(s.openingBalance, s.openingBalanceAsOf ?? null);
+    if (s.budgets && Object.keys(s.budgets).length > 0) {
+      const next = withListBudgetNames({ ...budgets, ...s.budgets });
+      setBudgetsState(next);
+      saveToLocal('budgets', next);
+      saveSetting('budgets', { budgets: next });
+    }
+    if (s.savingsGoal) setSavingsGoal(s.savingsGoal);
+    if (s.dailyLimit) setDailyLimit(s.dailyLimit);
+    if (s.payeeRules && s.payeeRules.length > 0) {
+      const matches = new Set(payeeRules.map(r => matchText(r.match)));
+      const ids = new Set(payeeRules.map(r => r.id));
+      const extra: PayeeRule[] = [];
+      for (const r of s.payeeRules) {
+        const key = matchText(r.match);
+        if (key.length < MIN_MATCH || matches.has(key)) continue;
+        matches.add(key);
+        const id = ids.has(r.id) ? `rule-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${extra.length}`}` : r.id;
+        ids.add(id);
+        extra.push({ id, match: r.match, kind: r.kind });
+      }
+      if (extra.length > 0) persistPayeeRules([...payeeRules, ...extra]);
+    }
+  }, [budgets, payeeRules, setOpeningBalance, setSavingsGoal, setDailyLimit, saveToLocal, saveSetting, persistPayeeRules]);
+
   // Memoized provider value (audit Phase 2.1) — consumers no longer re-render
   // from identity churn alone.
   const value = useMemo<WalletContextType>(() => ({
@@ -893,6 +926,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       deleteTransactions,
       clearAllTransactions,
       importTransactions,
+      restoreSettings,
       savePayeeRule,
       deletePayeeRule,
       openingBalance,
@@ -920,7 +954,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
-      deleteTransactions, clearAllTransactions, importTransactions, savePayeeRule, deletePayeeRule, getBalance,
+      deleteTransactions, clearAllTransactions, importTransactions, restoreSettings, savePayeeRule, deletePayeeRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatWhole, formatAmountCompact,
       convertToBase, shownCurrency, shownRate, exchangeRates, retryCloudConnection, refresh, lastLoginTime, formatEntry

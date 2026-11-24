@@ -291,6 +291,19 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   payee and note, and prints to PDF; the CSV has ISO dates, rupees to the paisa, how each entry
   counts (spending, income or money moved) and writes formula-like text as text. Checked by
   `scripts/check-report.mjs`. The old health check (`insightsService.ts`) is gone.
+- **Full backup and restore** (`services/backup.ts`, from 1.5.8) — Data Studio's backup is
+  version 2: every entry plus the opening balance and its day, budgets, the savings goal, the
+  daily limit and the Money moved rules (version 1, up to 1.5.7, held entries and the opening
+  balance). **Restore from a backup** reads either version and only adds: entries the wallet
+  has (same id) are skipped and nothing is deleted. Every row is rebuilt field by field from
+  the file, so only an entry's own fields come back; ids must be usable as Firestore document
+  ids, and malformed rows or repeated ids are counted and left out. A sheet
+  (`components/RestoreBackupSheet.tsx`) says what will happen before anything is written:
+  entries to add, entries already there, rows left out, and the settings, which are restored
+  only when ticked (ticked by default for an empty wallet). Entries go in through
+  `importTransactions`, settings through `restoreSettings` (budgets, goal and limit in the
+  file replace those here; Money moved rules are added unless one with the same match is
+  here). Checked by `scripts/check-restore.mjs`.
 - **Moved-vs-spent separation** — Transfer Out / Adjustment / Investment count in cash-flow
   totals but are excluded from every *spending* analysis (reports, Category Split, heatmaps).
 - **Feature screens** — Pulse (a hub and pages: Trends, Categories, Recurring with price rises,

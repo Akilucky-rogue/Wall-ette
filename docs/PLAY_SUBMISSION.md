@@ -111,11 +111,11 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 >
 > 🔐 PRIVATE & SECURE — Email + password sign-in, automatic session lock, per-user encrypted cloud sync via Google Firebase, full offline support. All insights are computed locally — no AI services, no ads, no data selling. Export or back up everything, anytime.
 >
-> 💱 MULTI-CURRENCY — INR, USD, EUR and GBP with live exchange rates.
+> 💱 ANY CURRENCY, LIVE RATES — Show amounts in any currency, converted at live exchange rates. Everything stays saved in rupees, to the paisa.
 >
 > Wall-ette — your mindful money companion.
 
-The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026).
+The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026). The currency line was rewritten on 25 Nov 2026: the old one named only INR, USD, EUR and GBP, but since 1.5.6 any currency can be shown, at live rates. Paste it into Play Console → Grow users → Store presence → Main store listing → Full description, then send the change for review.
 
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`

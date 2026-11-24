@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { localDay } from '../utils/dates';
 import { exportFile } from '../utils/exportFile';
 import { log } from '../utils/log';
 import { buildStatementHtml, PERIOD_LABELS, transactionsCsv, type ReportPeriod } from '../services/statementReport';
+import { buildBackup, MAX_BACKUP_CHARS, planRestore, PROBLEM_TEXT, readBackup, type RestorePlan } from '../services/backup';
+import RestoreBackupSheet from './RestoreBackupSheet';
 import { WallEEyes, FloatingLeaf, PottedPlant, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
 import PageHeader from './ui/PageHeader';
 import { Denim, DenimFigure, DenimLabel, Pocket } from './ui/Denim';
@@ -17,14 +19,19 @@ interface ExportReportsProps {
 type Period = ReportPeriod;
 
 const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, openingBalance, formatWhole, formatAmountCompact, shownCurrency, budgets } = useWallet();
+  const {
+    transactions, flowOf, openingBalance, openingBalanceAsOf, formatWhole, formatAmountCompact, shownCurrency,
+    budgets, savingsGoal, dailyLimit, payeeRules, importTransactions, restoreSettings,
+  } = useWallet();
   const [period, setPeriod] = useState<Period>('MONTH');
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [restore, setRestore] = useState<{ plan: RestorePlan; walletEmpty: boolean } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, ms = 3000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), ms);
   };
 
   const isMoved = useMemo(() => (t: Parameters<typeof flowOf>[0]) => flowOf(t).flow === 'moved', [flowOf]);
@@ -85,14 +92,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     if (busy) return;
     setBusy('backup');
     try {
-      const backup = {
-        app: 'Wall-ette',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        openingBalance,
-        transactionCount: transactions.length,
-        transactions,
-      };
+      const backup = buildBackup({ transactions, openingBalance, openingBalanceAsOf, budgets, savingsGoal, dailyLimit, payeeRules });
       const outcome = await exportFile(`wall-ette-backup-${stamp}.json`, 'application/json;charset=utf-8;', JSON.stringify(backup, null, 2));
       showToast(outcome === 'shared' ? 'Share sheet opened — pick where to save' : 'Backup downloaded');
     } catch (e) {
@@ -101,6 +101,43 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     } finally {
       setBusy(null);
     }
+  };
+
+  // ── Restore ────────────────────────────────────────────────────────────────
+
+  const chooseBackup = () => { if (!busy) fileRef.current?.click(); };
+
+  const readChosenBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // the same file can be chosen again
+    if (!file) return;
+    if (file.size > MAX_BACKUP_CHARS) { showToast(PROBLEM_TEXT['too-big'], 5000); return; }
+    setBusy('restore');
+    try {
+      const result = readBackup(await file.text());
+      if (!result.ok) { showToast(PROBLEM_TEXT[result.problem], 5000); return; }
+      setRestore({
+        plan: planRestore(result.backup, new Set(transactions.map(t => t.id))),
+        walletEmpty: transactions.length === 0,
+      });
+    } catch {
+      log.warn('Backup read failed');
+      showToast("Couldn't open that file. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runRestore = (withSettings: boolean) => {
+    if (!restore) return;
+    const { plan } = restore;
+    if (plan.add.length > 0) importTransactions(plan.add);
+    if (withSettings) restoreSettings(plan.settings);
+    setRestore(null);
+    const entries = `${plan.add.length.toLocaleString('en-IN')} ${plan.add.length === 1 ? 'entry' : 'entries'}`;
+    showToast(plan.add.length > 0
+      ? (withSettings ? `Added ${entries} and your settings` : `Added ${entries} from your backup`)
+      : 'Settings restored from your backup');
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
@@ -131,9 +168,19 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
       icon: 'cloud_download',
       iconCls: 'bg-sand-light text-sand-ink',
       title: 'Full backup',
-      desc: 'A complete copy of everything, including your opening balance, that Wall-ette can read back.',
+      desc: 'Every entry, your opening balance, budgets, goal, daily limit and Money moved rules, in one file you can restore below.',
       meta: `All time · ${transactions.length} entries · JSON`,
       action: exportBackup,
+      needsEntries: false,
+    },
+    {
+      id: 'restore',
+      icon: 'settings_backup_restore',
+      iconCls: 'bg-lavender-light text-lavender',
+      title: 'Restore from a backup',
+      desc: 'Adds the entries from a Wall-ette backup file. Entries already in your wallet are skipped, and nothing is deleted.',
+      meta: 'Choose a .json file',
+      action: chooseBackup,
       needsEntries: false,
     },
   ];
@@ -230,6 +277,26 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
           </p>
         </div>
       </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={readChosenBackup}
+        data-testid="restore-file"
+      />
+      {restore && (
+        <RestoreBackupSheet
+          plan={restore.plan}
+          walletEmpty={restore.walletEmpty}
+          money={formatWhole}
+          onRestore={runRestore}
+          onClose={() => setRestore(null)}
+        />
+      )}
 
       {/* Toast */}
       {toast && (

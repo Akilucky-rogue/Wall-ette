@@ -182,7 +182,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               onClick={() => onNavigate(AppScreen.INCOME_INSIGHTS)}
               className="flex flex-col items-center gap-3 bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft active:scale-95 transition-transform"
             >
-              <div className="bg-blue-50 text-blue-300 p-3 rounded-2xl">
+              <div className="bg-blue-zen-light text-blue-zen p-3 rounded-2xl">
                 <span className="material-symbols-outlined">bubble_chart</span>
               </div>
               <span className="text-[11px] font-semibold text-muted-taupe uppercase tracking-tighter">Flow</span>

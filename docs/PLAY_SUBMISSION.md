@@ -107,19 +107,20 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 >
 > 💼 KNOW YOUR INCOME — Income stream classification (fixed / recurring / one-off), an income stability score, next-pay countdown, and a money-flow diagram from sources to spending to savings.
 >
+> 💸 KNOW WHAT'S LEFT — Left to spend shows what you can still spend before your next pay, once bills still to come and your savings goal are set aside. Optional reminders the evening before a bill is due.
+>
 > 🔐 PRIVATE & SECURE — Email + password sign-in, automatic session lock, per-user encrypted cloud sync via Google Firebase, full offline support. All insights are computed locally — no AI services, no ads, no data selling. Export or back up everything, anytime.
 >
 > 💱 MULTI-CURRENCY — INR, USD, EUR and GBP with live exchange rates.
 >
 > Wall-ette — your mindful money companion.
 
-Proposed for 1.5.6, not yet in Play Console (add after "KNOW YOUR INCOME"):
-> 💸 KNOW WHAT'S LEFT — Left to spend shows what you can still spend before your next pay, once bills still to come and your savings goal are set aside. Optional reminders the evening before a bill is due.
+The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026).
 
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`
 - [x] Feature graphic 1024×500 — `store-assets/feature-graphic-1024x500.png`
-- [ ] **[YOU]** 2–8 phone screenshots (Dashboard, Pulse, Flow, Import). From 1.5.4 the Play build blocks screenshots (audit M11), so take new ones from a debug build (`npm run android:build`) with sample data.
+- [x] Phone screenshots for the 1.5.6 look — `store-assets/screenshots-1.5.6/` (8 × 1080×1920: Home, Pulse, Left to spend, Trends, Categories, Import, Vault, Flow). Sample data only, never a real account. The Play build blocks screenshots (audit M11), so they're taken from the web build with made-up data (the 19 Nov set in `store-assets/screenshots/` is the old look).
 
 ## 7. Remaining Play Console forms (~20 min, all simple)
 
@@ -151,6 +152,11 @@ Play installs updates by itself. From 1.5.3 the app also offers them (Google's p
 3. `node scripts/check-app-updates.mjs` checks the notes against `build.gradle`.
 4. `npm run android:bundle`, upload the AAB to the track, and paste the same lines into **Release notes** (500 characters at most).
 5. Production: roll out to a percentage first if you like, then 100%.
+
+**When the app doesn't offer an update** (check in Self → About → Check for updates, from 1.5.7):
+- *"This copy wasn't installed from Google Play"*: the phone has a build from Android Studio or an APK. Play can't update it, and a Play copy won't install over it (different signature). Uninstall it, then install Wall-ette from the Play test link; the data comes back from the cloud.
+- *"You have the latest version"* while Play Console shows a newer release: the Play Store app hasn't noticed it yet. Open Play Store → profile → Manage apps & device (that refreshes the list), then check again. Right after approval this can take a few hours.
+- No prompt at all, but the app is already on the new version: Play updated it in the background first; What's new appears once instead.
 
 **Requiring an update** (a bug that damages data, or a Firestore change old versions can't handle):
 

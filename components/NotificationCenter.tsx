@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
-import { getUpdateState, restartToUpdate, subscribe } from '../services/appUpdates';
+import { getUpdateState, installUpdate, restartToUpdate, subscribe } from '../services/appUpdates';
 import { latestNotes, RELEASE_NOTES } from '../services/releaseNotes';
 import { recentUnlocks } from '../services/securityLog';
 import { openAt } from '../utils/screenSection';
@@ -64,9 +64,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
   const all = useMemo(() => buildNotifications({
     now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks,
     updateReady: update.phase === 'ready',
+    updateAvailable: update.finding === 'available' && update.phase === 'idle' ? update.availableVersionCode : 0,
     release: RELEASE,
     money,
-  }), [now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks, update.phase, money]);
+  }), [now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks, update.phase, update.finding, update.availableVersionCode, money]);
   const { fresh, earlier } = useMemo(() => arrange(all, state, now.getTime()), [all, state, now]);
 
   const commit = useCallback((next: NotificationState) => {
@@ -111,6 +112,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
       onNavigate(n.action.screen);
     } else if (n.action.kind === 'restart') {
       void restartToUpdate();
+    } else if (n.action.kind === 'update') {
+      void installUpdate();
     } else {
       setNotesOpen(true);
     }

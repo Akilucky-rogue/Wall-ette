@@ -219,6 +219,12 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('app: update and release notes', ids(got), ['update:14', 'release:14']);
   eq('app: restart action', got[0]?.action, { kind: 'restart' });
   eq('app: what is new', [got[1]?.title, got[1]?.action], ["What's new in 1.5.6", { kind: 'whatsNew' }]);
+  const release = { versionCode: 14, version: '1.5.6', first: null };
+  const available = build_({ updateAvailable: 15, release });
+  eq('app: update on Play', [ids(available), available[0]?.title, available[0]?.action], [['update-available:15'], 'Update available', { kind: 'update' }]);
+  eq('app: a downloaded update wins over one on Play', ids(build_({ updateReady: true, updateAvailable: 15, release })), ['update:14']);
+  eq('app: nothing newer than this version', ids(build_({ updateAvailable: 14, release })), []);
+  eq('app: a newer one is a new note', ids(build_({ updateAvailable: 16, release })), ['update-available:16']);
 }
 
 // ── Seen, dismissed, pruned ────────────────────────────────────────────────

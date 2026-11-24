@@ -74,6 +74,36 @@ export function needsMinimum(availability: number, installStatus: number): boole
     || availability === UpdateAvailability.IN_PROGRESS;
 }
 
+/**
+ * What the last check found, for Self → About and the bell:
+ * - `latest`: Google Play has nothing newer for this phone.
+ * - `available`: Play has a newer version, whether or not its dialog was
+ *   shown or turned down.
+ * - `downloading`: an update is downloading.
+ * - `ready`: an update has downloaded and waits for a restart.
+ * - `not-from-play`: this copy wasn't installed from Google Play (a build from
+ *   Android Studio, or an APK), so Play can't update it.
+ * - `unavailable`: Play couldn't be asked: offline, no Play Store, or no answer.
+ */
+export type UpdateFinding = 'latest' | 'available' | 'downloading' | 'ready' | 'not-from-play' | 'unavailable';
+
+export function findingOf(availability: number, installStatus: number): UpdateFinding {
+  if (installStatus === INSTALL_DOWNLOADED) return 'ready';
+  if (availability === UpdateAvailability.IN_PROGRESS) return 'downloading';
+  if (availability === UpdateAvailability.AVAILABLE) return 'available';
+  if (availability === UpdateAvailability.NOT_AVAILABLE) return 'latest';
+  return 'unavailable';
+}
+
+/**
+ * A failed check, from Play's error message. Play refuses with
+ * InstallErrorCode.ERROR_APP_NOT_OWNED (-10) when the app wasn't installed
+ * from Play: "Install Error(-10): The app is not owned by any user on this device…".
+ */
+export function failureOf(message: string): UpdateFinding {
+  return /Install Error\(-10\)|ERROR_APP_NOT_OWNED|not owned by any user/i.test(message) ? 'not-from-play' : 'unavailable';
+}
+
 export function planUpdate(f: UpdateFacts): UpdatePlan {
   if (f.installStatus === INSTALL_DOWNLOADED) return isRequired(f) ? 'ready-required' : 'ready';
   if (f.availability === UpdateAvailability.IN_PROGRESS) return isRequired(f) ? 'required-store' : 'none';

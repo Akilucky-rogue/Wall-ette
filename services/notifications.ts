@@ -25,6 +25,8 @@ export type NotificationTone = 'alert' | 'warn' | 'good' | 'info';
 export type NotificationAction =
   | { kind: 'screen'; screen: AppScreen; section?: ScreenSection }
   | { kind: 'restart' }
+  /** Google Play's update (services/appUpdates.ts installUpdate). */
+  | { kind: 'update' }
   | { kind: 'whatsNew' };
 
 export interface AppNotification {
@@ -62,6 +64,11 @@ export interface NotificationInput {
   unlocks: UnlockEvent[];
   /** A downloaded update is waiting for a restart. */
   updateReady: boolean;
+  /**
+   * The versionCode Google Play offers, not yet downloading or downloaded
+   * (0 when there's none). Listed even after "No thanks" in Google's dialog.
+   */
+  updateAvailable?: number;
   /** The running version, with the first line of its release notes if it has any. */
   release: { versionCode: number; version: string; first: string | null };
   /** An amount in the base currency as the app shows it, without paise. */
@@ -302,7 +309,7 @@ function dataNotes({ transactions, counted, savingsGoal, now, money }: Notificat
   return notes;
 }
 
-function appNotes({ updateReady, release }: NotificationInput): AppNotification[] {
+function appNotes({ updateReady, updateAvailable = 0, release }: NotificationInput): AppNotification[] {
   const notes: AppNotification[] = [];
   if (updateReady) {
     notes.push({
@@ -312,6 +319,16 @@ function appNotes({ updateReady, release }: NotificationInput): AppNotification[
       title: 'Update ready',
       body: 'Restart Wall-ette to finish installing the new version.',
       action: { kind: 'restart' },
+      rank: RANK.update,
+    });
+  } else if (updateAvailable > release.versionCode) {
+    notes.push({
+      id: `update-available:${updateAvailable}`,
+      tone: 'info',
+      icon: 'system_update',
+      title: 'Update available',
+      body: 'A newer Wall-ette is on Google Play. Tap to update.',
+      action: { kind: 'update' },
       rank: RANK.update,
     });
   }

@@ -19,6 +19,10 @@ import { WallEEyes } from './SplashScreen';
 import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
+import {
+  checkForUpdate, getUpdateState, installUpdate, restartToUpdate, subscribe as subscribeUpdates, updatesSupported,
+} from '../services/appUpdates';
+import type { UpdateFinding } from '../services/appUpdatePolicy';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
@@ -82,6 +86,51 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; label: string }
     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sage"></div>
   </label>
 );
+
+/** What Self → About says after a check (services/appUpdates.ts). */
+const UPDATE_LINES: Record<UpdateFinding, string> = {
+  latest: 'You have the latest version.',
+  available: 'A newer version is on Google Play.',
+  downloading: "The update is downloading. You'll be asked to restart when it's ready.",
+  ready: 'The update has downloaded. Restart to install it.',
+  'not-from-play': "This copy wasn't installed from Google Play, so it can't update itself. Install Wall-ette from Google Play to get updates.",
+  unavailable: "Couldn't reach Google Play. Check your connection and try again.",
+};
+
+/** Asks Google Play again, even for a version turned down with "No thanks". */
+const UpdateCheckButton: React.FC = () => {
+  const { checking } = useSyncExternalStore(subscribeUpdates, getUpdateState);
+  return (
+    <button
+      onClick={() => { void checkForUpdate(true); }}
+      disabled={checking}
+      className="px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft disabled:opacity-60"
+    >
+      {checking ? 'Checking…' : 'Check for updates'}
+    </button>
+  );
+};
+
+/** Play's answer to the last check, and what can be done about it. */
+const UpdateCheckResult: React.FC = () => {
+  const { finding, checking, phase } = useSyncExternalStore(subscribeUpdates, getUpdateState);
+  if (!finding || checking) return null;
+  return (
+    <div className="mt-3 flex flex-col items-center gap-2.5">
+      <p role="status" className="text-[12px] text-muted-taupe leading-relaxed max-w-[280px]">{UPDATE_LINES[finding]}</p>
+      {finding === 'available' && phase === 'idle' && (
+        <button onClick={() => { void installUpdate(); }} className="px-5 py-2 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft">
+          Update
+        </button>
+      )}
+      {finding === 'ready' && phase === 'ready' && (
+        <button onClick={() => { void restartToUpdate(); }} className="px-5 py-2 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft">
+          Restart to update
+        </button>
+      )}
+    </div>
+  );
+};
 
 // Same strength rules as sign-up (Auth.tsx) — keep in sync.
 const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
@@ -646,10 +695,14 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             <p className="font-serif text-[20px] font-semibold text-premium-charcoal mt-3">Wall-ette</p>
             <p className="text-[12px] text-muted-taupe tabular-nums">Version {__APP_VERSION__} ({__APP_BUILD__})</p>
             {isNative() && (
-              <button onClick={() => setNotesOpen(true)} className="mt-4 px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft">
-                What's new
-              </button>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button onClick={() => setNotesOpen(true)} className="px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft">
+                  What's new
+                </button>
+                {updatesSupported() && <UpdateCheckButton />}
+              </div>
             )}
+            {isNative() && updatesSupported() && <UpdateCheckResult />}
           </div>
           <Card>
             <Row icon="policy" iconCls="bg-sand-light text-sand-ink" title="Privacy policy" sub="How your data is handled"

@@ -19,9 +19,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versionCode: 15,
+    version: '1.5.7',
+    // Play allows 500 characters in all (scripts/check-app-updates.mjs).
+    items: [
+      "What's new opens properly from the bell, on phones and computers.",
+      'Self → About can check Google Play for updates, and the bell shows when a new version is waiting.',
+    ],
+  },
+  {
     versionCode: 14,
     version: '1.5.6',
-    // Play allows 500 characters in all (scripts/check-app-updates.mjs).
     items: [
       'A new Pulse: money in and out, your spending pace, where it went and what stands out, with charts.',
       'Show amounts in any currency. They stay saved in rupees.',

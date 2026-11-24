@@ -373,6 +373,52 @@ export const bridgeAdjustment = (g: CoverageGap): Transaction => ({
   note: `Bridges un-imported period ${g.from} → ${g.to}. Delete this if you import that statement later.`,
 });
 
+/**
+ * The statement checked on its own: the rows read from it against its own
+ * opening and closing balances, and whether the import puts every row in the
+ * wallet exactly once. This is what proves an import right in a wallet that
+ * also holds other accounts or cash, whose total can't equal one account's.
+ */
+export interface StatementCheck {
+  /** Opening + every row read = closing, to the paisa. */
+  addsUp: boolean;
+  /** Closing − (opening + every row read): money the rows don't account for. */
+  unexplained: number;
+  /** Unticked rows the wallet doesn't have: the import would leave them out. */
+  leftOut: { count: number; net: number };
+  /** Ticked rows the wallet already has under another id: they'd count twice. */
+  twice: { count: number; net: number };
+  /** Adds up, and every row ends up in the wallet exactly once. */
+  complete: boolean;
+}
+
+/** The statement's own check; null when it doesn't print both balances. */
+export function statementCheck(args: {
+  /** Every row read from the statement, ticked or not. */
+  rows: readonly Transaction[];
+  selectedIds: ReadonlySet<string>;
+  /** Rows the wallet already has (findDuplicates). */
+  duplicateIds: ReadonlySet<string>;
+  walletIds: ReadonlySet<string>;
+  opening?: number;
+  closing?: number;
+}): StatementCheck | null {
+  const { rows, selectedIds, duplicateIds, walletIds, opening, closing } = args;
+  if (opening === undefined || closing === undefined || !Number.isFinite(opening) || !Number.isFinite(closing)) return null;
+  // A row with an id the wallet has is skipped by mergeImport, ticked or not.
+  const leftOut = rows.filter(t => !selectedIds.has(t.id) && !duplicateIds.has(t.id) && !walletIds.has(t.id));
+  const twice = rows.filter(t => selectedIds.has(t.id) && duplicateIds.has(t.id) && !walletIds.has(t.id));
+  const unexplained = paise(closing) - paise(opening) - netPaise(rows);
+  const total = (list: Transaction[]) => ({ count: list.length, net: netPaise(list) / 100 });
+  return {
+    addsUp: unexplained === 0,
+    unexplained: unexplained / 100,
+    leftOut: total(leftOut),
+    twice: total(twice),
+    complete: unexplained === 0 && leftOut.length === 0 && twice.length === 0,
+  };
+}
+
 export interface ImportTally {
   /** The wallet's balance at the statement's last day, after the import. */
   projected: number;
@@ -388,6 +434,8 @@ export interface ImportTally {
   gap: CoverageGap | null;
   /** Adjustments the import takes out, because this statement covers their period. */
   stale: string[];
+  /** The statement's own check (needs `rows`, and both balances printed). */
+  statement: StatementCheck | null;
 }
 
 /**
@@ -395,7 +443,9 @@ export interface ImportTally {
  * it (worked out with mergeImport itself, so the check and the import can't
  * disagree) against the statement's closing balance, both at the statement's
  * last day. Also finds a gap between this statement and the wallet's entries,
- * whichever side it's on, and the adjustment that would bridge it.
+ * whichever side it's on, and the adjustment that would bridge it. Given the
+ * statement's rows, it checks the statement on its own too, which is the
+ * check that counts when the wallet holds more than this one account.
  */
 export function importTally(args: {
   wallet: WalletLedger;
@@ -406,6 +456,10 @@ export function importTally(args: {
   opening?: number;
   closing?: number;
   bridge: boolean;
+  /** Every row read from the statement, ticked or not, and the ones the
+   *  wallet already has: for the statement's own check. */
+  rows?: readonly Transaction[];
+  duplicates?: ReadonlySet<string>;
 }): ImportTally | null {
   const { wallet, selected, minDate, maxDate, opening, closing, bridge } = args;
   if (closing === undefined || !Number.isFinite(closing)) return null;
@@ -447,5 +501,32 @@ export function importTally(args: {
     isNewest: !latest || maxDate >= latest,
     gap,
     stale,
+    statement: args.rows
+      ? statementCheck({
+          rows: args.rows,
+          selectedIds: new Set(selected.map(t => t.id)),
+          duplicateIds: args.duplicates ?? new Set(),
+          walletIds: new Set(wallet.transactions.map(t => t.id)),
+          opening,
+          closing,
+        })
+      : null,
   };
+}
+
+/**
+ * How the review's balance check reads:
+ *   - 'ok': the wallet will match the bank on the statement's last day
+ *     (bridged or not), with no gap left open;
+ *   - 'note': the statement checks out row for row, but the wallet's total
+ *     covers more than this account (other accounts, cash, entries typed in,
+ *     or a period not imported yet), so it can't equal this closing;
+ *   - 'off': the import itself is short (rows that don't add up, left out or
+ *     counted twice), or there's no statement check and the wallet differs.
+ */
+export function tallyTone(t: ImportTally, bridge: boolean): 'ok' | 'note' | 'off' {
+  const checks = t.statement?.complete === true;
+  if (t.gap && !(bridge && t.matched)) return checks ? 'note' : 'off';
+  if (t.matched) return 'ok';
+  return checks ? 'note' : 'off';
 }

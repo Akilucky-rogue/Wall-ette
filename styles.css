@@ -133,6 +133,18 @@ button.shadow-raised:active, .press:active {
 .denim-track { background: rgb(0 0 0 / 0.2); box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.28); }
 .denim-on { background: var(--wallet-ink); color: var(--wallet-2); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
 
+/* A caution card (Import's checks): an amber tint on the theme's own card,
+   with ink that stays readable in light and dark themes. Where color-mix
+   isn't supported the card falls back to plain paper and the page's ink. */
+.caution {
+	background-color: var(--card-alt);
+	border-color: var(--line-2);
+	background-color: color-mix(in srgb, var(--amber) 14%, var(--card));
+	border-color: color-mix(in srgb, var(--amber) 45%, var(--card));
+}
+.caution-ink { color: color-mix(in srgb, var(--amber-3) 45%, var(--ink)); }
+.caution-mark { color: var(--amber-3); }
+
 /* A receipt (Left to spend's "How it adds up"): paper with a torn, zigzag
    bottom edge. A mask would cut a box-shadow off, so the shadow is a
    drop-shadow on the wrapper, .receipt-lift. */

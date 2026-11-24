@@ -15,19 +15,21 @@
  *   - every day is a real day, inside the statement's period when printed
  *   - ids are unique, amounts positive and to the paisa
  *   - into an empty wallet, the balance is the bank's closing and the
- *     balance check on the review says it matches
+ *     balance check on the review says it matches; the statement's own check
+ *     (opening + rows = closing, each row in once) passes
  *   - importing it again adds nothing, and the review flags every row
  * and, for each account with more than one statement, that importing them
  * in date order, in reverse and in random orders always ends at the latest
- * statement's closing balance, with each row once; and that leaving one out,
- * bridging the gap with an adjustment, then importing it, ends with the same
- * balance and no adjustment.
+ * statement's closing balance, with each row once, and the check never reads
+ * "off" on the way; and that leaving one out, bridging the gap with an
+ * adjustment, then importing it, ends with the same balance and no adjustment.
  *
  * Then made-up cases real statements may not have: gaps on either side,
  * bridged and filled; a new account opening at 0; a wallet from before
  * balance anchors; an entry typed by hand that the statement also has; two
  * identical payments on one day; a row with no narration; a row with no
- * debit/credit side.
+ * debit/credit side; a wallet holding two accounts and cash, where the check
+ * reads as a note, not "off"; rows left unticked, ticked twice or missed.
  *
  * Usage (after `npm ci`):
  *   node scripts/check-import.mjs [folder ...]      default: private/statements
@@ -110,11 +112,14 @@ async function quietly(fn) {
   try { return await fn(); } finally { console.log = log; console.warn = warn; }
 }
 
-/** One import step, as the review does it by default: every row the wallet doesn't already have. */
-function importStep(wallet, s, { bridge = false } = {}) {
+/**
+ * One import step, as the review does it by default: every row the wallet
+ * doesn't already have. `pick` changes the ticks, as a person can.
+ */
+function importStep(wallet, s, { bridge = false, pick } = {}) {
   const dupes = I.findDuplicates(s.staged, wallet.transactions);
-  const selected = s.staged.filter(t => !dupes.has(t.id));
-  const tally = I.importTally({ wallet, selected, minDate: s.minDate, maxDate: s.maxDate, opening: s.opening, closing: s.closing, bridge });
+  const selected = pick ? pick(s.staged, dupes) : s.staged.filter(t => !dupes.has(t.id));
+  const tally = I.importTally({ wallet, selected, rows: s.staged, duplicates: dupes, minDate: s.minDate, maxDate: s.maxDate, opening: s.opening, closing: s.closing, bridge });
   const incoming = bridge && tally?.gap ? [I.bridgeAdjustment(tally.gap), ...selected] : selected;
   const stale = I.staleAdjustments(wallet.transactions, s.minDate, s.maxDate);
   const r = I.mergeImport(wallet, incoming, { opening: s.opening, statementStart: s.minDate, removeIds: stale });
@@ -123,7 +128,8 @@ function importStep(wallet, s, { bridge = false } = {}) {
     openingBalance: r.opening ? r.opening.balance : wallet.openingBalance,
     openingBalanceAsOf: r.opening ? r.opening.asOf : wallet.openingBalanceAsOf,
   } : wallet;
-  return { wallet: next, tally, dupes, added: r.added.length, removed: r.removed.length };
+  const tone = tally ? I.tallyTone(tally, bridge) : null;
+  return { wallet: next, tally, tone, dupes, added: r.added.length, removed: r.removed.length };
 }
 
 // ── Statements on disk ────────────────────────────────────────────────────
@@ -211,13 +217,17 @@ for (const path of files) {
   const first = importStep(EMPTY, s);
   if (s.closing !== undefined) {
     ok(paise(I.ledgerBalance(first.wallet)) === paise(s.closing), problems, `balance after import misses closing by ${paise(I.ledgerBalance(first.wallet)) - paise(s.closing)} paise`);
-    ok(first.tally?.matched === true, problems, "review's balance check doesn't say it matches");
+    ok(first.tally?.matched === true && first.tone === 'ok', problems, "review's balance check doesn't say it matches");
+  }
+  if (s.opening !== undefined && s.closing !== undefined) {
+    ok(first.tally?.statement?.complete === true, problems, "review's statement check doesn't pass");
   }
   ok(first.added === s.staged.length, problems, `${s.staged.length - first.added} rows not added`);
   // Again.
   const again = importStep(first.wallet, s);
   ok(again.added === 0, problems, `re-import added ${again.added}`);
   ok(again.dupes.size === s.staged.length, problems, `re-import flagged ${again.dupes.size} of ${s.staged.length}`);
+  if (s.closing !== undefined) ok(again.tone === 'ok', problems, `re-import: the check reads ${again.tone}`);
 
   if (problems.length === 0) statements.push(s);
   console.log(`${problems.length ? 'FAIL' : 'ok  '}  ${name.padEnd(48)} ${String(s.staged.length).padStart(5)} rows  ${s.bank ?? ''}${problems.length ? `  ${problems.join('; ')}` : ''}`);
@@ -247,7 +257,12 @@ for (const [, list] of byAccount) {
   const orders = [['date order', chrono], ['reverse', [...chrono].reverse()], ...Array.from({ length: 6 }, (_, i) => [`random ${i + 1}`, shuffled(chrono, rand)])];
   for (const [label, order] of orders) {
     let w = EMPTY;
-    for (const s of order) w = importStep(w, s).wallet;
+    for (const s of order) {
+      const step = importStep(w, s);
+      // Every row of a real account matches, so the check never reads 'off'.
+      ok(step.tone !== 'off' && step.tally?.statement?.complete === true, problems, `${label}: a step's check reads ${step.tone}`);
+      w = step.wallet;
+    }
     ok(paise(I.ledgerBalance(w)) === paise(latest.closing), problems, `${label}: balance misses the latest closing by ${paise(I.ledgerBalance(w)) - paise(latest.closing)} paise`);
     ok(w.transactions.length === distinct, problems, `${label}: ${w.transactions.length} entries for ${distinct} distinct rows`);
   }
@@ -383,8 +398,41 @@ for (const [label, order] of [['in order', [jan, feb, mar]], ['reverse', [mar, f
   eq('one step: adjustment out, rows in', [r.removed, r.added.length, r.transactions.some(t => t.id === adj.id)], [[adj.id], feb.staged.length, false]);
   eq('stale only when the period overlaps', [I.staleAdjustments([adj], '2026-01-01', '2026-01-31'), I.staleAdjustments([adj], '2026-03-01', '2026-03-31')], [[], []]);
 }
+// A wallet with two accounts and cash: its total can't equal one account's
+// closing, so when every row matches the check reads as a note, never "off",
+// whether the second account's statement overlaps, follows or precedes.
+{
+  const cash = { id: 'txn-cash', date: '2026-02-10', amount: 1500, type: 'EXPENSE', category: 'Dining', merchant: 'Cash lunch', createdAt: '2026-02-10T08:00:00.000Z' };
+  const savings = run([jan, feb, mar]);
+  const wallet = { ...savings, transactions: [cash, ...savings.transactions] };
+  const overlapping = await made(52000, [row('2026-02-04', 1200, 'EXPENSE', upi('METRO CARD')), row('2026-02-15', 30000, 'INCOME', 'NEFT/CMS000444/FREELANCE CLIENT'), row('2026-03-02', 4999, 'EXPENSE', upi('AMAZON'))]);
+  const step = importStep(wallet, overlapping);
+  eq('two accounts: the second checks out, as a note', [step.tally.statement.complete, step.tally.matched, step.tally.gap, step.tone], [true, false, null, 'note']);
+  eq('two accounts: all its rows in, once', step.added, overlapping.staged.length);
+  const newer = await made(52000, [row('2026-04-04', 1200, 'EXPENSE', upi('METRO CARD')), row('2026-04-15', 30000, 'INCOME', 'NEFT/CMS000555/FREELANCE CLIENT')]);
+  const after = importStep(wallet, newer);
+  eq('two accounts, a newer statement: the gap is a note', [after.tally.gap?.direction, after.tally.statement.complete, after.tone], ['after', true, 'note']);
+  const older = await made(52000, [row('2025-11-04', 1200, 'EXPENSE', upi('METRO CARD')), row('2025-11-15', 30000, 'INCOME', 'NEFT/CMS000666/FREELANCE CLIENT')]);
+  const before = importStep(wallet, older);
+  eq('two accounts, an older statement: the gap is a note', [before.tally.gap?.direction, before.tally.statement.complete, before.tone], ['before', true, 'note']);
+  eq('two accounts, bridged anyway: matches the bank, reads ok', importStep(wallet, newer, { bridge: true }).tone, 'ok');
+}
+// The import itself short: a row left unticked, a row the wallet has ticked
+// again, rows that don't add up to the closing. Each reads "off", by name.
+{
+  const w0 = run([jan]);
+  const leftOut = importStep(w0, feb, { pick: (rows) => rows.slice(1) });
+  eq('left out: the unticked row is counted, check off', [leftOut.tally.statement.leftOut.count, paise(leftOut.tally.statement.leftOut.net), leftOut.tone], [1, I.netPaise(feb.staged.slice(0, 1)), 'off']);
+  const typed = { id: 'txn-2', date: '2026-02-03', amount: 249, type: 'EXPENSE', category: 'Food', merchant: 'Swiggy', createdAt: '2026-02-03T13:00:00.000Z' };
+  const twice = importStep({ ...w0, transactions: [typed, ...w0.transactions] }, feb, { pick: (rows) => rows });
+  eq('ticked again: would count twice, check off', [twice.dupes.size, twice.tally.statement.twice.count, twice.tone], [1, 1, 'off']);
+  const missed = importStep(w0, { ...feb, staged: feb.staged.slice(1) });
+  eq('a row the reader missed: off by that row', [missed.tally.statement.addsUp, paise(missed.tally.statement.unexplained), missed.tone], [false, I.netPaise(feb.staged.slice(0, 1)), 'off']);
+  const noOpening = importStep(w0, { ...feb, opening: undefined });
+  eq('no opening printed: the wallet check decides', [noOpening.tally.statement, noOpening.tally.matched, noOpening.tone], [null, true, 'ok']);
+}
 
 for (const s of synth) console.log(`FAIL  ${s}`);
-console.log(`${synth.length ? 'FAIL' : 'ok  '}  made-up cases: gaps both sides bridged and filled, opening at 0, legacy wallet, typed entry, repeated rows, unreadable rows, paise`);
+console.log(`${synth.length ? 'FAIL' : 'ok  '}  made-up cases: gaps both sides bridged and filled, opening at 0, legacy wallet, typed entry, repeated rows, unreadable rows, paise, two accounts and cash, rows left out or twice`);
 console.log(`${checks - failures}/${checks} import checks passed (${statements.length} of ${files.length - skipped} statement files clean${skipped ? `, ${skipped} picture PDF${skipped > 1 ? 's' : ''} skipped` : ''})`);
 if (failures) process.exit(1);

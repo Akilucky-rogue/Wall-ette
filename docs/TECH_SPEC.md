@@ -229,14 +229,22 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
     on the first missing day and named by the period it stands for, so importing any
     statement that covers part of that period removes it (`staleAdjustments`);
   - a tally card (`importTally`) that runs `mergeImport` itself and compares the wallet
-    balance *as of statement end* with the statement's own closing balance, to the paisa;
+    balance *as of statement end* with the statement's own closing balance, to the paisa.
+    It also checks the statement on its own (`statementCheck`): opening + every row read =
+    closing, no row left unticked that the wallet lacks, none ticked that it already has.
+    `tallyTone` reads 'ok' when the wallet will match the bank, 'note' when the statement
+    checks out but the wallet also holds other accounts, cash or typed entries (so its total
+    can't equal one account's closing), and 'off' only when the import itself is short; the
+    card then names the cause (rows that don't add up, rows left out, rows counted twice);
   - rows the reader couldn't place (no real day or no debit/credit side) are counted and
     named on the review; a row with no narration is imported as "Unknown" rather than
     dropped (`unreadableRows`, `importable`).
   - End to end: `scripts/check-import.mjs` runs the app's readers, `toTransactions`, the
     duplicate check, `importTally` and `mergeImport` on every statement in a folder (rows,
     debits and credits to the paisa, dates, ids, balance into an empty wallet, re-import),
-    then per account in date order, reverse and random orders, and a gap bridged and filled.
+    then per account in date order, reverse and random orders, and a gap bridged and filled;
+    plus a wallet holding two accounts and cash (the check reads 'note', never 'off') and
+    rows left out, ticked twice or missed by the reader (each reads 'off', by name).
   - Validated by simulation: 300 shuffled import orders of 15 real statements converge to an
     identical, to-the-rupee ledger.
 - **Review UI** — paginated review with per-row edit, category auto-suggestion (Indian

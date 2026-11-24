@@ -29,6 +29,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       'Statement reports match Pulse to the rupee and look like the app.',
       'The bell and phone reminders flag budgets, bills due and price rises.',
       'Payees show by name, Vault is more compact, and Fee Hunter is gone.',
+      'Statement import and New entry are exact to the paisa.',
     ],
   },
   {

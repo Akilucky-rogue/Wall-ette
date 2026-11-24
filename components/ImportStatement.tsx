@@ -3,14 +3,18 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { parseStatementPdf, StatementLockedError } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
-import { bridgeAdjustment, findDuplicates, fromExcel, importTally, staleAdjustments, toTransactions, unreadableRows, type StatementRow } from '../services/statementImport';
+import { bridgeAdjustment, findDuplicates, fromExcel, importTally, staleAdjustments, tallyTone as tallyToneOf, toTransactions, unreadableRows, type StatementRow } from '../services/statementImport';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
+import { parseDay } from '../utils/dates';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
 import styles from './ImportStatement.module.css';
 
 // Pagination settings
 const ITEMS_PER_PAGE = 20;
+
+/** A statement day as the rest of the app shows one: "18 Nov 2026". */
+const showDay = (day: string) => parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 interface ImportStatementProps {
     onNavigate: (screen: AppScreen) => void;
@@ -103,28 +107,72 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // The wallet as this import will leave it (services/statementImport.ts
   // works it out with the same merge the import runs) against the bank's
   // closing balance, both on the statement's last day, to the paisa. Also
-  // finds a stretch with no statement on either side of the wallet's entries.
+  // finds a stretch with no statement on either side of the wallet's entries,
+  // and checks the statement on its own: opening + rows = closing, with every
+  // row in the wallet once. A wallet that also holds other accounts or cash
+  // can't equal one account's closing, so that check is what proves its import.
   const tally = useMemo(() => {
     if (!reviewSummary) return null;
     return importTally({
       wallet: { transactions: existingTransactions, openingBalance, openingBalanceAsOf },
       selected: extractedData.filter(t => selectedIds.has(t.id)),
+      rows: extractedData,
+      duplicates: duplicateIds,
       minDate: reviewSummary.minDate,
       maxDate: reviewSummary.maxDate,
       opening: parsedOpeningBalance,
       closing: parsedClosingBalance,
       bridge: bridgeGap,
     });
-  }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds,
+  }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds, duplicateIds,
       existingTransactions, openingBalanceAsOf, openingBalance, bridgeGap]);
 
-  // Card tone: gap (bridged → ok), tallied, or off.
+  // Card tone (services/statementImport.ts tallyTone): 'ok' when the wallet
+  // will match the bank; 'note' when the statement checks out row for row but
+  // the wallet's total covers more than this account; 'off' when the import
+  // itself is short.
   const tallyBridged = !!(tally?.gap && bridgeGap && tally.matched);
-  const tallyTone: 'ok' | 'gap' | 'off' | null =
-    !tally ? null
-    : tally.gap ? (tallyBridged ? 'ok' : 'gap')
-    : tally.matched ? 'ok'
-    : 'off';
+  const statementChecks = tally?.statement?.complete === true;
+  const tallyTone = tally ? tallyToneOf(tally, bridgeGap) : null;
+
+  // The card's words: what's wrong with the import itself first, then how
+  // the wallet's total relates to this one account.
+  const tallyMessage = (): string => {
+    if (!tally) return '';
+    const amount = (n: number) => formatAmount(Math.abs(n));
+    const st = tally.statement;
+    if (tallyTone === 'ok') {
+      if (tallyBridged) return '✓ Bridged: with the adjustment entry, your balance will match the bank.';
+      if (tally.hasNewer) return `✓ Tallies with the bank as of ${showDay(tally.endDate)}. Final balance after import: ${formatAmount(tally.projectedFinal)}.`;
+      return '✓ Tallies with the statement. Your balance will be accurate after import.';
+    }
+    if (st && !st.addsUp) {
+      return `The rows read don't add up to the bank's closing balance: ${amount(st.unexplained)} is unaccounted for. If money in and out look swapped, try Flip types; if rows are missing, try your bank's Excel download.`;
+    }
+    if (st && st.twice.count > 0) {
+      const n = st.twice.count;
+      return `${n === 1 ? '1 row your wallet already has is' : `${n} rows your wallet already has are`} ticked again and would count twice (${amount(st.twice.net)}). Untick ${n === 1 ? "it unless it's a separate payment" : "them unless they're separate payments"}.`;
+    }
+    if (st && st.leftOut.count > 0) {
+      const n = st.leftOut.count;
+      return `${n === 1 ? '1 unticked row' : `${n} unticked rows`} (${amount(st.leftOut.net)}) won't be imported, so your wallet will miss ${n === 1 ? 'it' : 'them'}.`;
+    }
+    const checked = statementChecks ? "✓ Every row adds up to the bank's closing balance, to the paisa. " : '';
+    const others = "That's expected if your wallet also tracks other accounts or cash.";
+    if (tally.gap && tally.gap.direction === 'after') {
+      return `${checked}Your wallet stands at ${formatAmount(getBalance())}, but this account opened the period at ${formatAmount(parsedOpeningBalance!)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} of activity between ${showDay(tally.gap.from)} and ${showDay(tally.gap.to)} hasn't been imported: import that period's statement (any order works).`;
+    }
+    if (tally.gap) {
+      return `${checked}This statement ends ${showDay(tally.gap.from)} at ${formatAmount(tally.closing)}, and your records resume ${showDay(tally.gap.to)} from ${formatAmount(openingBalance)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} in between hasn't been imported: import that statement (any order works).`;
+    }
+    const side = tally.diff > 0 ? 'higher' : 'lower';
+    if (statementChecks) {
+      // No gap, so the difference can't be a missing stretch of this account:
+      // it's money in the wallet from outside this statement.
+      return `${checked}On ${showDay(tally.endDate)} your wallet will be ${amount(tally.diff)} ${side} than this account, because it also holds money from outside this statement: other accounts, cash, or entries you added yourself.`;
+    }
+    return `Your wallet will be ${amount(tally.diff)} ${side} than the statement's closing on ${showDay(tally.endDate)}. ${others} If it tracks only this account, check unticked rows or try Flip types.`;
+  };
 
   // Helper to update loading messages
   const updateProgress = (msg: string) => setLoadingMessage(msg);
@@ -552,9 +600,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 )}
                 
                 {unreadable > 0 && (
-                    <div role="alert" className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
-                        <span className="material-symbols-outlined text-amber-600 text-[20px] mt-0.5" aria-hidden="true">warning</span>
-                        <p className="text-xs text-amber-800 leading-relaxed">
+                    <div role="alert" className="mb-4 p-4 rounded-2xl caution border flex items-start gap-3">
+                        <span className="material-symbols-outlined caution-mark text-[20px] mt-0.5" aria-hidden="true">warning</span>
+                        <p className="text-xs caution-ink leading-relaxed">
                             <b>{unreadable} row{unreadable > 1 ? 's' : ''} couldn't be read</b> (no date or no debit/credit side), so {unreadable > 1 ? "they aren't" : "it isn't"} in the list below. The balance check shows what that leaves out. Try your bank's Excel download for this period, or add {unreadable > 1 ? 'them' : 'it'} in New entry.
                         </p>
                     </div>
@@ -563,15 +611,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 {/* Balance tally — statement closing vs wallet after import */}
                 {tally && (
                     <div className={`mb-4 p-4 rounded-2xl border animate-slide-up ${
-                        tallyTone === 'ok' ? 'bg-sage-light/30 border-sage/20' : 'bg-amber-50 border-amber-200'
+                        tallyTone === 'ok' ? 'bg-sage-light/30 border-sage/20'
+                        : tallyTone === 'note' ? 'bg-white/70 border-sage/20'
+                        : 'caution'
                     }`}>
                         <div className="flex items-center gap-2 mb-3">
                             <span className={`material-symbols-outlined text-[18px] ${
-                                tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
-                            }`}>
-                                {tallyTone === 'ok' ? 'task_alt' : 'error'}
+                                tallyTone === 'off' ? 'caution-mark' : 'text-sage'
+                            }`} aria-hidden="true">
+                                {tallyTone === 'off' ? 'error' : 'task_alt'}
                             </span>
-                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-taupe">Balance Check</p>
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-taupe">Balance check</p>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <div>
@@ -581,30 +631,22 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
                             <div className="text-right">
                                 <p className="text-[10px] text-muted-taupe uppercase tracking-wider">
-                                    {tally.hasNewer ? `Wallet on ${tally.endDate}` : 'Wallet after import'}
+                                    {tally.hasNewer ? `Wallet on ${showDay(tally.endDate)}` : 'Wallet after import'}
                                 </p>
                                 <p className={`text-[15px] font-serif font-bold ${
-                                    tallyTone === 'ok' ? 'text-sage' : 'text-amber-600'
+                                    tallyTone === 'ok' ? 'text-sage' : tallyTone === 'note' ? 'text-premium-charcoal' : 'caution-ink'
                                 }`}>{formatAmount(tally.projected)}</p>
                             </div>
                         </div>
                         <p className={`text-[10px] mt-3 leading-relaxed ${
-                            tallyTone === 'ok' ? 'text-sage' : 'text-amber-700'
+                            tallyTone === 'ok' ? 'text-sage' : tallyTone === 'note' ? 'text-zen-charcoal' : 'caution-ink'
                         }`}>
-                            {tallyTone === 'ok' && tallyBridged
-                                ? '✓ Bridged — with the adjustment entry, your balance will match the bank.'
-                                : tallyTone === 'ok' && tally.hasNewer
-                                ? `✓ Tallies with the bank as of ${tally.endDate}. Final balance after import: ${formatAmount(tally.projectedFinal)}.`
-                                : tallyTone === 'ok'
-                                ? '✓ Tallies with the statement. Your balance will be accurate after import.'
-                                : tally.gap && tally.gap.direction === 'after'
-                                ? `The bank says this period started at ${formatAmount(parsedOpeningBalance!)}, but your wallet stands at ${formatAmount(getBalance())}. ${formatAmount(Math.abs(tally.gap.amount))} of activity between ${tally.gap.from} and ${tally.gap.to} hasn't been imported. Best fix: download that period's statement from your bank and import it (any order works).`
-                                : tally.gap
-                                ? `This statement ends ${tally.gap.from} at ${formatAmount(tally.closing)}, but your records resume ${tally.gap.to} from an opening of ${formatAmount(openingBalance)}. ${formatAmount(Math.abs(tally.gap.amount))} in between hasn't been imported — grab the statement covering that window (any order works).`
-                                : `Off by ${formatAmount(Math.abs(tally.diff))} as of ${tally.endDate}. Check deselected rows, try Flip Types — or your bank may have posted transactions after this statement was downloaded.`}
+                            {tallyMessage()}
                         </p>
                         {tally.gap && (
-                            <label className="mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-white/70 border border-amber-200 cursor-pointer">
+                            <label className={`mt-3 flex items-start gap-2.5 p-3 rounded-xl bg-white/70 border cursor-pointer ${
+                                tallyTone === 'off' ? 'border-[color:var(--amber-2)]' : 'border-sage/20'
+                            }`}>
                                 <input
                                     type="checkbox"
                                     checked={bridgeGap}
@@ -612,7 +654,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     className="mt-0.5 w-4 h-4 accent-[var(--sage)] shrink-0"
                                 />
                                 <span className="text-[10px] leading-relaxed text-premium-charcoal">
-                                    <b>Can't get that statement?</b> Add a single {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} to bridge the gap so your balance matches the bank.
+                                    <b>Tracking only this account, and can't get that statement?</b> Add one {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} so your balance matches the bank. Leave this off if your wallet also holds other accounts or cash.
                                 </span>
                             </label>
                         )}
@@ -632,7 +674,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             <div className="text-[10px] text-muted-taupe mt-2 space-y-0.5">
                                 <p>💰 Income: {formatAmount(reviewSummary.incomeSum)}</p>
                                 <p>💸 Expense: {formatAmount(reviewSummary.expenseSum)}</p>
-                                <p>📅 Covers: {reviewSummary.minDate} to {reviewSummary.maxDate}</p>
+                                <p>📅 Covers: {showDay(reviewSummary.minDate)} to {showDay(reviewSummary.maxDate)}</p>
                                 {parsedOpeningBalance !== undefined && (
                                     <p>🏦 Opens {formatAmount(parsedOpeningBalance)}{parsedClosingBalance !== undefined ? ` → closes ${formatAmount(parsedClosingBalance)}` : ''}</p>
                                 )}

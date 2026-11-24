@@ -180,6 +180,11 @@ const flagged = findDuplicates(incoming, wallet);
 eq('dupes: only the rows the wallet has', incoming.map(t => flagged.has(t.id)), [true, false, true, false, true, false]);
 eq('dupes: Swami Stores is not taken for Swiggy (L1)', flagged.has(incoming[1].id), false);
 eq('dupes: second identical charge stays new', flagged.has(incoming[3].id), false);
+// The wallet holds the second of two identical lines (its id numbered #2): it
+// is that line that's flagged, so the first is imported and none goes missing.
+eq('dupes: identical lines, the wallet holding the second: the second is flagged',
+  [...findDuplicates(incoming, [incoming[3]])], [incoming[3].id]);
+eq('dupes: a line the wallet has under its own id, edited since', findDuplicates([incoming[5]], [{ ...incoming[5], amount: 85000.5, merchant: 'Salary' }]).size, 1);
 eq('dupes: the Excel export against a wallet of PDF rows',
   [...findDuplicates(await toTransactions(asExcel), incoming)].length, statement.length);
 {

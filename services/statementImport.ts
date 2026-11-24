@@ -218,8 +218,11 @@ const looselyMatch = (a: string, b: string): boolean =>
 /**
  * Ids of the incoming transactions the wallet already has. Each wallet entry
  * stands for one incoming row at most, so two real ₹249 payments on one day
- * stay new when the wallet has only one. Matches need the same date, direction
- * and amount, then, strongest first across the whole statement:
+ * stay new when the wallet has only one. First, a row the wallet has under
+ * its own id (the same statement line, imported before, even if edited since)
+ * claims that entry, so an identical line beside it in the statement (its id
+ * numbered #2) isn't taken for it and stays new. The rest match on the same
+ * date, direction and amount, then, strongest first across the whole statement:
  *   1. the same bank reference;
  *   2. the same narration;
  *   3. one narration containing the other, or a wallet entry with no payee.
@@ -230,17 +233,29 @@ export function findDuplicates(
   existing: readonly Transaction[],
 ): Set<string> {
   const buckets = new Map<string, Entry[]>();
+  const byId = new Map<string, Entry>();
   for (const t of existing) {
     const key = bucketKey(t);
     let bucket = buckets.get(key);
     if (!bucket) buckets.set(key, (bucket = []));
-    bucket.push(entryOf(t));
+    const entry = entryOf(t);
+    bucket.push(entry);
+    byId.set(t.id, entry);
+  }
+
+  const found = new Set<string>();
+  for (const t of incoming) {
+    const own = byId.get(t.id);
+    if (own && !own.used) {
+      own.used = true;
+      found.add(t.id);
+    }
   }
 
   const rows = incoming
+    .filter(t => !found.has(t.id))
     .map(t => ({ id: t.id, entry: entryOf(t), bucket: buckets.get(bucketKey(t)) }))
     .filter(r => r.bucket);
-  const found = new Set<string>();
   const claim = (pass: (row: Entry, wallet: Entry) => boolean) => {
     for (const r of rows) {
       if (found.has(r.id)) continue;

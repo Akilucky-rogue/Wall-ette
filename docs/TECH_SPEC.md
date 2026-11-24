@@ -212,10 +212,12 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   - stable ids: `import-` + the first 32 hex digits of the key's SHA-256, with identical rows
     in one statement numbered in order, so a row keeps its id in every statement and format
     and an import skips rows the wallet already has under that id;
-  - count-aware duplicate claiming across the whole statement, strongest first: same bank
-    reference, then same narration, then one narration containing the other (or a wallet
-    entry with no payee). Rows whose references differ never match, so same-day payments of
-    the same amount to different payees aren't swapped;
+  - count-aware duplicate claiming across the whole statement. A row the wallet has under its
+    own id claims that entry first, so of two identical lines only the one the wallet holds is
+    flagged and the other is imported; then, strongest first: same bank reference, then same
+    narration, then one narration containing the other (or a wallet entry with no payee). Rows
+    whose references differ never match, so same-day payments of the same amount to different
+    payees aren't swapped;
   - Vault's duplicate cleaner (`components/DuplicateEntries.tsx`) groups imported rows by the
     same key and never removes rows with stable ids (they're all real); typed entries are left
     alone. Tests and a before/after replay over real statements: `scripts/check-duplicates.mjs`;

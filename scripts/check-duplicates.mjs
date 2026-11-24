@@ -155,13 +155,15 @@ eq('ids: shape', ids.every(id => /^import-[0-9a-f]{32}$/.test(id)), true);
 eq('ids: same again', (await toTransactions(statement)).map(t => t.id), ids);
 eq('ids: same in the Excel export', (await toTransactions(asExcel)).map(t => t.id), ids);
 eq('ids: same in a later statement that has the rows', (await toTransactions([pdfRow('2026-03-07', 120, 'EXPENSE', 'UPI/DR/631245780001/TEA STALL/YESB/tea@yesb/UPI'), ...statement])).map(t => t.id).slice(1), ids);
-eq('ids: invalid rows dropped', (await toTransactions([
+// Rows without a real day, a side or an amount can't be imported; a row
+// without a narration can (as "Unknown"), so no money goes missing.
+eq('ids: rows with no day, side or amount dropped; no narration kept', (await toTransactions([
   { date: '2026-03-08', amount: 0, type: 'EXPENSE', merchant: 'x' },
   { date: '08-03-2026', amount: 10, type: 'EXPENSE', merchant: 'x' },
   { date: '2026-03-08', amount: 10, type: 'DEBIT', merchant: 'x' },
   { date: '2026-03-08', amount: 10, type: 'EXPENSE' },
   pdfRow('2026-03-08', 10, 'EXPENSE', 'SMS CHARGES'),
-])).length, 1);
+])).map(t => t.merchant), ['Unknown', 'SMS CHARGES']);
 {
   const many = [];
   for (let i = 0; i < 20000; i++) {

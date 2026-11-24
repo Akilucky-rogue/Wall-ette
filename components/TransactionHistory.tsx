@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { getSymbol, toBase, toShown } from '../utils/currencyUtils';
+import { getSymbol, inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
 import { WallEMascot, WallEEyes } from './SplashScreen';
@@ -22,7 +22,14 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, shownRate, shownCurrency } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency } = useWallet();
+  // A saved amount as the edit box and the amount filter see it: as typed
+  // when typed in the currency shown, else converted, to the decimals that
+  // currency can hold.
+  const shownOf = (t: Transaction): number =>
+    t.typedCurrency === shownCurrency && typeof t.typedAmount === 'number'
+      ? t.typedAmount
+      : toShown(t.amount, shownRate, inputDigits(shownCurrency, shownRate));
   // Amounts typed here (filters, edits) are in the currency shown; saved amounts are rupees.
   const symbol = getSymbol(shownCurrency);
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
@@ -84,7 +91,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         const inMerchant = (t.merchant || '').toLowerCase().includes(q);
         const inCategory = t.category.toLowerCase().includes(q);
         const inNote = (t.note || '').toLowerCase().includes(q);
-        const inAmount = String(t.amount).includes(q);
+        const inAmount = String(t.amount).includes(q) || String(shownOf(t)).includes(q);
         if (!inMerchant && !inCategory && !inNote && !inAmount) return false;
       }
       // Type Filter
@@ -104,7 +111,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       // Amount Range Filter
       const minAmt = parseFloat(minAmount);
       const maxAmt = parseFloat(maxAmount);
-      const shown = toShown(t.amount, shownRate);
+      const shown = shownOf(t);
       if (!isNaN(minAmt) && shown < minAmt) return false;
       if (!isNaN(maxAmt) && shown > maxAmt) return false;
 
@@ -148,7 +155,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   }, [filteredTransactions, sortBy]);
 
   // Exact amounts in the ledger, without ".00".
-  const exact = (n: number) => { const s = formatAmount(n); return s.endsWith('.00') ? s.slice(0, -3) : s; };
+  const exact = (t: Transaction) => { const s = formatEntry(t); return s.endsWith('.00') ? s.slice(0, -3) : s; };
 
   // Totals for whatever is currently visible — the "do these filters tally?"
   // strip (single pass, only recomputed when the filtered list changes).
@@ -256,7 +263,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setEditingTransaction(transaction);
     setEditForm({
       merchant: transaction.merchant || '',
-      amount: String(toShown(transaction.amount, shownRate)),
+      amount: String(shownOf(transaction)),
       category: transaction.category || 'Uncategorized',
       date: toDay(transaction.date),
       note: transaction.note || '',
@@ -282,11 +289,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     const typed = parseFloat(editForm.amount);
     if (isNaN(typed) || typed <= 0) return;
     // Unchanged, the saved rupees stay exactly as they were; changed, the
-    // amount typed in the currency shown is saved in rupees.
-    const amount = editForm.amount === String(toShown(editingTransaction.amount, shownRate))
-      ? editingTransaction.amount
-      : toBase(typed, shownRate);
+    // amount typed in the currency shown is saved in rupees, and kept as
+    // typed when that isn't rupees.
+    const unchanged = editForm.amount === String(shownOf(editingTransaction));
+    const amount = unchanged ? editingTransaction.amount : toBase(typed, shownRate);
     if (amount <= 0) return;
+    const typedFields: Pick<Transaction, 'typedAmount' | 'typedCurrency'> = unchanged
+      ? { typedAmount: editingTransaction.typedAmount, typedCurrency: editingTransaction.typedCurrency }
+      : shownCurrency === 'INR'
+        ? { typedAmount: undefined, typedCurrency: undefined }
+        : { typedAmount: Math.round(typed * 100) / 100, typedCurrency: shownCurrency };
     
     setEditSaving(true);
     try {
@@ -297,7 +309,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         // The day as picked: no UTC round trip (audit H4)
         date: isDay(editForm.date) ? editForm.date : editingTransaction.date,
         note: editForm.note.trim(),
-        type: editForm.type
+        type: editForm.type,
+        ...typedFields,
       };
       
       await editTransaction(editingTransaction.id, updates);
@@ -679,7 +692,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                 <span className="block text-[11px] text-muted-taupe truncate">{sub}</span>
                             </span>
                             <span className={`shrink-0 text-[14px] font-semibold tabular-nums whitespace-nowrap ${isExpense ? 'text-premium-charcoal' : 'text-sage'}`}>
-                                {isExpense ? '−' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : exact(t.amount)}
+                                {isExpense ? '−' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : exact(t)}
                             </span>
                         </button>
 

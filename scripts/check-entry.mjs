@@ -28,7 +28,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = mkdtempSync(join(tmpdir(), 'wallette-entry-'));
 const entry = join(tmp, 'entry.ts');
-writeFileSync(entry, `export * from ${JSON.stringify(join(root, 'utils', 'entryAmount.ts'))};\nexport * from ${JSON.stringify(join(root, 'utils', 'currencyUtils.ts'))};\n`);
+writeFileSync(entry, [
+  `export * from ${JSON.stringify(join(root, 'utils', 'entryAmount.ts'))};`,
+  `export * from ${JSON.stringify(join(root, 'utils', 'currencyUtils.ts'))};`,
+  `export { ledgerBalance, mergeImport } from ${JSON.stringify(join(root, 'services', 'statementImport.ts'))};`,
+].join('\n'));
 const bundle = join(tmp, 'entry.mjs');
 await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'esm', logLevel: 'error' });
 const E = await import(pathToFileURL(bundle).href);
@@ -112,6 +116,47 @@ for (const [rate, saved] of [[1, 1234.5], [0.0108, 925.9259259], [1.71, 584.795]
   const field = String(E.toShown(saved, rate));
   const kept = field === String(E.toShown(saved, rate)) ? saved : E.toBase(parseFloat(field), rate);
   eq(`unchanged edit at rate ${rate} keeps ₹${saved}`, kept, saved);
+}
+
+// ── The entry saved ────────────────────────────────────────────────────────
+// What New entry hands the wallet when Save is pressed (entryFromForm).
+const NOW = new Date('2026-11-24T06:56:00+05:30');
+const form = (over) => ({ typed: '0.00', rate: 1, currency: 'INR', type: 'EXPENSE', category: '', merchant: '', note: '', day: '2026-11-24', ...over });
+const saved = (over) => E.entryFromForm(form(over), 'txn-test', NOW);
+eq('entry: rupees typed are the rupees saved', saved({ typed: '1234.56', category: 'Food', merchant: ' Swiggy ' }),
+  { id: 'txn-test', amount: 1234.56, type: 'EXPENSE', category: 'Food', date: '2026-11-24', createdAt: '2026-11-24T01:26:00.000Z', note: '', merchant: 'Swiggy' });
+eq('entry: nothing typed saves nothing', [saved({ typed: '0.00' }), saved({ typed: '0.' })], [null, null]);
+eq('entry: a payee from the note, else Unknown Merchant', [saved({ typed: '5', note: 'Chai' }).merchant, saved({ typed: '5' }).merchant], ['Chai', 'Unknown Merchant']);
+eq('entry: income without a payee', [saved({ typed: '5', type: 'INCOME' }).merchant, saved({ typed: '5', type: 'INCOME' }).category], ['Income Source', 'Uncategorized']);
+eq('entry: the day picked, not today', saved({ typed: '5', day: '2026-10-31' }).date, '2026-10-31');
+eq('entry: $10 at 92.59 a dollar', saved({ typed: '10', rate: 0.0108, currency: 'USD' }).amount, 925.93);
+eq('entry: typed in dollars, kept as typed', (({ typedAmount, typedCurrency }) => [typedAmount, typedCurrency])(saved({ typed: '10', rate: 0.0108, currency: 'USD' })), [10, 'USD']);
+eq('entry: typed in rupees, nothing extra', 'typedAmount' in saved({ typed: '10' }), false);
+// A rupee is worth less than a paisa's step in yen, won, rupiah and dong:
+// the rupees can't hold ¥1,500 exactly, so the entry keeps what was typed and
+// inputs read saved amounts in whole units.
+eq('decimals inputs show', [['INR', 1], ['USD', 0.0108], ['EUR', 0.0098], ['KWD', 0.0035], ['JPY', 1.78], ['KRW', 16.4], ['IDR', 190], ['VND', 300]].map(([c, r]) => E.inputDigits(c, r)), [2, 2, 2, 3, 0, 0, 0, 0]);
+{
+  const yen = saved({ typed: '1500', rate: 1.78, currency: 'JPY' });
+  eq('entry: ¥1,500 reads back as typed', [yen.typedAmount, E.toShown(yen.amount, 1.78, E.inputDigits('JPY', 1.78))], [1500, 1500]);
+  const dong = saved({ typed: '100000', rate: 300, currency: 'VND' });
+  eq('entry: ₫100,000 kept as typed (the rupees alone read ₫99,999)', [dong.typedAmount, dong.amount, E.toShown(dong.amount, 300, 0)], [100000, 333.33, 99999]);
+}
+// Typed amounts keep the paisa from keypad to balance, however many entries.
+{
+  let wallet = { transactions: [], openingBalance: 1000.1, openingBalanceAsOf: null };
+  let expected = Math.round(1000.1 * 100);
+  const rand = (() => { let x = 7; return () => (x = (x * 48271) % 2147483647) / 2147483647; })();
+  for (let i = 0; i < 2000; i++) {
+    const typed = (Math.floor(rand() * 10000000) / 100).toFixed(2).replace(/\.00$/, '');
+    const isIncome = rand() < 0.3;
+    const e = E.entryFromForm(form({ typed, type: isIncome ? 'INCOME' : 'EXPENSE', day: `2026-11-${String(1 + (i % 24)).padStart(2, '0')}` }), `txn-${i}`, NOW);
+    if (!e) continue;
+    wallet = { ...wallet, transactions: E.mergeImport(wallet, [e]).transactions };
+    expected += (isIncome ? 1 : -1) * Math.round(parseFloat(typed) * 100);
+  }
+  eq('entry: 2,000 typed entries add up to the paisa', Math.round(E.ledgerBalance(wallet) * 100), expected);
+  eq('entry: each kept once', wallet.transactions.length, 2000 - 0);
 }
 
 // ── The daily-limit warning ────────────────────────────────────────────────

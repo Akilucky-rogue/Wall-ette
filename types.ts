@@ -14,6 +14,14 @@ export interface Transaction {
   merchant?: string;
   /** When the entry was added in New Entry (ISO timestamp). Imported rows have none. */
   createdAt?: string;
+  /**
+   * For an entry typed in another currency: the amount as typed and its code.
+   * `amount` is the same in rupees, to the paisa; these let the entry read
+   * back exactly as typed (¥1,500, not ¥1,500.01) while it's shown in that
+   * currency.
+   */
+  typedAmount?: number;
+  typedCurrency?: string;
 }
 
 export interface IncomeSource {

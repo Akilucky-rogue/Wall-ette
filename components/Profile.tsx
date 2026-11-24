@@ -4,7 +4,7 @@ import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, type M
 import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { toBase, toShown } from '../utils/currencyUtils';
+import { inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import {
@@ -96,13 +96,13 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   const { user } = useAuth();
   const {
     dailyLimit, setDailyLimit, formatAmount, formatWhole, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
-    clearAllTransactions, currency, counted, budgets, shownRate,
+    clearAllTransactions, currency, counted, budgets, shownRate, shownCurrency,
   } = useWallet();
 
   const [notesOpen, setNotesOpen] = useState(false);
 
   // ── Daily limit: typed in the currency shown, saved in rupees ──
-  const shownLimit = dailyLimit > 0 ? String(toShown(dailyLimit, shownRate)) : '';
+  const shownLimit = dailyLimit > 0 ? String(toShown(dailyLimit, shownRate, inputDigits(shownCurrency, shownRate))) : '';
   const [limitInput, setLimitInput] = useState(shownLimit);
   const [limitSaved, setLimitSaved] = useState(false);
   useEffect(() => { setLimitInput(shownLimit); }, [shownLimit]);

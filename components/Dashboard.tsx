@@ -19,7 +19,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
-    getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount, formatWhole,
+    getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount, formatWhole, formatEntry,
     formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance, budgets,
   } = useWallet();
 
@@ -487,7 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     </p>
                   </div>
                   <span className={`text-[13px] font-bold flex-shrink-0 ${tx.type === TransactionType.INCOME ? 'text-sage' : 'text-rose'}`}>
-                    {tx.type === TransactionType.INCOME ? '+' : '-'}{formatWhole(tx.amount)}
+                    {tx.type === TransactionType.INCOME ? '+' : '-'}{formatEntry(tx, true)}
                   </span>
                 </div>
               ))}

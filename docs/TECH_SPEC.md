@@ -112,7 +112,13 @@ Plain React context — no Redux/Zustand.
   Intl formatting with each currency's own decimals, rates cached as `fxRates_v2`). Anything
   typed (a new entry, an edit, a budget, the daily limit, the savings goal, Vault's amount
   filter) is in the shown currency and saved with `toBase` to the paisa; inputs show saved
-  rupees with `toShown` (`scripts/check-entry.mjs`, `scripts/check-currency.mjs`). Includes batched bulk ops
+  rupees with `toShown`, to the decimals the currency can hold (`inputDigits`: whole yen,
+  won, rupiah and dong). An entry typed in another currency also keeps `typedAmount` and
+  `typedCurrency`, so it reads back exactly as typed while shown in that currency
+  (`formatEntry`). New entry builds the entry with `entryFromForm` (utils/entryAmount.ts)
+  and saves once per tap (`scripts/check-entry.mjs`, `scripts/check-currency.mjs`). Every
+  change to the list builds on the newest list (`listRef`), so two changes in a row can't
+  undo each other. Includes batched bulk ops
   (`deleteTransactions` via Firestore `writeBatch` chunks) and an instant, optimistic
   `clearAllTransactions` (local state clears immediately; cloud deletion continues in the
   background).
@@ -213,11 +219,24 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   - Vault's duplicate cleaner (`components/DuplicateEntries.tsx`) groups imported rows by the
     same key and never removes rows with stable ids (they're all real); typed entries are left
     alone. Tests and a before/after replay over real statements: `scripts/check-duplicates.mjs`;
-  - opening-balance anchoring to the earliest statement (`openingBalanceAsOf`);
-  - forward/backward coverage-gap detection with optional single bridge adjustment
-    (auto-deleted when a later import fills the window);
-  - a tally card comparing the wallet balance *as of statement end* against the statement's
-    own closing balance.
+  - opening-balance anchoring to the earliest statement (`openingBalanceAsOf`); a statement's
+    opening and closing are passed on only when it prints them (`openingKnown`,
+    `closingKnown`), so a new account's 0.00 counts and an unknown figure doesn't;
+  - one step from staged rows to the wallet (`mergeImport` in services/statementImport.ts,
+    which `importTransactions` runs): rows the wallet has are skipped, stale adjustments come
+    out in the same update, and the opening moves when this is the earliest statement;
+  - forward/backward coverage-gap detection with optional single bridge adjustment, dated
+    on the first missing day and named by the period it stands for, so importing any
+    statement that covers part of that period removes it (`staleAdjustments`);
+  - a tally card (`importTally`) that runs `mergeImport` itself and compares the wallet
+    balance *as of statement end* with the statement's own closing balance, to the paisa;
+  - rows the reader couldn't place (no real day or no debit/credit side) are counted and
+    named on the review; a row with no narration is imported as "Unknown" rather than
+    dropped (`unreadableRows`, `importable`).
+  - End to end: `scripts/check-import.mjs` runs the app's readers, `toTransactions`, the
+    duplicate check, `importTally` and `mergeImport` on every statement in a folder (rows,
+    debits and credits to the paisa, dates, ids, balance into an empty wallet, re-import),
+    then per account in date order, reverse and random orders, and a gap bridged and filled.
   - Validated by simulation: 300 shuffled import orders of 15 real statements converge to an
     identical, to-the-rupee ledger.
 - **Review UI** — paginated review with per-row edit, category auto-suggestion (Indian

@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types';
 import { getSymbol, localeFor, niceAmount, toBase } from '../utils/currencyUtils';
-import { amountValue, pressKey } from '../utils/entryAmount';
+import { amountValue, entryFromForm, pressKey } from '../utils/entryAmount';
 import { useWallet } from '../context/WalletContext';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
@@ -129,24 +129,26 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   const handleKeypad = (val: string) => setAmount(prev => pressKey(prev, val));
 
+  // One save per tap: a second tap before the first finishes (a double tap,
+  // or Save pressed while saving) adds nothing.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
-    if (numAmount <= 0) return;
+    if (savingRef.current) return;
     // Typed in the currency shown; saved in rupees, to the paisa.
-    const amountInBase = toBase(numAmount, shownRate);
-    if (amountInBase <= 0) return;
+    const entry = entryFromForm(
+      { typed: amount, rate: shownRate, currency: shownCurrency, type, category, merchant, note, day: localDay(selectedDate) },
+      `txn-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`,
+      new Date(),
+    );
+    if (!entry) return;
 
-    const success = await addTransaction({
-      id: `txn-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`,
-      amount: amountInBase,
-      type,
-      category: category || 'Uncategorized',
-      date: localDay(selectedDate),
-      createdAt: new Date().toISOString(),
-      note,
-      merchant: merchant.trim() || (type === TransactionType.EXPENSE ? (note || 'Unknown Merchant') : 'Income Source'),
-    });
-
-    if (success) {
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      const success = await addTransaction(entry);
+      if (!success) return;
       done();
       if (saveAndAdd) {
         setAmount('0.00'); setNote(''); setMerchant(''); setCategory(''); setAutoCat(false);
@@ -156,6 +158,9 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       } else {
         onNavigate(AppScreen.DASHBOARD);
       }
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -219,14 +224,14 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             onClick={() => { setType(TransactionType.EXPENSE); setCategory(''); setAutoCat(false); }}
             className={`flex-1 py-3 px-4 rounded-full text-[13px] font-semibold tracking-wide flex items-center justify-center gap-2 transition-all ${type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'text-muted-taupe hover:bg-white'}`}
           >
-            <span className="material-symbols-outlined text-sm font-bold">arrow_downward</span>
+            <span className="material-symbols-outlined text-sm font-bold" aria-hidden="true">arrow_downward</span>
             Expense
           </button>
           <button
             onClick={() => { setType(TransactionType.INCOME); setCategory(''); setAutoCat(false); }}
             className={`flex-1 py-3 px-4 rounded-full text-[13px] font-semibold tracking-wide flex items-center justify-center gap-2 transition-all ${type === TransactionType.INCOME ? 'bg-sage-light text-sage' : 'text-muted-taupe hover:bg-white'}`}
           >
-            <span className="material-symbols-outlined text-sm font-bold">arrow_upward</span>
+            <span className="material-symbols-outlined text-sm font-bold" aria-hidden="true">arrow_upward</span>
             Income
           </button>
         </div>
@@ -236,7 +241,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           <div className="bg-white rounded-[24px] p-4 shadow-soft border border-black/[0.01]">
             <div className="flex items-center gap-4">
               <div className="bg-lavender-light text-lavender p-2.5 rounded-2xl shrink-0">
-                <span className="material-symbols-outlined text-[20px]">storefront</span>
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">storefront</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Merchant / Payee</p>
@@ -288,7 +293,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                       : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-premium-charcoal/[0.12]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">{CAT_ICON(cat)}</span>
+                  <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{CAT_ICON(cat)}</span>
                   {cat}
                 </button>
               ))}
@@ -301,13 +306,13 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01] cursor-pointer hover:shadow-lg transition-shadow"
           >
             <div className="bg-rose-light text-rose p-2.5 rounded-2xl">
-              <span className="material-symbols-outlined text-[20px]">calendar_today</span>
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">calendar_today</span>
             </div>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
               <p className="text-premium-charcoal text-[15px] font-serif font-semibold">{dateLabel}</p>
             </div>
-            <span className="material-symbols-outlined text-muted-taupe opacity-40">expand_more</span>
+            <span className="material-symbols-outlined text-muted-taupe opacity-40" aria-hidden="true">expand_more</span>
           </div>
 
           {showDatePicker && (
@@ -316,8 +321,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                 {[
                   { label: 'Today', days: 0 },
                   { label: 'Yesterday', days: 1 },
-                  { label: 'Last Week', days: 7 },
-                  { label: 'Last Month', days: 30 },
+                  { label: 'Last week', days: 7 },
+                  { label: 'Last month', days: 30 },
                 ].map(q => (
                   <button
                     key={q.label}
@@ -354,7 +359,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           {/* Note */}
           <div className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01]">
             <div className="bg-zen-bg text-muted-taupe p-2.5 rounded-2xl border border-black/[0.03]">
-              <span className="material-symbols-outlined text-[20px]">notes</span>
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notes</span>
             </div>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
@@ -373,7 +378,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           {/* Daily limit heads-up */}
           {overLimit && (
             <div className="flex items-center gap-2 bg-rose-light/40 border border-rose/20 rounded-2xl px-4 py-3">
-              <span className="material-symbols-outlined text-rose text-[18px]">warning</span>
+              <span className="material-symbols-outlined text-rose text-[18px]" aria-hidden="true">warning</span>
               <p className="text-rose text-[11px] font-medium leading-relaxed">
                 This takes today past your {formatWhole(dailyLimit)} daily limit
                 ({formatWhole(todaySpend)} spent so far). It still saves.
@@ -393,34 +398,38 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           ))}
           <button onClick={() => handleKeypad('.')} className="py-3 flex items-center justify-center text-2xl font-serif text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">.</button>
           <button onClick={() => handleKeypad('0')} className="py-3 flex items-center justify-center text-2xl font-serif text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">0</button>
-          <button onClick={() => handleKeypad('backspace')} className="py-3 flex items-center justify-center text-muted-taupe rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-[24px]">backspace</span>
+          <button onClick={() => handleKeypad('backspace')} aria-label="Delete the last digit" className="py-3 flex items-center justify-center text-muted-taupe rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
+            <span className="material-symbols-outlined text-[24px]" aria-hidden="true">backspace</span>
           </button>
         </div>
 
-        <label className="flex items-center justify-center gap-2 mt-3 cursor-pointer select-none">
-          <div
+        <div className="flex items-center justify-center gap-2 mt-3 select-none">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={saveAndAdd}
+            aria-labelledby="save-and-add-label"
             onClick={() => setSaveAndAdd(p => !p)}
             className={`relative w-10 h-5 rounded-full transition-colors ${saveAndAdd ? 'bg-sage' : 'bg-black/10'}`}
           >
-            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-5' : 'translate-x-0'}`} />
-          </div>
-          <span className="text-[12px] text-muted-taupe font-medium">Save and add another</span>
-        </label>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+          <span id="save-and-add-label" onClick={() => setSaveAndAdd(p => !p)} className="text-[12px] text-muted-taupe font-medium cursor-pointer">Save and add another</span>
+        </div>
 
         <button
           onClick={handleSave}
-          disabled={numAmount <= 0}
+          disabled={numAmount <= 0 || saving}
           className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] font-serif text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-[22px]">{saveAndAdd ? 'add' : 'check'}</span>
+          <span className="material-symbols-outlined text-[22px]" aria-hidden="true">{saveAndAdd ? 'add' : 'check'}</span>
           {saveAndAdd ? 'Save and add another' : 'Save entry'}
         </button>
       </div>
 
       {toast && (
         <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
-          <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
+          <span className="material-symbols-outlined text-sage text-[20px]" aria-hidden="true">check_circle</span>
           <span className="text-[13px] font-medium font-serif">{toast}</span>
         </div>
       )}

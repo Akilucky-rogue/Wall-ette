@@ -35,6 +35,9 @@ interface StatementSummary {
   totalDebit: number;
   totalCredit: number;
   closingBalance: number;
+  /** Whether the statement printed these (0 is also a real balance). */
+  openingKnown: boolean;
+  closingKnown: boolean;
   accountNumber: string;
   statementPeriod: string;
   customerName: string;
@@ -172,6 +175,8 @@ export class IDFCBankParser {
     let totalDebit = 0;
     let totalCredit = 0;
     let closingBalance = 0;
+    let openingKnown = false;
+    let closingKnown = false;
     let accountNumber = '';
     let statementPeriod = '';
     let customerName = '';
@@ -189,9 +194,13 @@ export class IDFCBankParser {
       const closing = labels.findIndex(c => /^closing bal/.test(c));
       const values = data[i + 1] || [];
       openingBalance = this.parseAmount(values[opening]);
+      openingKnown = (values[opening] ?? '').toString().trim() !== '';
       totalDebit = this.parseAmount(values[debits]);
       totalCredit = this.parseAmount(values[credits]);
-      if (closing !== -1) closingBalance = this.parseAmount(values[closing]);
+      if (closing !== -1) {
+        closingBalance = this.parseAmount(values[closing]);
+        closingKnown = (values[closing] ?? '').toString().trim() !== '';
+      }
       break;
     }
 
@@ -220,6 +229,8 @@ export class IDFCBankParser {
       totalDebit,
       totalCredit,
       closingBalance,
+      openingKnown,
+      closingKnown,
       accountNumber,
       statementPeriod,
       customerName

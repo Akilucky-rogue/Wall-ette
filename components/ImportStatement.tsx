@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { parseStatementPdf, StatementLockedError } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
-import { findDuplicates, fromExcel, toTransactions, type StatementRow } from '../services/statementImport';
+import { bridgeAdjustment, findDuplicates, fromExcel, importTally, staleAdjustments, toTransactions, unreadableRows, type StatementRow } from '../services/statementImport';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
@@ -28,7 +28,7 @@ interface EditingTransaction {
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
       importTransactions, transactions: existingTransactions,
-      getBalance, openingBalance, openingBalanceAsOf, formatAmount, deleteTransaction
+      getBalance, openingBalance, openingBalanceAsOf, formatAmount
   } = useWallet();
 
   // Stages: IDLE (Upload), PROCESSING (AI Loading), REVIEW (Selection)
@@ -42,6 +42,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const [error, setError] = useState<string | null>(null);
   const [parsedOpeningBalance, setParsedOpeningBalance] = useState<number | undefined>(undefined);
   const [parsedClosingBalance, setParsedClosingBalance] = useState<number | undefined>(undefined);
+  // Rows with money on them the statement reader couldn't place (no day or
+  // direction). Not imported; the review says how many.
+  const [unreadable, setUnreadable] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Edit modal state
@@ -97,98 +100,23 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   }, [extractedData]);
 
   // ── Balance tally (issue: imported data must reconcile) ──────────────────
-  // Projects the wallet balance after this import and compares it with the
-  // statement's own closing balance. Only meaningful when this statement is
-  // the newest data in the wallet — older back-fills show an info note instead.
+  // The wallet as this import will leave it (services/statementImport.ts
+  // works it out with the same merge the import runs) against the bank's
+  // closing balance, both on the statement's last day, to the paisa. Also
+  // finds a stretch with no statement on either side of the wallet's entries.
   const tally = useMemo(() => {
-    if (parsedClosingBalance === undefined || !reviewSummary) return null;
-
-    let selectedNet = 0;
-    for (const t of extractedData) {
-      if (!selectedIds.has(t.id)) continue;
-      selectedNet += t.type === TransactionType.INCOME ? t.amount : -t.amount;
-    }
-
-    // Mirror the context's opening-balance anchoring to predict the new opening.
-    let openingDelta = 0;
-    if (parsedOpeningBalance !== undefined) {
-      let applies = false;
-      if (existingTransactions.length === 0) {
-        applies = true;
-      } else if (openingBalanceAsOf) {
-        applies = reviewSummary.minDate < openingBalanceAsOf;
-      } else {
-        const earliest = existingTransactions.reduce(
-          (m, t) => (t.date < m ? t.date : m), existingTransactions[0].date);
-        applies = reviewSummary.minDate <= earliest;
-      }
-      if (applies) openingDelta = parsedOpeningBalance - openingBalance;
-    }
-
-    // Sorted desc in context — [0] is latest, [len-1] is earliest.
-    const latestExisting = existingTransactions.length > 0 ? existingTransactions[0].date : null;
-    const earliestExisting = existingTransactions.length > 0
-      ? existingTransactions[existingTransactions.length - 1].date : null;
-    const isNewest = !latestExisting || reviewSummary.maxDate >= latestExisting;
-
-    // Coverage-gap detection — works whichever order statements arrive in:
-    //  • importing a LATER period: its opening should equal the wallet's
-    //    current balance; a difference = un-imported months in between.
-    //  • importing an EARLIER period: its closing should equal the wallet's
-    //    opening anchor; a difference = a hole between this statement's end
-    //    and where the wallet's records resume.
-    let gap: { amount: number; from: string; to: string; at: string; direction: 'after' | 'before' } | null = null;
-    if (
-      parsedOpeningBalance !== undefined &&
-      latestExisting &&
-      reviewSummary.minDate > latestExisting.slice(0, 10)
-    ) {
-      const gapAmount = parsedOpeningBalance - getBalance();
-      if (Math.abs(gapAmount) > 1) {
-        gap = { amount: gapAmount, from: latestExisting.slice(0, 10), to: reviewSummary.minDate, at: reviewSummary.minDate, direction: 'after' };
-      }
-    } else if (
-      parsedClosingBalance !== undefined &&
-      earliestExisting &&
-      reviewSummary.maxDate < earliestExisting.slice(0, 10) &&
-      openingBalanceAsOf
-    ) {
-      const gapAmount = openingBalance - parsedClosingBalance;
-      if (Math.abs(gapAmount) > 1) {
-        gap = { amount: gapAmount, from: reviewSummary.maxDate, to: openingBalanceAsOf.slice(0, 10), at: reviewSummary.maxDate, direction: 'before' };
-      }
-    }
-
-    const bridge = bridgeGap && gap ? gap.amount : 0;
-    const projectedFinal = getBalance() + selectedNet + openingDelta + bridge;
-
-    // The bank's closing figure only knows about money up to the statement's
-    // last day — so the honest check is the wallet balance AS OF that day.
-    // Existing transactions dated later are excluded from the comparison
-    // (but still part of the final balance). This makes the check exact for
-    // overlapping statements and any import order.
-    let futureNet = 0;
-    for (const t of existingTransactions) {
-      if (t.date.slice(0, 10) > reviewSummary.maxDate) {
-        futureNet += t.type === TransactionType.INCOME ? t.amount : -t.amount;
-      }
-    }
-    const projectedAtEnd = projectedFinal - futureNet;
-    const diff = projectedAtEnd - parsedClosingBalance;
-
-    return {
-      projected: projectedAtEnd,
-      projectedFinal,
-      hasNewer: futureNet !== 0,
-      endDate: reviewSummary.maxDate,
+    if (!reviewSummary) return null;
+    return importTally({
+      wallet: { transactions: existingTransactions, openingBalance, openingBalanceAsOf },
+      selected: extractedData.filter(t => selectedIds.has(t.id)),
+      minDate: reviewSummary.minDate,
+      maxDate: reviewSummary.maxDate,
+      opening: parsedOpeningBalance,
       closing: parsedClosingBalance,
-      diff,
-      matched: Math.abs(diff) <= 1,
-      isNewest,
-      gap,
-    };
+      bridge: bridgeGap,
+    });
   }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds,
-      existingTransactions, openingBalanceAsOf, openingBalance, getBalance, bridgeGap]);
+      existingTransactions, openingBalanceAsOf, openingBalance, bridgeGap]);
 
   // Card tone: gap (bridged → ok), tallied, or off.
   const tallyBridged = !!(tally?.gap && bridgeGap && tally.matched);
@@ -233,6 +161,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // (audit Phases 1.5 + 2.7 — was duplicated inline three times).
   const stageForReview = async (raw: StatementRow[], parserLabel: string) => {
       const mappedTransactions = await toTransactions(raw);
+      setUnreadable(unreadableRows(raw));
       if (mappedTransactions.length === 0) {
           throw new Error('No transactions found in this statement. Check it lists transactions with dates and amounts.');
       }
@@ -271,9 +200,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             throw new Error("Couldn't find transactions in this PDF. If your bank offers an Excel download, try that.");
         }
 
+        // 0 is a real balance (a new account); unknown is undefined.
         storeStatementMeta(
-            result.header.openingBalance || undefined,
-            result.header.closingBalance || undefined
+            result.header.openingKnown ? result.header.openingBalance : undefined,
+            result.header.closingKnown ? result.header.closingBalance : undefined
         );
         updateProgress(result.validationPassed
             ? `Verified ${result.transactions.length} transactions with balance validation ✓`
@@ -317,7 +247,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             throw new Error('No transactions found in Excel file.');
         }
 
-        storeStatementMeta(result.summary.openingBalance, result.summary.closingBalance || undefined);
+        storeStatementMeta(
+            result.summary.openingKnown ? result.summary.openingBalance : undefined,
+            result.summary.closingKnown ? result.summary.closingBalance : undefined
+        );
         await stageForReview(fromExcel(result.transactions),
             `${result.bank} Excel${result.validation.isValid ? ' · totals match the bank' : ' (verify amounts)'}`);
     } catch (err: any) {
@@ -399,44 +332,25 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   const confirmImport = () => {
       const toImport = extractedData.filter(t => selectedIds.has(t.id));
-      if (toImport.length === 0) return;
+      if (toImport.length === 0 || !reviewSummary) return;
 
       // One adjustment entry that stands in for a missing statement window,
-      // so the running balance matches the bank to the rupee.
-      if (bridgeGap && tally?.gap) {
-          const g = tally.gap;
-          toImport.unshift({
-              id: `adjust-${g.from}-${g.to}-${Math.round(Math.abs(g.amount) * 100)}`,
-              date: g.at,
-              merchant: 'Balance adjustment — missing statement period',
-              amount: Math.abs(g.amount),
-              type: g.amount >= 0 ? TransactionType.INCOME : TransactionType.EXPENSE,
-              category: 'Adjustment',
-              note: `Bridges un-imported period ${g.from} → ${g.to}. Delete this if you import that statement later.`
-          });
-      }
+      // so the running balance matches the bank to the paisa.
+      if (bridgeGap && tally?.gap) toImport.unshift(bridgeAdjustment(tally.gap));
 
-      // Stale bridge adjustments: this statement now covers a window an
-      // earlier adjustment entry was standing in for — remove those so the
-      // real rows don't double-count on top of the placeholder.
-      if (reviewSummary) {
-          const stale = existingTransactions.filter(t =>
-              t.id.startsWith('adjust-') &&
-              t.date.slice(0, 10) >= reviewSummary.minDate &&
-              t.date.slice(0, 10) <= reviewSummary.maxDate
-          );
-          for (const t of stale) deleteTransaction(t.id);
-          if (stale.length > 0) log.debug(`Removed ${stale.length} stale bridge adjustment(s)`);
-      }
+      // Adjustments that stood in for a period this statement covers come out
+      // in the same step, so its real rows don't count on top of them.
+      const stale = staleAdjustments(existingTransactions, reviewSummary.minDate, reviewSummary.maxDate);
 
-      log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions`);
+      log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions, replacing ${stale.length} adjustment(s)`);
       // Opening balance + statement start let the context anchor the balance
       // to the earliest statement, so multi-statement imports always tally.
-      importTransactions(toImport, parsedOpeningBalance, reviewSummary?.minDate);
+      importTransactions(toImport, parsedOpeningBalance, reviewSummary.minDate, stale);
       onNavigate(AppScreen.DASHBOARD);
   }
 
   const handleDiscard = () => {
+      setUnreadable(0);
       setExtractedData([]);
       setSelectedIds(new Set());
       setParsedOpeningBalance(undefined);
@@ -637,6 +551,15 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
                 
+                {unreadable > 0 && (
+                    <div role="alert" className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-600 text-[20px] mt-0.5" aria-hidden="true">warning</span>
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                            <b>{unreadable} row{unreadable > 1 ? 's' : ''} couldn't be read</b> (no date or no debit/credit side), so {unreadable > 1 ? "they aren't" : "it isn't"} in the list below. The balance check shows what that leaves out. Try your bank's Excel download for this period, or add {unreadable > 1 ? 'them' : 'it'} in New entry.
+                        </p>
+                    </div>
+                )}
+
                 {/* Balance tally — statement closing vs wallet after import */}
                 {tally && (
                     <div className={`mb-4 p-4 rounded-2xl border animate-slide-up ${

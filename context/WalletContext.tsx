@@ -8,6 +8,7 @@ import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
+import { mergeImport } from '../services/statementImport';
 
 // Firestore refuses fields set to undefined; leave them out.
 const forCloud = <T extends object,>(t: T): T =>
@@ -99,7 +100,12 @@ interface WalletContextType {
   deleteTransactions: (ids: string[]) => void;
   /** Clears instantly; cloud deletion runs in the background unless waitForCloud. */
   clearAllTransactions: (waitForCloud?: boolean) => Promise<void>;
-  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string) => void;
+  /**
+   * Adds a statement's rows (skipping ids the wallet has), takes out the
+   * stale balance adjustments named in `removeIds`, and moves the opening
+   * balance when this is now the earliest statement. One step, one list.
+   */
+  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string, removeIds?: string[]) => void;
   /** Adds a rule, or changes the kind of the rule with the same match. */
   savePayeeRule: (match: string, kind: PayeeKind) => void;
   deletePayeeRule: (id: string) => void;
@@ -113,6 +119,8 @@ interface WalletContextType {
   formatAmount: (amountInBase: number) => string;
   /** Whole units, no decimals: for figures read at a glance. */
   formatWhole: (amountInBase: number) => string;
+  /** One entry's amount: as typed when it was typed in the currency shown, else converted. */
+  formatEntry: (t: Pick<Transaction, 'amount' | 'typedAmount' | 'typedCurrency'>, whole?: boolean) => string;
   formatAmountCompact: (amountInBase: number) => string;
   convertToBase: (amount: number) => number;
   /** The currency amounts are shown in (the chosen one once its rate is known, else INR). */
@@ -165,6 +173,11 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] => {
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // The newest list, ahead of React's next render: every change builds on it,
+  // so two changes in a row (an import that also removes adjustments, two
+  // quick saves) can't undo each other.
+  const listRef = useRef<Transaction[]>([]);
+  useEffect(() => { listRef.current = transactions; }, [transactions]);
   const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
   const [payeeRules, setPayeeRules] = useState<PayeeRule[]>([]);
   const [dailyLimit, setDailyLimitState] = useState<number>(0);
@@ -259,6 +272,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       getWholeCurrencyFormatter(shownCurrency).format(Math.round(amountInBase * shownRate)), [shownCurrency, shownRate]);
 
   // Short form for chart axes: ₹85.7K instead of ₹85,707.00
+  const formatEntry = useCallback((t: Pick<Transaction, 'amount' | 'typedAmount' | 'typedCurrency'>, whole = false): string => {
+      const shown = t.typedCurrency === shownCurrency && typeof t.typedAmount === 'number' && Number.isFinite(t.typedAmount)
+        ? t.typedAmount
+        : t.amount * shownRate;
+      return whole
+        ? getWholeCurrencyFormatter(shownCurrency).format(Math.round(shown))
+        : getCurrencyFormatter(shownCurrency).format(shown);
+  }, [shownCurrency, shownRate]);
+
   const formatAmountCompact = useCallback((amountInBase: number): string =>
       getCompactCurrencyFormatter(shownCurrency).format(amountInBase * shownRate), [shownCurrency, shownRate]);
 
@@ -654,7 +676,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // The daily limit is a warning, not a gate: New Entry says when an entry
     // takes today past it, and the bell on Home reports it. A real expense is
     // always saved.
-    const newTxs = [transaction, ...transactions].sort(byNewest);
+    const newTxs = [transaction, ...listRef.current.filter(t => t.id !== transaction.id)].sort(byNewest);
+    listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
@@ -663,18 +686,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         void sendToCloud(`tx:${transaction.id}`, 1, () => setDoc(txRef, forCloud(transaction)));
     }
     return true;
-  }, [transactions, persistTransactions, user]);
+  }, [persistTransactions, user]);
 
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
-    const transaction = transactions.find(t => t.id === id);
+    const current = listRef.current;
+    const transaction = current.find(t => t.id === id);
     if (!transaction) {
       log.error('Edit failed: transaction not found');
       return false;
     }
 
     const updatedTx = { ...transaction, ...updates, id: transaction.id };
-    const newTxs = transactions.map(t => t.id === id ? updatedTx : t);
+    const newTxs = current.map(t => t.id === id ? updatedTx : t);
     if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
+    listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
@@ -685,10 +710,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       void sendToCloud(`tx:${id}`, 1, () => setDoc(txRef, forCloud(updatedTx)));
     }
     return true;
-  }, [transactions, persistTransactions, user]);
+  }, [persistTransactions, user]);
 
   const deleteTransaction = useCallback((id: string) => {
-    const newTxs = transactions.filter(t => t.id !== id);
+    const newTxs = listRef.current.filter(t => t.id !== id);
+    listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
@@ -696,7 +722,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
       void sendToCloud(`tx:${id}`, 1, () => deleteDoc(txRef));
     }
-  }, [transactions, persistTransactions, user]);
+  }, [persistTransactions, user]);
 
   // Deletes in batches of 500, Firestore's limit, all handed over at once.
   const deleteInBatches = useCallback((uid: string, ids: string[]): Promise<boolean>[] =>
@@ -710,18 +736,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const deleteTransactions = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
     const idSet = new Set(ids);
-    const newTxs = transactions.filter(t => !idSet.has(t.id));
+    const newTxs = listRef.current.filter(t => !idSet.has(t.id));
+    listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
     if (user) deleteInBatches(user.uid, ids);
-  }, [transactions, persistTransactions, user, deleteInBatches]);
+  }, [persistTransactions, user, deleteInBatches]);
 
   const clearAllTransactions = useCallback(async (waitForCloud = false) => {
     // Capture ids BEFORE wiping state — deleting by known ids skips the
     // expensive getDocs read that made Clear All feel slow.
-    const idsToDelete = transactions.map(t => t.id);
+    const idsToDelete = listRef.current.map(t => t.id);
 
     clearingRef.current = true;
+    listRef.current = [];
     setTransactions([]);
     saveToLocal('transactions', []);
     setOpeningBalanceState(0);
@@ -781,56 +809,41 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     void Promise.all(work).finally(() => { clearingRef.current = false; });
   }, [transactions, user, saveToLocal, deleteInBatches]);
 
-  const importTransactions = useCallback((newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string) => {
-    const existingIds = new Set(transactions.map(t => t.id));
-    const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
-
-    if (uniqueNew.length === 0) {
+  const importTransactions = useCallback((newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string, removeIds: string[] = []) => {
+    const result = mergeImport(
+      { transactions: listRef.current, openingBalance, openingBalanceAsOf },
+      newTransactions,
+      { opening: importedOpeningBalance, statementStart, removeIds },
+    );
+    if (result.added.length === 0 && result.removed.length === 0) {
         log.warn('No new unique transactions to import');
         return;
     }
 
-    // Anchor the opening balance to the EARLIEST statement we've ever seen,
-    // so Balance = opening + Σ(all txns) always tallies even when statements
-    // are imported out of order (issue: imported balance not matching).
-    if (importedOpeningBalance !== undefined) {
-        let shouldApply = false;
-        if (transactions.length === 0) {
-            shouldApply = true;
-        } else if (openingBalanceAsOf) {
-            // Older statement than the current anchor → its opening wins.
-            shouldApply = !!statementStart && statementStart < openingBalanceAsOf;
-        } else if (statementStart) {
-            // Legacy data without an anchor: apply only if this statement
-            // starts at/before everything already in the wallet.
-            const earliest = transactions.reduce((m, t) => (t.date < m ? t.date : m), transactions[0].date);
-            shouldApply = statementStart <= earliest;
-        }
-        if (shouldApply) {
-            setOpeningBalance(importedOpeningBalance, statementStart ?? null);
-        }
-    }
+    // Balance = opening + every entry, anchored to the earliest statement
+    // ever imported, so statements tally in any order.
+    if (result.opening) setOpeningBalance(result.opening.balance, result.opening.asOf);
 
-    const combined = [...uniqueNew, ...transactions].sort(byNewest);
-
-    setTransactions(combined);
-    persistTransactions(combined);
+    listRef.current = result.transactions;
+    setTransactions(result.transactions);
+    persistTransactions(result.transactions);
 
     if (user) {
         // Every batch is handed to Firestore at once. Awaiting each in turn
         // meant an import made offline, with the app closed before it
         // reconnected, kept only its first 500 rows (audit M4).
         const uid = user.uid;
-        for (const chunk of chunkArray(uniqueNew, 500)) {
+        if (result.removed.length > 0) deleteInBatches(uid, result.removed);
+        for (const chunk of chunkArray(result.added, 500)) {
             void sendToCloud(`import:${chunk[0].id}`, chunk.length, () => {
                 const batch = writeBatch(db);
                 chunk.forEach(tx => batch.set(doc(db, `users/${uid}/transactions/${tx.id}`), forCloud(tx)));
                 return batch.commit();
             });
         }
-        log.debug(`Importing ${uniqueNew.length} transactions`);
+        log.debug(`Importing ${result.added.length} transactions, removing ${result.removed.length}`);
     }
-  }, [transactions, openingBalanceAsOf, setOpeningBalance, persistTransactions, user]);
+  }, [openingBalance, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, deleteInBatches]);
 
   // Payee rules save on this device at once and to the cloud through
   // Firestore's queue, which also holds the write while offline.
@@ -893,6 +906,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       getTotalExpense,
       formatAmount,
       formatWhole,
+      formatEntry,
       formatAmountCompact,
       convertToBase,
       shownCurrency,
@@ -909,7 +923,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       deleteTransactions, clearAllTransactions, importTransactions, savePayeeRule, deletePayeeRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatWhole, formatAmountCompact,
-      convertToBase, shownCurrency, shownRate, exchangeRates, retryCloudConnection, refresh, lastLoginTime
+      convertToBase, shownCurrency, shownRate, exchangeRates, retryCloudConnection, refresh, lastLoginTime, formatEntry
   ]);
 
   return (

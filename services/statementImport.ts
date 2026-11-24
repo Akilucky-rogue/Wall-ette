@@ -11,6 +11,7 @@
 // (audit L1–L3).
 
 import { Transaction, TransactionType } from '../types';
+import { addDays, byNewest } from '../utils/dates';
 import { narrationFields } from './narration';
 
 /** A row as the statement parsers return it. */
@@ -97,22 +98,45 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** A day as statements give it: 'YYYY-MM-DD', and a real date. */
+const isStatementDay = (d: unknown): d is string => {
+  if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const [y, m, day] = d.split('-').map(Number);
+  const probe = new Date(y, m - 1, day);
+  return probe.getFullYear() === y && probe.getMonth() === m - 1 && probe.getDate() === day;
+};
+
 /**
- * The valid rows as wallet transactions. A row's id is a SHA-256 hash of its
- * key, so it's the same in every statement that has the row; identical rows
- * in one statement are numbered in order (audit L2).
+ * Whether a parsed row can go into the wallet: a real day, a direction and an
+ * amount above zero. A row without a narration still can (it's kept as
+ * "Unknown", as the Excel reader names it), so no money goes missing.
+ */
+export const importable = (t: StatementRow): boolean =>
+  isStatementDay(t.date) &&
+  (t.type === 'INCOME' || t.type === 'EXPENSE') &&
+  typeof t.amount === 'number' && Number.isFinite(t.amount) && t.amount > 0;
+
+/**
+ * Rows with money on them that can't be imported (no readable day or
+ * direction, or an amount below zero). Import says how many, so a statement
+ * is never short without the person knowing.
+ */
+export const unreadableRows = (rows: readonly StatementRow[]): number =>
+  rows.filter(t => !importable(t) && !(t.amount === 0)).length;
+
+/**
+ * The importable rows as wallet transactions, amounts to the paisa. A row's
+ * id is a SHA-256 hash of its key, so it's the same in every statement that
+ * has the row; identical rows in one statement are numbered in order (audit L2).
  */
 export async function toTransactions(rows: readonly StatementRow[]): Promise<Transaction[]> {
   const valid: Omit<Transaction, 'id'>[] = [];
   for (const t of rows) {
-    if (!t.date || !t.amount || !t.type || !t.merchant) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) continue;
-    if (typeof t.amount !== 'number' || t.amount <= 0) continue;
-    if (t.type !== 'INCOME' && t.type !== 'EXPENSE') continue;
+    if (!importable(t)) continue;
     valid.push({
-      date: t.date,
-      merchant: t.merchant.trim(),
-      amount: Math.abs(t.amount),
+      date: t.date!,
+      merchant: t.merchant?.trim() || 'Unknown',
+      amount: Math.round(t.amount! * 100) / 100,
       type: t.type === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE,
       category: t.category?.trim() || 'Uncategorized',
       note: t.note?.trim() || '',
@@ -231,4 +255,197 @@ export function findDuplicates(
   claim((row, w) => refsAgree(row.ref, w.ref) && w.text === row.text);
   claim((row, w) => refsAgree(row.ref, w.ref) && (!w.hasPayee || looselyMatch(row.loose, w.loose)));
   return found;
+}
+
+// ── Into the wallet ─────────────────────────────────────────────────────────
+
+/** What importing works on: the entries and the balance they start from. */
+export interface WalletLedger {
+  transactions: readonly Transaction[];
+  openingBalance: number;
+  /** The first day of the earliest statement imported, or null. */
+  openingBalanceAsOf: string | null;
+}
+
+export interface MergeResult {
+  /** All entries after the import, newest first. */
+  transactions: Transaction[];
+  /** The rows that went in (not ones the wallet already had). */
+  added: Transaction[];
+  /** Ids taken out (stale balance adjustments). */
+  removed: string[];
+  /** The new opening balance, when this statement is now the earliest. */
+  opening: { balance: number; asOf: string | null } | null;
+}
+
+/**
+ * The wallet after an import, worked out in one step from one list, so
+ * nothing is lost between taking out stale adjustments and adding rows.
+ *   - rows with an id the wallet has (the same row from another statement)
+ *     are left out, as are repeats within the import;
+ *   - the balance anchors to the earliest statement ever imported: its
+ *     opening balance applies when it starts before the current anchor (or,
+ *     for wallets from before anchors, before every entry), so
+ *     balance = opening + every entry, in whatever order statements arrive.
+ */
+export function mergeImport(
+  wallet: WalletLedger,
+  incoming: readonly Transaction[],
+  options: { opening?: number; statementStart?: string; removeIds?: Iterable<string> } = {},
+): MergeResult {
+  const remove = new Set(options.removeIds ?? []);
+  const base = wallet.transactions.filter(t => !remove.has(t.id));
+  const removed = wallet.transactions.filter(t => remove.has(t.id)).map(t => t.id);
+  const ids = new Set(base.map(t => t.id));
+  const added: Transaction[] = [];
+  for (const t of incoming) {
+    if (ids.has(t.id)) continue;
+    ids.add(t.id);
+    added.push(t);
+  }
+
+  let opening: MergeResult['opening'] = null;
+  const { opening: statementOpening, statementStart } = options;
+  if (statementOpening !== undefined && Number.isFinite(statementOpening) && added.length > 0) {
+    let applies = false;
+    if (base.length === 0) applies = true;
+    else if (wallet.openingBalanceAsOf) applies = !!statementStart && statementStart < wallet.openingBalanceAsOf;
+    else if (statementStart) applies = base.every(t => statementStart <= t.date.slice(0, 10));
+    if (applies) opening = { balance: statementOpening, asOf: statementStart ?? null };
+  }
+
+  return {
+    transactions: added.length || removed.length ? [...added, ...base].sort(byNewest) : [...wallet.transactions],
+    added,
+    removed,
+    opening,
+  };
+}
+
+/** Money in minus money out, counted in paise so sums are exact. */
+export const netPaise = (list: readonly Pick<Transaction, 'amount' | 'type'>[]): number =>
+  list.reduce((s, t) => s + (t.type === TransactionType.INCOME ? 1 : -1) * Math.round(t.amount * 100), 0);
+
+/** The wallet's balance: opening plus every entry (all of them, counted or not). */
+export const ledgerBalance = (wallet: WalletLedger): number =>
+  (Math.round(wallet.openingBalance * 100) + netPaise(wallet.transactions)) / 100;
+
+const ADJUST_ID = /^adjust-(\d{4}-\d{2}-\d{2})-(\d{4}-\d{2}-\d{2})-/;
+
+/**
+ * Balance adjustments that stood in for a missing statement period this
+ * statement now covers (any part of it). The adjustment's id names the
+ * period: the last day covered before and the first day covered after.
+ */
+export function staleAdjustments(existing: readonly Transaction[], from: string, to: string): string[] {
+  return existing
+    .filter(t => {
+      if (!t.id.startsWith('adjust-')) return false;
+      const m = ADJUST_ID.exec(t.id);
+      if (m) return from < m[2] && to > m[1];
+      const day = t.date.slice(0, 10); // an adjustment from an older version
+      return day >= from && day <= to;
+    })
+    .map(t => t.id);
+}
+
+/** A run of days with no statement, and the money it moved. */
+export interface CoverageGap {
+  amount: number;
+  /** Last day covered before the gap. */
+  from: string;
+  /** First day covered after it. */
+  to: string;
+  /** The day the adjustment is entered on: the first missing day, so the
+   *  balance on either statement's own last day leaves it out. */
+  at: string;
+  direction: 'after' | 'before';
+}
+
+/** One entry that stands in for a missing statement period. */
+export const bridgeAdjustment = (g: CoverageGap): Transaction => ({
+  id: `adjust-${g.from}-${g.to}-${Math.round(Math.abs(g.amount) * 100)}`,
+  date: g.at,
+  merchant: 'Balance adjustment — missing statement period',
+  amount: Math.round(Math.abs(g.amount) * 100) / 100,
+  type: g.amount >= 0 ? TransactionType.INCOME : TransactionType.EXPENSE,
+  category: 'Adjustment',
+  note: `Bridges un-imported period ${g.from} → ${g.to}. Delete this if you import that statement later.`,
+});
+
+export interface ImportTally {
+  /** The wallet's balance at the statement's last day, after the import. */
+  projected: number;
+  /** The wallet's balance after the import, counting later entries too. */
+  projectedFinal: number;
+  hasNewer: boolean;
+  endDate: string;
+  closing: number;
+  diff: number;
+  /** The same to the paisa. */
+  matched: boolean;
+  isNewest: boolean;
+  gap: CoverageGap | null;
+  /** Adjustments the import takes out, because this statement covers their period. */
+  stale: string[];
+}
+
+/**
+ * The balance check on Import's review: the wallet as the import will leave
+ * it (worked out with mergeImport itself, so the check and the import can't
+ * disagree) against the statement's closing balance, both at the statement's
+ * last day. Also finds a gap between this statement and the wallet's entries,
+ * whichever side it's on, and the adjustment that would bridge it.
+ */
+export function importTally(args: {
+  wallet: WalletLedger;
+  selected: readonly Transaction[];
+  /** All rows in the statement (their first and last day). */
+  minDate: string;
+  maxDate: string;
+  opening?: number;
+  closing?: number;
+  bridge: boolean;
+}): ImportTally | null {
+  const { wallet, selected, minDate, maxDate, opening, closing, bridge } = args;
+  if (closing === undefined || !Number.isFinite(closing)) return null;
+  const days = wallet.transactions.map(t => t.date.slice(0, 10));
+  const latest = days.length ? days.reduce((a, b) => (b > a ? b : a)) : null;
+  const earliest = days.length ? days.reduce((a, b) => (b < a ? b : a)) : null;
+  const balance = ledgerBalance(wallet);
+  const paise = (n: number) => Math.round(n * 100);
+
+  let gap: CoverageGap | null = null;
+  if (opening !== undefined && latest && minDate > latest) {
+    const amount = (paise(opening) - paise(balance)) / 100;
+    if (paise(amount) !== 0) gap = { amount, from: latest, to: minDate, at: addDays(latest, 1), direction: 'after' };
+  } else if (earliest && maxDate < earliest && wallet.openingBalanceAsOf) {
+    const amount = (paise(wallet.openingBalance) - paise(closing)) / 100;
+    if (paise(amount) !== 0) gap = { amount, from: maxDate, to: wallet.openingBalanceAsOf.slice(0, 10), at: addDays(maxDate, 1), direction: 'before' };
+  }
+
+  const stale = staleAdjustments(wallet.transactions, minDate, maxDate);
+  const incoming = bridge && gap ? [bridgeAdjustment(gap), ...selected] : [...selected];
+  const after = mergeImport(wallet, incoming, { opening, statementStart: minDate, removeIds: stale });
+  const afterLedger: WalletLedger = {
+    transactions: after.transactions,
+    openingBalance: after.opening ? after.opening.balance : wallet.openingBalance,
+    openingBalanceAsOf: after.opening ? after.opening.asOf : wallet.openingBalanceAsOf,
+  };
+  const projectedFinal = ledgerBalance(afterLedger);
+  const later = after.transactions.filter(t => t.date.slice(0, 10) > maxDate);
+  const projected = (paise(projectedFinal) - netPaise(later)) / 100;
+  const diff = (paise(projected) - paise(closing)) / 100;
+  return {
+    projected,
+    projectedFinal,
+    hasNewer: later.length > 0,
+    endDate: maxDate,
+    closing,
+    diff,
+    matched: paise(diff) === 0,
+    isNewest: !latest || maxDate >= latest,
+    gap,
+    stale,
+  };
 }

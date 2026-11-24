@@ -120,5 +120,20 @@ export function niceAmount(n: number): number {
  */
 export const toBase = (shownAmount: number, rate: number): number =>
   rate > 0 && Number.isFinite(shownAmount) ? Math.round((shownAmount / rate) * 100) / 100 : 0;
-export const toShown = (baseAmount: number, rate: number): number =>
-  Number.isFinite(baseAmount) ? Math.round(baseAmount * rate * 100) / 100 : 0;
+export const toShown = (baseAmount: number, rate: number, digits = 2): number => {
+  if (!Number.isFinite(baseAmount)) return 0;
+  const f = 10 ** digits;
+  return Math.round(baseAmount * rate * f) / f;
+};
+
+/**
+ * Decimal places for a saved amount shown in an input: the currency's own,
+ * but none finer than one paisa is worth in it. A rupee is under two yen, so
+ * yen (and won, rupiah, dong) read back in whole units instead of
+ * ¥1,500.01.
+ */
+export function inputDigits(code: CurrencyCode, rate: number): number {
+  const own = minorDigits(code);
+  if (!(rate > 1)) return own;
+  return Math.max(0, Math.min(own, Math.floor(2 - Math.log10(rate) + 1e-9)));
+}

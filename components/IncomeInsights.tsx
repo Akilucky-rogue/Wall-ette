@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { getSymbol, toBase, toShown } from '../utils/currencyUtils';
+import { getSymbol, toBase, toShown, inputDigits } from '../utils/currencyUtils';
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
@@ -599,12 +599,12 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         type="number"
                         inputMode="numeric"
                         placeholder={`Set ${getSymbol(shownCurrency)}`}
-                        value={goalInput ?? (savingsGoal > 0 ? String(toShown(savingsGoal, shownRate)) : '')}
+                        value={goalInput ?? (savingsGoal > 0 ? String(toShown(savingsGoal, shownRate, inputDigits(shownCurrency, shownRate))) : '')}
                         onChange={e => setGoalInput(e.target.value)}
                         onBlur={() => {
                           if (goalInput !== null) {
                             // Typed in the currency shown; saved in rupees.
-                            if (goalInput !== String(toShown(savingsGoal, shownRate))) setSavingsGoal(toBase(Math.max(0, parseFloat(goalInput) || 0), shownRate));
+                            if (goalInput !== String(toShown(savingsGoal, shownRate, inputDigits(shownCurrency, shownRate)))) setSavingsGoal(toBase(Math.max(0, parseFloat(goalInput) || 0), shownRate));
                             setGoalInput(null);
                           }
                         }}
@@ -647,6 +647,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         budget={r.budget}
                         formatAmountCompact={formatAmountCompact}
                         shownRate={shownRate}
+                        digits={inputDigits(shownCurrency, shownRate)}
                         symbol={getSymbol(shownCurrency)}
                         onSet={amt => setBudget(r.cat, amt)}
                       />
@@ -669,12 +670,14 @@ interface BudgetRowProps {
   budget: number;
   formatAmountCompact: (n: number) => string;
   shownRate: number;
+  /** Decimals the shown currency can hold (inputDigits). */
+  digits: number;
   symbol: string;
   /** Called with rupees. */
   onSet: (amount: number) => void;
 }
 
-const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountCompact, shownRate, symbol, onSet }) => {
+const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountCompact, shownRate, digits, symbol, onSet }) => {
   const [val, setVal] = useState<string | null>(null);
   const pct = budget > 0 ? spent / budget : 0;
   const over = budget > 0 && spent > budget;
@@ -691,12 +694,12 @@ const BudgetRow: React.FC<BudgetRowProps> = ({ cat, spent, budget, formatAmountC
           type="number"
           inputMode="numeric"
           placeholder={`Cap ${symbol}`}
-          value={val ?? (budget > 0 ? String(toShown(budget, shownRate)) : '')}
+          value={val ?? (budget > 0 ? String(toShown(budget, shownRate, digits)) : '')}
           onChange={e => setVal(e.target.value)}
           onBlur={() => {
             if (val !== null) {
               // Typed in the currency shown; saved in rupees.
-              if (val !== String(toShown(budget, shownRate))) onSet(toBase(Math.max(0, parseFloat(val) || 0), shownRate));
+              if (val !== String(toShown(budget, shownRate, digits))) onSet(toBase(Math.max(0, parseFloat(val) || 0), shownRate));
               setVal(null);
             }
           }}

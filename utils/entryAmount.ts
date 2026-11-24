@@ -1,3 +1,6 @@
+import { Transaction, TransactionType } from '../types';
+import { toBase } from './currencyUtils';
+
 /**
  * New entry's keypad: the amount typed so far, as text, after one more key.
  * Pure, so scripts/check-entry.mjs can press every key.
@@ -30,3 +33,47 @@ export const amountValue = (amount: string): number => {
   const n = parseFloat(amount);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
+
+/** What New entry's form holds when Save is pressed. */
+export interface EntryForm {
+  /** The keypad's text, in the currency shown. */
+  typed: string;
+  /** Rupees to the shown currency (1 for rupees). */
+  rate: number;
+  /** The currency shown ('INR', 'USD', …). */
+  currency: string;
+  type: TransactionType;
+  category: string;
+  merchant: string;
+  note: string;
+  /** The day picked, 'YYYY-MM-DD'. */
+  day: string;
+}
+
+/**
+ * The entry New entry saves, or null when there's no amount: rupees to the
+ * paisa, the day picked, a payee even when none was typed, and when it was
+ * added (which orders entries on the same day).
+ */
+export function entryFromForm(form: EntryForm, id: string, now: Date): Transaction | null {
+  const amount = toBase(amountValue(form.typed), form.rate);
+  if (!(amount > 0)) return null;
+  const payee = form.merchant.trim()
+    || (form.type === TransactionType.EXPENSE ? (form.note.trim() || 'Unknown Merchant') : 'Income Source');
+  const entry: Transaction = {
+    id,
+    amount,
+    type: form.type,
+    category: form.category || 'Uncategorized',
+    date: form.day,
+    createdAt: now.toISOString(),
+    note: form.note,
+    merchant: payee,
+  };
+  // Typed in another currency: keep what was typed, so it reads back exactly.
+  if (form.currency !== 'INR') {
+    entry.typedAmount = amountValue(form.typed);
+    entry.typedCurrency = form.currency;
+  }
+  return entry;
+}

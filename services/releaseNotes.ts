@@ -19,6 +19,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versionCode: 16,
+    version: '1.5.8',
+    items: [
+      'Restore a Full backup in Data Studio: entries and settings come back, and nothing is deleted.',
+      "Payments Wall-ette can't name show as To review, and after each import you can say what they were.",
+      'A payment and its reversal cancel out, and fund redemptions no longer count as income.',
+      'Each import leaves a receipt: rows added and skipped, and how the balance check read.',
+      'Home says what Balance includes and how far your entries reach; new wallets start with a guide.',
+      'Clearer text in the light themes.',
+    ],
+  },
+  {
     versionCode: 15,
     version: '1.5.7',
     // Play allows 500 characters in all (scripts/check-app-updates.mjs).

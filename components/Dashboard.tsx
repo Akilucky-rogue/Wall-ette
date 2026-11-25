@@ -89,6 +89,31 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   // Today's figures belong under the cards only while they show this month.
   const showingThisMonth = periodMode === 'MONTH' && selectedDate.getTime() === currentMonthStart.getTime();
 
+  // "24 Nov", with the year when it isn't this one.
+  const dayText = (d: Date) => d.toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+  });
+  // What the big figure is: the balance the entries add up to (opening
+  // balance included), now, or at the end of an earlier month picked below.
+  const balanceLabel = periodMode === 'ALL' || showingThisMonth
+    ? 'Balance from your entries'
+    : `Balance on ${dayText(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0))}`;
+  // How far the entries reach: the wallet holds what was imported or added,
+  // it isn't a live bank feed.
+  const dataThrough = useMemo(() => {
+    let newest = '';
+    for (const t of transactions) if (t.date > newest) newest = t.date;
+    return newest ? parseDay(newest.slice(0, 10)) : null;
+  }, [transactions]);
+  const status = refreshing ? 'Refreshing…'
+    : isCloudSyncing ? 'Saved to your account'
+    : isOnline ? "Can't reach your account · Retry"
+    : 'Offline · saved on this device';
+  // A wallet with nothing in it yet opens on what to do first.
+  const isNewWallet = transactions.length === 0 && openingBalance === 0;
+  const openRestore = () => { openAt('restore'); onNavigate(AppScreen.EXPORT); };
+  const monthLong = selectedDate.toLocaleString('en-GB', { month: 'long' });
+
   // --- Budgets: this calendar month's spending against each category's budget ---
   const budgetRows = useMemo(() => {
     const month = localDay().slice(0, 7);
@@ -218,6 +243,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     </>
   );
 
+  const startPanel = (
+    <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-labelledby="start-title">
+      <div className="bg-white rounded-[30px] p-6 shadow-raised border border-black/[0.02]">
+        <h1 id="start-title" className="font-serif text-[24px] leading-tight font-semibold text-premium-charcoal">Start your wallet</h1>
+        <p className="text-[13px] text-muted-taupe leading-relaxed mt-2 max-w-[52ch]">
+          Import a bank statement to bring in months of entries at once, or add one by hand. Statements are read on this device and checked against the bank's balance before anything is saved.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2.5 mt-5">
+          <button
+            onClick={() => onNavigate(AppScreen.IMPORT)}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-sage text-white text-[14px] font-semibold shadow-soft active:scale-[0.98] transition-transform"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">upload_file</span>
+            Import a statement
+          </button>
+          <button
+            onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-white border border-sage/30 text-sage text-[14px] font-semibold shadow-soft active:scale-[0.98] transition-transform"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+            Add an entry
+          </button>
+        </div>
+        <button onClick={openRestore} className="mt-4 text-[12px] text-muted-taupe hover:text-sage hover:underline underline-offset-2">
+          Have a Wall-ette backup? Restore it in Data Studio
+        </button>
+      </div>
+    </section>
+  );
+
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-6xl mx-auto overflow-x-hidden pb-24 lg:pb-12 bg-zen-bg">
       {/* Header */}
@@ -237,11 +292,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {/* The wallet: the balance for the period picked, with what came in and
           went out in its two pockets (styles.css .wallet) */}
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:px-8 lg:items-start">
+      {isNewWallet ? startPanel : (
       <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-label="Balance">
         <div className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden">
-          <div className="relative flex items-center justify-between gap-3">
-            <p className="text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>Balance</p>
-            <div className="flex items-center rounded-full bg-black/20 shadow-pressed p-0.5 text-[11px] font-semibold" role="group" aria-label="Period">
+          <p className="relative text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>{balanceLabel}</p>
+
+          <h1 className="relative wallet-emboss font-serif text-[40px] leading-none tabular-nums mt-3 truncate">
+            {formatWhole(balance)}
+          </h1>
+
+          {/* Saved to the account (tap to refresh), and how far the entries reach */}
+          <div className="relative flex flex-wrap items-center gap-x-1.5 mt-3 text-[11px] font-medium" style={{ color: 'var(--wallet-mut)' }}>
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-1.5 -ml-1 px-1 py-1 rounded-full hover:bg-black/10 transition-colors"
+              title="Refresh"
+            >
+              <span
+                aria-hidden="true"
+                className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'motion-safe:animate-pulse' : ''}`}
+                style={{ background: refreshing || isCloudSyncing ? '#BFE3AE' : isOnline ? '#F2B8B5' : 'var(--wallet-mut)' }}
+              />
+              {status}
+            </button>
+            {dataThrough && (
+              <span className="tabular-nums"><span aria-hidden="true" className="mr-1.5">·</span>Data through {dayText(dataThrough)}</span>
+            )}
+          </div>
+
+          {/* The period the two pockets below cover */}
+          <div className="relative flex items-center justify-between gap-2 mt-4 min-h-[30px]">
+            <div className="flex items-center rounded-full bg-black/20 shadow-pressed p-0.5 text-[11px] font-semibold" role="group" aria-label="Income and spending for">
               {(['MONTH', 'ALL'] as const).map(mode => (
                 <button
                   key={mode}
@@ -258,30 +339,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 </button>
               ))}
             </div>
-          </div>
-
-          <h1 className="relative wallet-emboss font-serif text-[40px] leading-none tabular-nums mt-4 truncate">
-            {formatWhole(balance)}
-          </h1>
-
-          <div className="relative flex items-center justify-between gap-2 mt-3 min-h-[28px]">
-            {/* Sync status; tap to refresh */}
-            <button
-              onClick={handleRefresh}
-              className="inline-flex items-center gap-1.5 -ml-1 px-1 py-1 rounded-full text-[11px] font-medium hover:bg-black/10 transition-colors"
-              style={{ color: 'var(--wallet-mut)' }}
-              title="Refresh"
-            >
-              <span
-                aria-hidden="true"
-                className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'motion-safe:animate-pulse' : ''}`}
-                style={{ background: refreshing || isCloudSyncing ? '#BFE3AE' : isOnline ? '#F2B8B5' : 'var(--wallet-mut)' }}
-              />
-              {refreshing ? 'Refreshing…'
-                : isCloudSyncing ? 'Synced'
-                : isOnline ? 'Not syncing · Retry'
-                : 'Offline · saved on this phone'}
-            </button>
             {periodMode === 'MONTH' && (
               <div className="flex items-center text-[12px] font-semibold">
                 <button
@@ -307,7 +364,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             )}
           </div>
 
-          <div className="relative grid grid-cols-2 gap-2.5 mt-4">
+          <div className="relative grid grid-cols-2 gap-2.5 mt-2.5">
             {([
               { label: 'Income', amount: income, sign: '+', icon: 'south_west', today: getDailyIncome(), count: credits, noun: 'credit' },
               { label: 'Spending', amount: expenses, sign: '−', icon: 'north_east', today: getDailyExpense(), count: payments, noun: 'payment' },
@@ -330,6 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </section>
+      )}
       <div className="hidden lg:block lg:col-span-5 lg:pt-3">
         {quickServices}
       </div>
@@ -338,6 +396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {/* Wider screens: cards flow into two columns, three on desktops;
           phones/APK keep the single column (CSS columns are inert below md). */}
       <div className="md:columns-2 md:gap-x-0 lg:columns-3 lg:px-2">
+      {transactions.length === 0 && !isNewWallet && <div className="break-inside-avoid">{startPanel}</div>}
 
       {/* What's left until pay day, once something has come in */}
       <LeftToSpendCard onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
@@ -425,7 +484,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Savings Rate */}
           {income > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">Savings</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">{showingThisMonth ? 'Kept so far' : 'Kept'}</p>
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                 <circle
@@ -436,7 +495,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 />
               </svg>
               <p className="text-premium-charcoal font-serif text-xl font-bold -mt-2">{savingsRate}%</p>
-              <p className="text-[10px] text-muted-taupe">of income saved</p>
+              <p className="text-[10px] text-muted-taupe text-center leading-snug">
+                {showingThisMonth ? "of this month's income" : showAllTime ? 'of all income' : `of ${monthLong}'s income`}
+              </p>
             </div>
           )}
           {/* Top Categories */}
@@ -492,33 +553,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Empty state when no transactions */}
-      {transactions.length === 0 && (
-        <div className="px-6 py-8 flex flex-col items-center gap-4 text-center break-inside-avoid">
-          <div className="w-16 h-16 rounded-full bg-sage-light flex items-center justify-center">
-            <span className="material-symbols-outlined text-sage text-[28px]">account_balance_wallet</span>
-          </div>
-          <div>
-            <p className="text-premium-charcoal font-serif text-lg font-semibold">Start your journey</p>
-            <p className="text-muted-taupe text-sm mt-1">Add a transaction or import a bank statement to begin.</p>
-          </div>
-          <div className="flex gap-3 mt-2">
-            <button
-              onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
-              className="px-5 py-2.5 bg-sage text-white rounded-full text-sm font-semibold shadow-soft active:scale-95 transition-transform"
-            >
-              Add Entry
-            </button>
-            <button
-              onClick={() => onNavigate(AppScreen.IMPORT)}
-              className="px-5 py-2.5 bg-white border border-sage/30 text-sage rounded-full text-sm font-semibold shadow-soft active:scale-95 transition-transform"
-            >
-              Import
-            </button>
           </div>
         </div>
       )}

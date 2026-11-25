@@ -5,7 +5,7 @@ import { localDay, parseDay } from '../utils/dates';
 import { WallEMascot } from './SplashScreen';
 import { pulseView, usePulseView } from './pulseView';
 import { tick } from '../utils/haptics';
-import { openAt } from '../utils/screenSection';
+import { openAt, type ScreenSection } from '../utils/screenSection';
 import { analyzePulse, type Insight, type PulseResult } from '../services/pulseAnalysis';
 import { detectRecurringCharges, priceRises, prettyMerchant } from '../services/analyticsService';
 import UnsortedTransfers from './UnsortedTransfers';
@@ -79,7 +79,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
   const canBack = !!firstKey && selKey > firstKey;
   const canForward = selKey < nowKey;
 
-  const open = (screen: AppScreen, section?: 'goals') => { if (section) openAt(section); onNavigate(screen); };
+  const open = (screen: AppScreen, section?: ScreenSection) => { if (section) openAt(section); onNavigate(screen); };
 
   const monthSwitch = (
     <div className="flex items-center rounded-full bg-white shadow-soft border border-black/[0.03] px-1 py-1 shrink-0">
@@ -230,7 +230,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
 };
 
 /** One finding: its icon in the tone's tint, the line, the detail, and where to look. */
-const InsightRow: React.FC<{ insight: Insight; open: (screen: AppScreen, section?: 'goals') => void }> = ({ insight, open }) => (
+const InsightRow: React.FC<{ insight: Insight; open: (screen: AppScreen, section?: ScreenSection) => void }> = ({ insight, open }) => (
   <li className="flex items-start gap-3 py-3">
     <IconChip icon={insight.icon} tint={TONE[insight.tone].tint} size="sm" />
     <div className="flex-1 min-w-0">
@@ -474,7 +474,7 @@ const Recurring: React.FC = () => {
 
 // ── Insights ──────────────────────────────────────────────────────────────
 
-const Insights: React.FC<{ r: PulseResult; open: (screen: AppScreen, section?: 'goals') => void }> = ({ r, open }) => {
+const Insights: React.FC<{ r: PulseResult; open: (screen: AppScreen, section?: ScreenSection) => void }> = ({ r, open }) => {
   const groups = (['watch', 'good', 'info'] as const)
     .map(tone => ({ tone, items: r.insights.filter(i => i.tone === tone) }))
     .filter(g => g.items.length > 0);

@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { localDay } from '../utils/dates';
 import { exportFile } from '../utils/exportFile';
 import { log } from '../utils/log';
+import { takeSection } from '../utils/screenSection';
 import { buildStatementHtml, PERIOD_LABELS, transactionsCsv, type ReportPeriod } from '../services/statementReport';
 import { buildBackup, MAX_BACKUP_CHARS, planRestore, PROBLEM_TEXT, readBackup, type RestorePlan } from '../services/backup';
 import RestoreBackupSheet from './RestoreBackupSheet';
@@ -185,6 +186,16 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     },
   ];
 
+  // Opened from a new wallet's "Restore it": straight to the restore card.
+  const restoreRef = useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    if (!takeSection('restore')) return;
+    const el = restoreRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.focus({ preventScroll: true });
+  }, []);
+
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
@@ -247,6 +258,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
               {cards.map(card => (
                 <li key={card.id}>
                   <button
+                    ref={card.id === 'restore' ? restoreRef : undefined}
                     onClick={card.action}
                     disabled={busy !== null || (card.needsEntries && summary.entries === 0)}
                     className="w-full text-left px-5 py-4 flex items-center gap-4 transition-colors hover:bg-zen-cream/60 active:bg-zen-cream disabled:opacity-50 disabled:cursor-not-allowed"

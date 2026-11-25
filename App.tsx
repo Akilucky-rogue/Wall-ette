@@ -116,6 +116,18 @@ function AppContent() {
     };
   }, []);
   const openSignIn = () => { window.location.hash = SIGN_IN_HASH; };
+  // Signed in, the address drops "#signin" so it no longer reads as the
+  // sign-in page; signed out on the sign-in screen, it carries it again, so
+  // Back still returns to the product page. replaceState fires no hashchange.
+  useEffect(() => {
+    if (!IS_WEB || loading) return;
+    const hash = window.location.hash;
+    if (user && hash === SIGN_IN_HASH) {
+      window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+    } else if (!user && !showLanding && hash !== SIGN_IN_HASH) {
+      window.history.replaceState(window.history.state, '', SIGN_IN_HASH);
+    }
+  }, [user, loading, showLanding]);
   const openProductPage = () => {
     window.history.pushState(null, '', window.location.pathname + window.location.search);
     setShowLanding(true);

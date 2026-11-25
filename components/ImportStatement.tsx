@@ -450,12 +450,16 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
 
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Upload a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank, as the PDF or Excel file your bank gives you. Other banks' PDFs often work too. Read on your phone, without AI.
+                Choose a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank: the PDF or Excel file your bank gives you. Other banks' PDFs often work too. It's read on this device, without AI, and never uploaded.
                 </p>
                 
-                <div 
+                <div
                     onClick={handleDropAreaClick}
-                    className={`relative w-full aspect-[4/3] rounded-4xl flex flex-col items-center justify-center gap-4 bg-white/30 border-2 border-dashed border-sage/20 hover:border-sage/40 transition-all active:scale-[0.98] cursor-pointer`}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDropAreaClick(); } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Choose a statement file"
+                    className={`relative w-full aspect-[4/3] rounded-4xl flex flex-col items-center justify-center gap-4 bg-white/30 border-2 border-dashed border-sage/20 hover:border-sage/40 transition-all active:scale-[0.98] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage`}
                 >
                     {/* Wall-ette Upload Helper */}
                     <div className="relative">
@@ -468,7 +472,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                       </div>
                     </div>
                     <div className="text-center px-6">
-                        <p className="text-premium-charcoal font-serif text-lg font-semibold">Tap to Upload</p>
+                        <p className="text-premium-charcoal font-serif text-lg font-semibold">Choose statement</p>
                         <p className="text-muted-taupe text-xs mt-1">Excel (.xlsx/.xls) or PDF</p>
                         <p className="text-[10px] text-muted-taupe/60 mt-2 italic">"Let me analyze your finances!"</p>
                     </div>
@@ -478,8 +482,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         className="hidden"
                         type="file"
                         onChange={handleFileSelect}
-                        title="Upload bank statement file"
-                        aria-label="Upload bank statement file"
+                        title="Choose a bank statement file"
+                        aria-label="Choose a bank statement file"
                     />
                 </div>
 

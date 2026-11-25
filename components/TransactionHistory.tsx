@@ -640,18 +640,45 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         )}
         {groupedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-                <WallEMascot
-                  mood="thinking"
-                  message="Nothing here yet..."
-                  size="md"
-                />
-                <p className="mt-4 text-muted-taupe text-sm">No transactions match your filters</p>
-                <button
-                  onClick={clearFilters}
-                  className="mt-3 text-sage text-xs font-semibold hover:underline"
-                >
-                  Clear all filters
-                </button>
+                {transactions.length === 0 ? (
+                  <>
+                    <WallEMascot mood="happy" size="md" />
+                    <p className="mt-4 font-serif text-lg font-semibold text-premium-charcoal">No entries yet</p>
+                    <p className="mt-1 text-muted-taupe text-sm text-center max-w-[280px] leading-relaxed">
+                      Every entry you add or import shows up here, newest first.
+                    </p>
+                    <div className="flex gap-2.5 mt-5">
+                      <button
+                        onClick={() => onNavigate(AppScreen.IMPORT)}
+                        className="px-4 py-2.5 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+                      >
+                        Import a statement
+                      </button>
+                      <button
+                        onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
+                        className="px-4 py-2.5 rounded-full bg-white border border-sage/30 text-sage text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+                      >
+                        Add an entry
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <WallEMascot mood="thinking" size="md" />
+                    <p className="mt-4 text-premium-charcoal text-sm font-semibold">
+                      {searchQuery ? `Nothing matches “${searchQuery}”` : 'No entries match these filters'}
+                    </p>
+                    <p className="mt-1 text-muted-taupe text-[13px]">
+                      {transactions.length.toLocaleString('en-IN')} {transactions.length === 1 ? 'entry is' : 'entries are'} in your wallet.
+                    </p>
+                    <button
+                      onClick={clearFilters}
+                      className="mt-3 text-sage text-xs font-semibold hover:underline"
+                    >
+                      {searchQuery ? 'Clear the search and filters' : 'Clear all filters'}
+                    </button>
+                  </>
+                )}
             </div>
         ) : (
             groupedTransactions.map(group => (

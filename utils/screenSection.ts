@@ -1,9 +1,10 @@
 /**
  * Where to open the next screen, set just before navigating to it: a budget
- * notification or Home's budgets open Flow on Goals. The screen takes it once
+ * notification or Home's budgets open Flow on Goals, and a new wallet's
+ * "Restore it" opens Data Studio on its restore card. The screen takes it once
  * when it appears; anything else ignores it.
  */
-export type ScreenSection = 'goals';
+export type ScreenSection = 'goals' | 'restore';
 
 let pending: ScreenSection | null = null;
 

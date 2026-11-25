@@ -321,7 +321,8 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
   const prevCum = anyIn.has(prevKey) ? prevDaily.map(v => (run += v)) : [];
   const soFar = through > 0 ? (nowCum[through - 1] ?? 0) : 0;
   let projection: Pace['projection'] = null;
-  if (isCurrent && through >= 3) {
+  // A month with no spending in it yet has nothing to run forward: no "₹0" course.
+  if (isCurrent && through >= 3 && thisMonth.length > 0) {
     // Everyday spending runs on at its rate so far; bills and one-offs
     // already paid are counted once; bills still due are added.
     const everydaySoFar = everydayDaily.slice(0, through).reduce((s, v) => s + v, 0);

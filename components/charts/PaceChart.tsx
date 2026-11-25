@@ -24,10 +24,12 @@ const PaceChart: React.FC<{
   const [ref, width] = useWidth<HTMLDivElement>();
   const [day, setDay] = React.useState<number | null>(null);
 
-  // The month before is drawn only when it's a fair comparison (fully covered).
-  const before = compare ? pace.before : [];
+  // The axis is this month's: November ends on the 30th even after a 31-day
+  // October. The month before is drawn only when it's a fair comparison
+  // (fully covered), and only as far as this month runs.
+  const days = pace.daysInMonth;
+  const before = compare ? pace.before.slice(0, days) : [];
   const PLOT = 160, TOP = 22, AXIS = 22, LEFT = 46, RIGHT = 10;
-  const days = Math.max(pace.daysInMonth, before.length);
   const end = pace.through;
   const endValue = end > 0 ? pace.now[end - 1] ?? 0 : 0;
   const projecting = pace.projected !== null && end < pace.daysInMonth;

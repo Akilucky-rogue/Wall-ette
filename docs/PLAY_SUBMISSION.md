@@ -115,7 +115,7 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 >
 > Wall-ette — your mindful money companion.
 
-The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026). The currency line was rewritten on 25 Nov 2026: the old one named only INR, USD, EUR and GBP, but since 1.5.6 any currency can be shown, at live rates. Paste it into Play Console → Grow users → Store presence → Main store listing → Full description, then send the change for review.
+The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026). The currency line was rewritten on 25 Nov 2026: the old one named only INR, USD, EUR and GBP, but since 1.5.6 any currency can be shown, at live rates. The owner put it into the listing on 25 Nov 2026 (Play Console → Grow users → Store presence → Main store listing → Full description).
 
 **Graphics (in `store-assets/`):**
 - [x] App icon 512×512 — `store-assets/icon-512.png`

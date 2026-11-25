@@ -185,12 +185,12 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         ctx.fillText(text, W / 2, y);
       };
 
-      center('W A L L · E T T E   W R A P P E D', 262, '600 15px Verdana, sans-serif', '#8E8D8A');
+      center('W A L L · E T T E   W R A P P E D', 262, '600 15px Verdana, sans-serif', '#72716E');
       center(String(wrapped.year), 340, 'bold 76px Georgia, serif', '#333333');
 
       // stats
       const row = (label: string, value: string, y: number, color = '#333333', big = false) => {
-        ctx.font = '600 13px Verdana, sans-serif'; ctx.fillStyle = '#8E8D8A'; ctx.textAlign = 'center';
+        ctx.font = '600 13px Verdana, sans-serif'; ctx.fillStyle = '#72716E'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
         ctx.font = `bold ${big ? 44 : 32}px Georgia, serif`; ctx.fillStyle = color;
         ctx.fillText(value, W / 2, y + (big ? 50 : 40));
@@ -207,7 +207,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       ctx.beginPath(); ctx.moveTo(80, 690); ctx.lineTo(W - 80, 690); ctx.stroke();
 
       const small = (label: string, value: string, y: number) => {
-        ctx.font = '600 11px Verdana, sans-serif'; ctx.fillStyle = '#8E8D8A'; ctx.textAlign = 'center';
+        ctx.font = '600 11px Verdana, sans-serif'; ctx.fillStyle = '#72716E'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
         ctx.font = 'bold 19px Georgia, serif'; ctx.fillStyle = '#333333';
         const v = value.length > 34 ? value.slice(0, 33) + '…' : value;

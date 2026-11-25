@@ -108,7 +108,7 @@ const CurrencySelector: React.FC<{ variant?: 'pill' | 'field' }> = ({ variant = 
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Search by name, code or symbol"
                   aria-label="Search currencies"
-                  className="flex-1 bg-transparent outline-none text-[14px] text-premium-charcoal placeholder:text-muted-taupe/70"
+                  className="flex-1 bg-transparent outline-none text-[14px] text-premium-charcoal placeholder:text-muted-taupe"
                 />
               </label>
             </div>

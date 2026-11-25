@@ -140,7 +140,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
       <button
         type="button"
         onClick={() => commit(dismiss(state, n.id, Date.now()))}
-        className="absolute top-2.5 right-3 w-8 h-8 rounded-full text-muted-taupe/50 hover:text-muted-taupe hover:bg-zen-cream flex items-center justify-center"
+        className="absolute top-2.5 right-3 w-8 h-8 rounded-full text-muted-taupe hover:text-muted-taupe hover:bg-zen-cream flex items-center justify-center"
         aria-label={`Dismiss: ${n.title}`}
       >
         <span className="material-symbols-outlined text-[16px]" aria-hidden="true">close</span>

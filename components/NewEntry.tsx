@@ -201,8 +201,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           <div className="absolute top-2 right-8"><Diya className="opacity-50" /></div>
           <p className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-2">Amount</p>
           <div className="flex items-center justify-center gap-1">
-            <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/50'}`}>{getSymbol(shownCurrency)}</span>
-            <span className={`font-serif leading-none ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe/40'}`}>{amount}</span>
+            <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{getSymbol(shownCurrency)}</span>
+            <span className={`font-serif leading-none ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{amount}</span>
           </div>
           {/* Quick amounts */}
           <div className="flex justify-center gap-1.5 mt-4 flex-wrap">
@@ -250,7 +250,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   value={merchant}
                   onChange={e => applyMerchant(e.target.value)}
                   placeholder={type === TransactionType.EXPENSE ? 'e.g. Swiggy, Amazon' : 'e.g. Employer, Client'}
-                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none placeholder:text-muted-taupe/50 placeholder:font-sans placeholder:font-normal placeholder:text-sm"
+                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none placeholder:text-muted-taupe placeholder:font-sans placeholder:font-normal placeholder:text-sm"
                 />
               </div>
             </div>
@@ -364,7 +364,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
               <input
-                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif placeholder:text-muted-taupe/40"
+                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif placeholder:text-muted-taupe"
                 placeholder="Add details..."
                 type="text"
                 value={note}

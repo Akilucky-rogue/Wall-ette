@@ -149,7 +149,7 @@ export function reportData({ transactions, isMoved, period, now = new Date(), op
 // The report's colours: the app's light Sage theme and the chart palette
 // (utils/theme.ts), fixed so the page prints the same from any theme.
 const C = {
-  bg: '#FAF9F6', card: '#FFFFFF', ink: '#333333', mut: '#8E8D8A', line: '#EFEDE8', line2: '#E8E5DE',
+  bg: '#FAF9F6', card: '#FFFFFF', ink: '#333333', mut: '#72716E', line: '#EFEDE8', line2: '#E8E5DE',
   sage: '#9BAE93', wallet: '#5D6758', wallet2: '#4B5247',
   in: '#1D7AA3', out: '#C0714A', out1: '#8A4A2C', out3: '#E2A685',
 };

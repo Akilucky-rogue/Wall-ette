@@ -21,7 +21,9 @@ const CUSTOM_KEY = 'walletThemeCustom';
 // ── Neutral bases ──────────────────────────────────────────────────────────
 const LIGHT_BASE: Palette = {
   'bg': '#FAF9F6', 'card': '#FFFFFF', 'card-alt': '#FDFBF7',
-  'ink': '#333333', 'ink-2': '#4A4947', 'mut': '#8E8D8A', 'mut-2': '#B9B7B2',
+  // Secondary text at 4.6:1 or more on the page, cards and pale cards (WCAG
+  // AA); the audits found the earlier #8E8D8A too pale at 3.2:1.
+  'ink': '#333333', 'ink-2': '#4A4947', 'mut': '#72716E', 'mut-2': '#B9B7B2',
   'line': '#EFEDE8', 'line-2': '#E8E5DE',
   'rose': '#D4A5A5', 'rose-2': '#E8A5A5', 'rose-3': '#C98989', 'rose-strong': '#E57373', 'rose-soft': '#F5E6E6',
   'sand': '#D6C6B2', 'sand-soft': '#F4EFE9', 'sand-ink': '#A8844F', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
@@ -72,7 +74,7 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeDef> = {
     name: 'Slate', dark: false,
     vars: {
       'bg': '#F7F8FA', 'card-alt': '#FBFCFD', 'ink': '#24272B', 'ink-2': '#3A3F45',
-      'mut': '#7C838C', 'line': '#ECEEF1', 'line-2': '#E3E6EA',
+      'mut': '#6B7179', 'line': '#ECEEF1', 'line-2': '#E3E6EA',
       'sage': '#647E9C', 'sage-2': '#54708E', 'sage-3': '#7E94AE',
       'sage-deep': '#4E6884', 'sage-soft': '#E4EAF2', 'sage-line': '#CDD9E6',
     },
@@ -81,7 +83,7 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeDef> = {
     name: 'Terra', dark: false,
     vars: {
       'bg': '#FBF6F0', 'card-alt': '#FDF9F4', 'ink': '#3A3230', 'ink-2': '#4E4542',
-      'mut': '#97897F', 'line': '#F0E7DC', 'line-2': '#EADFD2',
+      'mut': '#796E66', 'line': '#F0E7DC', 'line-2': '#EADFD2',
       'sage': '#C0764F', 'sage-2': '#A9633F', 'sage-3': '#D08F6C',
       'sage-deep': '#9C5A38', 'sage-soft': '#F4E2D6', 'sage-line': '#E8CDBC',
       'sand': '#D2A65B', 'sand-soft': '#F6ECD9',
@@ -268,6 +270,12 @@ export function initTheme() {
 }
 
 /** Swatch data for the picker UI. */
+/** A preset theme's full palette, base and accent together (scripts/check-contrast.mjs reads it). */
+export function themePalette(id: Exclude<ThemeId, 'custom'>): Palette {
+  const def = THEMES[id];
+  return { ...(def.dark ? DARK_BASE : LIGHT_BASE), ...def.vars };
+}
+
 export function themeSwatches(): { id: ThemeId; name: string; accent: string; bg: string; ink: string; dark: boolean }[] {
   const entries = (Object.keys(THEMES) as (keyof typeof THEMES)[]).map(id => {
     const def = THEMES[id];

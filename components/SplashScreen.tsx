@@ -487,7 +487,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
       <div className={`mt-6 transition-all duration-700 delay-500 ${
         phase !== 'logo' ? 'opacity-100' : 'opacity-0'
       }`}>
-        <p className="text-xs text-muted-taupe/70 italic font-serif">
+        <p className="text-xs text-muted-taupe italic font-serif">
           {content.tagline}
         </p>
       </div>

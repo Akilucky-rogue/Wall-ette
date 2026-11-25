@@ -82,7 +82,7 @@ const BalanceTrend: React.FC<BalanceTrendProps> = ({ endMonth, className = '' })
         {/* Balance at the top, middle and bottom gridlines */}
         <div className="relative h-24 w-10 shrink-0" aria-hidden="true">
           <span className="absolute right-0 top-[8%] -translate-y-1/2 text-[9px] text-muted-taupe tabular-nums">{formatAmountCompact(max)}</span>
-          <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] text-muted-taupe/70 tabular-nums">{formatAmountCompact(mid)}</span>
+          <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] text-muted-taupe tabular-nums">{formatAmountCompact(mid)}</span>
           <span className="absolute right-0 top-[92%] -translate-y-1/2 text-[9px] text-muted-taupe tabular-nums">{formatAmountCompact(min)}</span>
         </div>
         <div className="relative h-24 flex-1">

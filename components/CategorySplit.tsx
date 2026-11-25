@@ -369,7 +369,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           <div className="flex flex-col items-center py-12 break-inside-avoid">
             <WallEMascot mood="sad" message={view === 'SPEND' ? 'No spending here...' : 'Nothing moved...'} size="md" />
             <p className="text-muted-taupe text-sm mt-4">No {view === 'SPEND' ? 'expenses' : 'transfers'} for this period</p>
-            <p className="text-muted-taupe/70 text-xs mt-1">Try a different time range{data.movedTotal > 0 || data.spendTotal > 0 ? ' or switch the view above' : ''}</p>
+            <p className="text-muted-taupe text-xs mt-1">Try a different time range{data.movedTotal > 0 || data.spendTotal > 0 ? ' or switch the view above' : ''}</p>
           </div>
         )}
       </div>

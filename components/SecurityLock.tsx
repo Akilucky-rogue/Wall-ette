@@ -169,7 +169,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         <p className="text-muted-taupe text-[14px] leading-relaxed max-w-[280px] mx-auto">
           For your security, please verify your identity to continue.
         </p>
-        <p className="text-[10px] text-muted-taupe/50 mt-2 italic">"I'm guarding your finances!"</p>
+        <p className="text-[10px] text-muted-taupe mt-2 italic">"I'm guarding your finances!"</p>
       </div>
 
       <div className="w-full bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02]">
@@ -269,7 +269,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       </div>
       
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe/60 font-medium">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe font-medium">
           Wall-ette Secured
         </p>
       </div>

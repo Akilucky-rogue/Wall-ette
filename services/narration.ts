@@ -11,8 +11,8 @@
  * No imports, so the check scripts can run it in Node.
  */
 
-// HDFC-style narrations: a rail, then fields joined by "-".
-const RAIL_DASH = /^\s*(UPI|IMPS|NEFT|RTGS|ACH|NACH|MMT)\b[^/:]*?-/i;
+// HDFC-style narrations: a rail, then fields joined by "-" ("FT" is HDFC's funds transfer).
+const RAIL_DASH = /^\s*(UPI|IMPS|NEFT|RTGS|ACH|NACH|MMT|FT)\b[^/:]*?-/i;
 // Channels some banks write before the rail.
 const CHANNEL = /^(MB|IB|INB|NB|MOB|NET)$/i;
 
@@ -24,3 +24,11 @@ export function narrationFields(narration: string): string[] {
   while (fields.length > 1 && CHANNEL.test(fields[0].replace(/\s+/g, ''))) fields.shift();
   return fields;
 }
+
+/**
+ * The fields to read a payee from. "A/C" (account) is a word there, not two
+ * fields: HDFC's "FT- … - ACME MUTUAL FUND - COMMON REDEMPTION A/C -".
+ * Bank references are read with narrationFields as it is, so the ids of
+ * entries already imported never change.
+ */
+export const payeeFields = (narration: string): string[] => narrationFields(narration.replace(/\bA\/C\b/gi, 'AC'));

@@ -134,8 +134,19 @@ export interface PulseResult {
   keptPct: number | null;
   prevSpent: number;
   prevCameIn: number;
-  /** Spending against the month before, like for like (null without a fully covered month before). */
+  /**
+   * Spending against the month before, like for like (null without a fully
+   * covered month before, or while payments still to review swamp either
+   * month: see `review`).
+   */
   compare: Compare | null;
+  /**
+   * Set while payments still to review (transfers nobody has said were
+   * spending: services/review.ts) are at least a quarter of this month's or
+   * the month before's spending. An unsorted investment can be most of a
+   * month, so the months aren't compared until it's sorted.
+   */
+  review: { amount: number; prevAmount: number } | null;
   /** The months "usual" averages over, newest first ('YYYY-MM'). */
   baseline: string[];
   /** Spending on each day of this month. */
@@ -153,6 +164,11 @@ export interface PulseResult {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** The category services/review.ts shows a transfer nobody has sorted under. */
+const TO_REVIEW = 'To review';
+/** Payments to review at or above this share of a month's spending (and REVIEW_MIN) stop the comparison. */
+const REVIEW_SHARE = 0.25;
+const REVIEW_MIN = 1000;
 const dayOf = (t: Transaction): string => (isDay(t.date) ? t.date : localDay(parseDay(t.date)));
 const keyOf = (y: number, m: number): string => `${y}-${String(m + 1).padStart(2, '0')}`;
 const monthIndex = (key: string): number => +key.slice(0, 4) * 12 + (+key.slice(5) - 1);
@@ -232,6 +248,7 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
   const nowDaily: number[] = new Array(daysInMonth).fill(0);
   const prevDaily: number[] = new Array(prevDays).fill(0);
   const thisMonth: Transaction[] = [];
+  const reviewBy = new Map<string, number>(); // month → spending still to review
   let first = '', newest = '';
   for (const t of counted) {
     const day = dayOf(t);
@@ -244,6 +261,7 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
       continue;
     }
     outBy.set(mk, (outBy.get(mk) ?? 0) + t.amount);
+    if (t.category === TO_REVIEW) reviewBy.set(mk, (reviewBy.get(mk) ?? 0) + t.amount);
     let cats = catBy.get(mk);
     if (!cats) { cats = new Map(); catBy.set(mk, cats); }
     cats.set(t.category, (cats.get(t.category) ?? 0) + t.amount);
@@ -347,9 +365,19 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
   }
   const projected = projection ? Math.round(projection.soFar + projection.everydayToCome + projection.billsToCome) : null;
 
+  // ── Payments still to review ──
+  const swamped = (k: string): boolean => {
+    const r = reviewBy.get(k) ?? 0;
+    const out = outBy.get(k) ?? 0;
+    return r >= REVIEW_MIN && out > 0 && r / out >= REVIEW_SHARE;
+  };
+  const review = swamped(key) || swamped(prevKey)
+    ? { amount: reviewBy.get(key) ?? 0, prevAmount: reviewBy.get(prevKey) ?? 0 }
+    : null;
+
   // ── Like for like against the month before ──
   let compare: Compare | null = null;
-  if (complete(prevKey) && prevSpent > 0) {
+  if (!review && complete(prevKey) && prevSpent > 0) {
     if (isCurrent) {
       if (through >= 1) {
         const day = Math.min(through, prevDays);
@@ -418,8 +446,20 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
   const info: (Insight & { weight: number })[] = [];
   const asOfText = behind && through > 0 ? ` (entries up to ${through} ${shortMonth(key)})` : '';
 
+  // Payments to review first: until they're sorted, the month isn't compared.
+  if (review) {
+    const here = review.amount >= REVIEW_MIN;
+    watch.push({
+      id: 'review', icon: 'help', tone: 'watch', weight: Number.MAX_SAFE_INTEGER,
+      title: here ? `${money(review.amount)} of ${name}'s spending is still to review` : `${prevName} has ${money(review.prevAmount)} still to review`,
+      detail: `Transfers nobody has said were spending count as spending until they're sorted, so ${name} isn't compared with ${prevName} yet. `
+        + 'Say which were investments, rent, family or your own accounts.',
+      action: { screen: AppScreen.MONEY_MOVED, label: 'Review payments' },
+    });
+  }
+
   // Where the month is heading, or how it compares
-  if (isCurrent && projected !== null && through >= 5 && complete(prevKey) && prevSpent > 0) {
+  if (!review && isCurrent && projected !== null && through >= 5 && complete(prevKey) && prevSpent > 0) {
     const diff = projected - prevSpent;
     const tone: InsightTone = diff > prevSpent * 0.1 ? 'watch' : diff < -prevSpent * 0.1 ? 'good' : 'info';
     const p = projection!;
@@ -569,7 +609,7 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
   return {
     key, label: `${name} ${key.slice(0, 4)}`, name, prevName, isCurrent,
     spent, cameIn, kept, keptPct: cameIn > 0 ? pct(kept, cameIn) : null,
-    prevSpent, prevCameIn, compare, baseline,
+    prevSpent, prevCameIn, compare, review, baseline,
     daily: nowDaily,
     weekdays,
     months,

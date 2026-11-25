@@ -202,7 +202,7 @@ console.log('Settings');
     "openingBalance": -1250.75, "openingBalanceAsOf": "2025-04-01",
     "budgets": {"Dining": 5000, "__proto__": 1, "constructor": 2, "__name__": 3, "Rent": -10, "Fuel": "900", "  Groceries ": 7000, "": 5},
     "savingsGoal": -5, "dailyLimit": 0,
-    "payeeRules": [{"id":"rule-1","match":"ravi kumar","kind":"family"},{"id":"rule-2","match":"x","kind":"stolen"},{"id":"a/b","match":"bank","kind":"mine"},{"id":"rule-3","match":"   ","kind":"mine"}]
+    "payeeRules": [{"id":"rule-1","match":"ravi kumar","kind":"family"},{"id":"rule-2","match":"x","kind":"stolen"},{"id":"a/b","match":"bank","kind":"mine"},{"id":"rule-3","match":"   ","kind":"mine"},{"id":"rule-4","match":"sunrise chs","kind":"counts","category":"Rent"},{"id":"rule-5","match":"acme","kind":"counts","category":"<script>"},{"id":"rule-6","match":"zerodha","kind":"investment","category":"Rent"}]
   }}`;
   const r = B.readBackup(raw);
   ok('reads', r.ok);
@@ -211,7 +211,12 @@ console.log('Settings');
   eq('only real budgets, by trimmed name', s.budgets, { Dining: 5000, Groceries: 7000 });
   ok('no budget can reach the prototype', Object.getPrototypeOf(s.budgets) === Object.prototype && !('polluted' in {}));
   eq('a negative goal and a zero limit are nothing to restore', [s.savingsGoal, s.dailyLimit], [undefined, undefined]);
-  eq('only valid Money moved rules', s.payeeRules, [{ id: 'rule-1', match: 'ravi kumar', kind: 'family' }]);
+  eq('only valid Money moved rules; a category only on a rule that counts, and only a plain name', s.payeeRules, [
+    { id: 'rule-1', match: 'ravi kumar', kind: 'family' },
+    { id: 'rule-4', match: 'sunrise chs', kind: 'counts', category: 'Rent' },
+    { id: 'rule-5', match: 'acme', kind: 'counts' },
+    { id: 'rule-6', match: 'zerodha', kind: 'investment' },
+  ]);
 }
 
 // ── Size ─────────────────────────────────────────────────────────────────────

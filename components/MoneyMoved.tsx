@@ -3,6 +3,7 @@ import { AppScreen, PayeeKind, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { flowClassifier, matchText, MIN_MATCH, suggestPayees } from '../services/spend';
 import { parseDay } from '../utils/dates';
+import ReviewPayees from './ReviewPayees';
 
 interface MoneyMovedProps {
   onNavigate: (screen: AppScreen) => void;
@@ -31,8 +32,8 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
   const [newMatch, setNewMatch] = useState('');
   const [newKind, setNewKind] = useState<PayeeKind>('family');
 
-  // Payees still counted as spending or income that look like transfers
-  const suggestions = useMemo(() => suggestPayees(transactions, flowOf), [transactions, flowOf]);
+  // Payees only money comes in from, still counted as income (money out is reviewed above them)
+  const incoming = useMemo(() => suggestPayees(transactions, flowOf).filter(s => s.out === 0), [transactions, flowOf]);
 
   // What each rule covers, and the total left out of spending and income
   const { perRule, movedOut, movedIn } = useMemo(() => {
@@ -75,7 +76,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
     setNewMatch('');
   };
 
-  const shown = showAll ? suggestions : suggestions.slice(0, SHOW_FIRST);
+  const shownIncoming = showAll ? incoming : incoming.slice(0, SHOW_FIRST);
   const dayLabel = (day: string) =>
     parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -108,22 +109,28 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* To sort: transfers to and from payees no rule covers yet */}
-      {suggestions.length > 0 && (
-        <section className="px-6 pb-2">
-          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To sort</h3>
+      {/* To review: payments to payees no rule covers yet (services/review.ts) */}
+      <section className="px-6 pb-2">
+        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To review</h3>
+        <p className="text-muted-taupe text-[12px] mb-3 pl-1">
+          These payments count as spending until you say what they were.
+        </p>
+        <ReviewPayees />
+      </section>
+
+      {/* Money in from payees no rule covers yet, with nothing going out to them */}
+      {incoming.length > 0 && (
+        <section className="px-6 pt-4 pb-2">
+          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">Money in to sort</h3>
           <p className="text-muted-taupe text-[12px] mb-3 pl-1">
-            These transfers count as spending or income until you sort them.
+            These transfers count as income until you sort them.
           </p>
           <div className="space-y-3">
-            {shown.map(s => (
+            {shownIncoming.map(s => (
               <div key={s.match} className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft">
                 <p className="text-premium-charcoal font-serif font-semibold text-[15px] truncate" title={s.name}>{s.name}</p>
                 <p className="text-muted-taupe text-[11px] mt-0.5">
-                  {s.out > 0 && <>{formatAmountCompact(s.out)} out</>}
-                  {s.out > 0 && s.in > 0 && ' · '}
-                  {s.in > 0 && <>{formatAmountCompact(s.in)} in</>}
-                  {' · '}{s.count} {s.count === 1 ? 'payment' : 'payments'} · last {dayLabel(s.last)}
+                  {formatAmountCompact(s.in)} in · {s.count} {s.count === 1 ? 'payment' : 'payments'} · last {dayLabel(s.last)}
                 </p>
                 <div className="grid grid-cols-4 gap-2 mt-3">
                   {SORT_KINDS.map(kind => (
@@ -138,20 +145,20 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                   <button
                     onClick={() => savePayeeRule(s.name, 'counts')}
                     className="bg-gray-50 text-premium-charcoal border border-premium-charcoal/[0.08] py-2 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
-                    title={s.out >= s.in ? 'Keep counting these as spending' : 'Keep counting these as income'}
+                    title="Keep counting these as income"
                   >
-                    {s.out >= s.in ? 'Spending' : 'Income'}
+                    Income
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          {suggestions.length > SHOW_FIRST && (
+          {incoming.length > SHOW_FIRST && (
             <button
               onClick={() => setShowAll(v => !v)}
               className="w-full mt-3 text-[11px] font-semibold text-sage uppercase tracking-wider py-2"
             >
-              {showAll ? 'Show fewer' : `Show ${suggestions.length - SHOW_FIRST} more`}
+              {showAll ? 'Show fewer' : `Show ${incoming.length - SHOW_FIRST} more`}
             </button>
           )}
         </section>
@@ -177,12 +184,13 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                   <div className="min-w-0 flex-1">
                     <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate" title={rule.match}>{rule.match}</p>
                     <p className="text-muted-taupe text-[10px]">
+                      {rule.kind === 'counts' && rule.category && <>Shown as {rule.category} · </>}
                       {stats ? `${stats.count} ${stats.count === 1 ? 'payment' : 'payments'} · ${formatAmountCompact(stats.total)}` : 'No payments match yet'}
                     </p>
                   </div>
                   <select
                     value={rule.kind}
-                    onChange={e => savePayeeRule(rule.match, e.target.value as PayeeKind)}
+                    onChange={e => savePayeeRule(rule.match, e.target.value as PayeeKind, e.target.value === 'counts' ? rule.category : undefined)}
                     className="text-[11px] font-semibold text-premium-charcoal bg-gray-50 border border-premium-charcoal/[0.08] rounded-lg px-2 py-1.5"
                     aria-label={`How payments matching ${rule.match} count`}
                   >

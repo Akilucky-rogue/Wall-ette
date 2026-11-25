@@ -189,7 +189,11 @@ function readSettings(raw: unknown, version: number, legacyOpening: unknown): Ba
     for (const r of raw.payeeRules) {
       if (!isObject(r) || !isEntryId(r.id) || typeof r.match !== 'string' || !PAYEE_KINDS.has(r.kind as PayeeKind)) continue;
       const match = r.match.trim().slice(0, 100);
-      if (match) rules.push({ id: r.id, match, kind: r.kind as PayeeKind });
+      if (!match) continue;
+      // A rule that counts may carry the category its payments show under.
+      const category = r.kind === 'counts' && typeof r.category === 'string' && /^[A-Za-z][A-Za-z &]{0,39}$/.test(r.category)
+        ? r.category : undefined;
+      rules.push(category ? { id: r.id, match, kind: 'counts', category } : { id: r.id, match, kind: r.kind as PayeeKind });
     }
     if (rules.length > 0) s.payeeRules = rules;
   }

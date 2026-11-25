@@ -247,5 +247,27 @@ for (let run = 0; run < 300; run++) {
   }
 }
 
+// ── 4. Payments still to review stop the month comparison (1.5.8) ─────────
+// The worked example's wallet, plus an unsorted ₹1,50,000 fund transfer on
+// 10 Nov (shown as "To review", as WalletContext shows it): November is
+// mostly money that wasn't spent, so the months aren't compared.
+{
+  const swamp = [...list, out('2026-11-10', 150000, 'To review', 'NEFT/N3120001/BLUECHIP MUTUAL FUND/HDFC0000123')];
+  const rv = P.analyzePulse({ counted: swamp, month: NOW, now: NOW, money, budgets: { Dining: 5000 } });
+  eq('review: set while a quarter or more of the month is to review', rv.review, { amount: 150000, prevAmount: 0 });
+  eq('… no comparison with October', rv.compare, null);
+  eq('… no "on course … more than October" finding', rv.insights.some(i => i.id === 'pace' || i.id === 'change'), false);
+  eq('… the review finding comes first, to Money moved', [rv.insights[0].id, rv.insights[0].action.screen, rv.insights[0].action.label], ['review', 'MONEY_MOVED', 'Review payments']);
+  eq('… its title', rv.insights[0].title, "₹1,50,000 of November's spending is still to review");
+  eq('… spending still counts it', Math.round(rv.spent - r.spent), 150000);
+  const small = [...list, out('2026-11-10', 999, 'To review', 'UPI/DR/612300000009/KAVYA TRADERS/UTIB/kavya@axis/UPI')];
+  const rs = P.analyzePulse({ counted: small, month: NOW, now: NOW, money, budgets: { Dining: 5000 } });
+  eq('a small payment to review changes nothing', [rs.review, rs.compare !== null], [null, r.compare !== null]);
+  const dec = P.analyzePulse({ counted: swamp, month: new Date(2026, 11, 1), now: new Date(2026, 11, 20, 12), money });
+  eq('the month after: the month before is swamped, so no comparison either', [dec.review?.prevAmount, dec.compare], [150000, null]);
+  const empty2 = P.analyzePulse({ counted: [], month: NOW, now: NOW, money });
+  eq('an empty month: no review, no "On course for ₹0"', [empty2.review, empty2.pace.projected], [null, null]);
+}
+
 console.log(`${checks - failures}/${checks} pulse checks passed`);
 if (failures) process.exit(1);

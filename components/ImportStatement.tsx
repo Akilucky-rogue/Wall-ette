@@ -8,6 +8,9 @@ import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
 import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
+import ReviewPayees from './ReviewPayees';
+import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
+import { receiptLines, type ImportReceipt } from '../services/importReceipt';
 import styles from './ImportStatement.module.css';
 
 // Pagination settings
@@ -19,6 +22,44 @@ const showDay = (day: string) => parseDay(day).toLocaleDateString('en-GB', { day
 interface ImportStatementProps {
     onNavigate: (screen: AppScreen) => void;
 }
+
+/**
+ * What an import did (services/importReceipt.ts): the statement's period,
+ * the rows read and what became of them, and how the balance check read.
+ */
+const ReceiptCard: React.FC<{ receipt: ImportReceipt; money: (n: number) => string; heading?: string; showWhen?: boolean }> = ({ receipt: r, money, heading, showWhen }) => {
+  const check = r.check === 'ok'
+    ? { icon: 'check_circle', cls: 'text-sage', text: `Matches the bank's closing balance${r.closing !== undefined ? ` of ${money(r.closing)}` : ''} on ${showDay(r.to)}.` }
+    : r.check === 'note'
+      ? { icon: 'info', cls: 'text-ocean', text: "The statement adds up row for row. Your wallet also holds other accounts or entries, so its balance can't equal this closing balance." }
+      : r.check === 'off'
+        ? { icon: 'error', cls: 'text-rose', text: `Off by ${money(Math.abs(r.difference ?? 0))} against the bank's closing balance on ${showDay(r.to)}.` }
+        : { icon: 'help', cls: 'text-muted-taupe', text: "This statement doesn't print a closing balance, so there was nothing to check it against." };
+  const when = new Date(r.at);
+  return (
+    <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
+      {heading && <p className="font-serif text-[20px] font-semibold text-premium-charcoal mb-0.5">{heading}</p>}
+      <p className="text-[12px] text-muted-taupe">
+        {r.bank ?? 'Statement'} {r.format} · {showDay(r.from)} to {showDay(r.to)}
+      </p>
+      <ul className="mt-3 space-y-1 text-[13px] text-premium-charcoal leading-snug">
+        {receiptLines(r).map(line => <li key={line}>{line}</li>)}
+      </ul>
+      <p className="mt-3 flex items-start gap-2 text-[12px] text-premium-charcoal leading-snug">
+        <span className={`material-symbols-outlined text-[18px] shrink-0 ${check.cls}`} aria-hidden="true">{check.icon}</span>
+        <span>{check.text}</span>
+      </p>
+      {r.toReview !== undefined && (
+        <p className="mt-2 text-[12px] text-muted-taupe">{money(r.toReview)} of payments left to review.</p>
+      )}
+      {showWhen && (
+        <p className="mt-2 text-[11px] text-muted-taupe">
+          Imported {when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      )}
+    </div>
+  );
+};
 
 interface EditingTransaction {
     id: string;
@@ -32,11 +73,21 @@ interface EditingTransaction {
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
       importTransactions, transactions: existingTransactions,
-      getBalance, openingBalance, openingBalanceAsOf, formatAmount
+      getBalance, openingBalance, openingBalanceAsOf, formatAmount,
+      flowOf, importReceipts, saveImportReceipt,
   } = useWallet();
 
-  // Stages: IDLE (Upload), PROCESSING (AI Loading), REVIEW (Selection)
-  const [stage, setStage] = useState<'IDLE' | 'PROCESSING' | 'REVIEW'>('IDLE');
+  // Stages: IDLE (choose a file), PROCESSING (reading it), REVIEW (the rows),
+  // DONE (the receipt, and the payments to review)
+  const [stage, setStage] = useState<'IDLE' | 'PROCESSING' | 'REVIEW' | 'DONE'>('IDLE');
+  // The bank the reader recognised and the file's format, for the receipt.
+  const [source, setSource] = useState<{ bank: string | null; format: 'PDF' | 'Excel' }>({ bank: null, format: 'PDF' });
+  const [receipt, setReceipt] = useState<ImportReceipt | null>(null);
+  const [importedIds, setImportedIds] = useState<ReadonlySet<string>>(new Set());
+  const toReviewAfter = useMemo(
+    () => (stage === 'DONE' ? reviewPayees(existingTransactions, flowOf, importedIds) : []),
+    [stage, existingTransactions, flowOf, importedIds],
+  );
   const [loadingMessage, setLoadingMessage] = useState('Initializing...');
   
   const [extractedData, setExtractedData] = useState<Transaction[]>([]);
@@ -258,6 +309,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             : `Found ${result.transactions.length} transactions`);
 
         const bank = result.header.bankName;
+        setSource({ bank: bank && bank !== 'Generic (auto-detected)' ? bank : null, format: 'PDF' });
         await stageForReview(result.transactions,
             bank === 'Generic (auto-detected)'
                 ? 'Generic PDF parser (verify amounts)'
@@ -299,6 +351,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             result.summary.openingKnown ? result.summary.openingBalance : undefined,
             result.summary.closingKnown ? result.summary.closingBalance : undefined
         );
+        setSource({ bank: result.bank || null, format: 'Excel' });
         await stageForReview(fromExcel(result.transactions),
             `${result.bank} Excel${result.validation.isValid ? ' · totals match the bank' : ' (verify amounts)'}`);
     } catch (err: any) {
@@ -393,11 +446,40 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions, replacing ${stale.length} adjustment(s)`);
       // Opening balance + statement start let the context anchor the balance
       // to the earliest statement, so multi-statement imports always tally.
-      importTransactions(toImport, parsedOpeningBalance, reviewSummary.minDate, stale);
-      onNavigate(AppScreen.DASHBOARD);
+      const result = importTransactions(toImport, parsedOpeningBalance, reviewSummary.minDate, stale);
+
+      // The receipt: what this import did, kept with the account's settings.
+      const toReview = toImport
+        .filter(t => t.type === TransactionType.EXPENSE && shownCategory(t, flowOf(t)) === TO_REVIEW)
+        .reduce((sum, t) => sum + t.amount, 0);
+      const done: ImportReceipt = {
+          id: `receipt-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`,
+          at: new Date().toISOString(),
+          bank: source.bank,
+          format: source.format,
+          from: reviewSummary.minDate.slice(0, 10),
+          to: reviewSummary.maxDate.slice(0, 10),
+          rows: extractedData.length,
+          added: result.added,
+          duplicates: extractedData.filter(t => duplicateIds.has(t.id) && !selectedIds.has(t.id)).length,
+          leftOut: extractedData.filter(t => !duplicateIds.has(t.id) && !selectedIds.has(t.id)).length,
+          unreadable,
+          replaced: result.removed,
+          bridged: !!(bridgeGap && tally?.gap),
+          check: tally ? tallyToneOf(tally, bridgeGap) : null,
+          ...(tally ? { closing: tally.closing, difference: tally.diff } : {}),
+          ...(toReview > 0 ? { toReview: Math.round(toReview * 100) / 100 } : {}),
+      };
+      saveImportReceipt(done);
+      setReceipt(done);
+      setImportedIds(new Set(toImport.map(t => t.id)));
+      setStage('DONE');
+      window.scrollTo(0, 0);
   }
 
   const handleDiscard = () => {
+      setReceipt(null);
+      setImportedIds(new Set());
       setUnreadable(0);
       setExtractedData([]);
       setSelectedIds(new Set());
@@ -474,7 +556,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <div className="text-center px-6">
                         <p className="text-premium-charcoal font-serif text-lg font-semibold">Choose statement</p>
                         <p className="text-muted-taupe text-xs mt-1">Excel (.xlsx/.xls) or PDF</p>
-                        <p className="text-[10px] text-muted-taupe/60 mt-2 italic">"Let me analyze your finances!"</p>
+                        <p className="text-[10px] text-muted-taupe mt-2 italic">"Let me analyze your finances!"</p>
                     </div>
                     <input
                         ref={fileInputRef}
@@ -526,7 +608,49 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         <p className="text-rose text-xs font-medium">{error}</p>
                     </div>
                 )}
+
+                {/* What earlier imports did */}
+                {importReceipts.length > 0 && (
+                    <section className="mt-8" aria-labelledby="recent-imports">
+                        <h3 id="recent-imports" className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-3 pl-1">Recent imports</h3>
+                        <div className="space-y-3">
+                            {importReceipts.slice(0, 3).map(r => <ReceiptCard key={r.id} receipt={r} money={formatAmount} showWhen />)}
+                        </div>
+                    </section>
+                )}
             </>
+        )}
+
+        {stage === 'DONE' && receipt && (
+            <div className="space-y-6 animate-slide-up">
+                <ReceiptCard receipt={receipt} money={formatAmount} heading={receipt.added > 0 ? 'Imported' : 'Nothing new to add'} />
+
+                {/* The payments this statement leaves to review */}
+                {toReviewAfter.length > 0 && (
+                    <section aria-labelledby="review-title">
+                        <h3 id="review-title" className="font-serif text-[20px] font-semibold text-premium-charcoal px-1">What were these payments?</h3>
+                        <p className="text-muted-taupe text-[13px] leading-relaxed mt-1 mb-4 px-1">
+                            {toReviewAfter.length === 1 ? 'One payee' : `${toReviewAfter.length} payees`} in this statement {toReviewAfter.length === 1 ? 'is a transfer' : 'are transfers'} Wall-ette can't name. They count as spending until you say what they were; your answer covers every payment to that payee, now and in later statements.
+                        </p>
+                        <ReviewPayees onlyIds={importedIds} first={5} />
+                    </section>
+                )}
+
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => onNavigate(AppScreen.DASHBOARD)}
+                        className="flex-1 bg-sage text-white font-semibold py-3.5 rounded-full shadow-soft active:scale-[0.99] transition-transform"
+                    >
+                        Done
+                    </button>
+                    <button
+                        onClick={handleDiscard}
+                        className="flex-1 bg-white text-sage border border-sage/30 font-semibold py-3.5 rounded-full shadow-soft active:scale-[0.99] transition-transform"
+                    >
+                        Import another
+                    </button>
+                </div>
+            </div>
         )}
 
         {stage === 'PROCESSING' && (
@@ -548,7 +672,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
                 <h3 className="text-xl font-serif font-semibold text-premium-charcoal mb-2">{loadingMessage}</h3>
                 <p className="text-muted-taupe text-xs animate-pulse">Wall-ette is analyzing your document</p>
-                <p className="text-[10px] text-muted-taupe/50 mt-3 italic">"Processing... beep boop!"</p>
+                <p className="text-[10px] text-muted-taupe mt-3 italic">"Processing... beep boop!"</p>
             </div>
         )}
 

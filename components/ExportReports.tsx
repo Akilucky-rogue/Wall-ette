@@ -21,7 +21,7 @@ type Period = ReportPeriod;
 
 const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   const {
-    transactions, flowOf, openingBalance, openingBalanceAsOf, formatWhole, formatAmountCompact, shownCurrency,
+    transactions, storedTransactions, flowOf, openingBalance, openingBalanceAsOf, formatWhole, formatAmountCompact, shownCurrency,
     budgets, savingsGoal, dailyLimit, payeeRules, importTransactions, restoreSettings,
   } = useWallet();
   const [period, setPeriod] = useState<Period>('MONTH');
@@ -93,7 +93,8 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
     if (busy) return;
     setBusy('backup');
     try {
-      const backup = buildBackup({ transactions, openingBalance, openingBalanceAsOf, budgets, savingsGoal, dailyLimit, payeeRules });
+      // The entries as saved, not as shown ("To review" is a label, not data).
+      const backup = buildBackup({ transactions: storedTransactions, openingBalance, openingBalanceAsOf, budgets, savingsGoal, dailyLimit, payeeRules });
       const outcome = await exportFile(`wall-ette-backup-${stamp}.json`, 'application/json;charset=utf-8;', JSON.stringify(backup, null, 2));
       showToast(outcome === 'shared' ? 'Share sheet opened — pick where to save' : 'Backup downloaded');
     } catch (e) {

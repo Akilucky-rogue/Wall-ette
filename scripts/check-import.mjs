@@ -19,9 +19,11 @@
  *     (opening + rows = closing, each row in once) passes
  *   - importing it again adds nothing, and the review flags every row
  * and, for each account with more than one statement, that importing them
- * in date order, in reverse and in random orders always ends at the latest
- * statement's closing balance, with each row once, and the check never reads
- * "off" on the way; and that leaving one out, bridging the gap with an
+ * in every order (all of them for up to five statements, else date order,
+ * reverse and random orders) always ends at the latest statement's closing
+ * balance, with each row once and the very same entries whatever the order,
+ * and the check never reads "off" on the way; and that leaving one out,
+ * bridging the gap with an
  * adjustment, then importing it, ends with the same balance and no adjustment.
  *
  * Then made-up cases real statements may not have: gaps on either side,
@@ -254,7 +256,12 @@ for (const [, list] of byAccount) {
   const latest = chrono.reduce((a, b) => (b.maxDate > a.maxDate ? b : a));
   const distinct = new Set(list.flatMap(s => s.staged.map(t => t.id))).size;
   const rand = rng(20261124 + accountNo);
-  const orders = [['date order', chrono], ['reverse', [...chrono].reverse()], ...Array.from({ length: 6 }, (_, i) => [`random ${i + 1}`, shuffled(chrono, rand)])];
+  // Every order for up to five statements (120 of them); beyond that, a sample.
+  const permutations = a => (a.length <= 1 ? [a] : a.flatMap((x, i) => permutations([...a.slice(0, i), ...a.slice(i + 1)]).map(p => [x, ...p])));
+  const orders = list.length <= 5
+    ? permutations(chrono).map((o, i) => [i === 0 ? 'date order' : `order ${i + 1}`, o])
+    : [['date order', chrono], ['reverse', [...chrono].reverse()], ...Array.from({ length: 6 }, (_, i) => [`random ${i + 1}`, shuffled(chrono, rand)])];
+  let firstIds = null;
   for (const [label, order] of orders) {
     let w = EMPTY;
     for (const s of order) {
@@ -265,6 +272,9 @@ for (const [, list] of byAccount) {
     }
     ok(paise(I.ledgerBalance(w)) === paise(latest.closing), problems, `${label}: balance misses the latest closing by ${paise(I.ledgerBalance(w)) - paise(latest.closing)} paise`);
     ok(w.transactions.length === distinct, problems, `${label}: ${w.transactions.length} entries for ${distinct} distinct rows`);
+    const ids = w.transactions.map(t => t.id).sort().join(',');
+    firstIds ??= ids;
+    ok(ids === firstIds, problems, `${label}: different entries than in date order`);
   }
   // Leave out a statement no other one overlaps, bridge the gap, then import it.
   const lone = chrono.filter((m, i) => i > 0 && i < chrono.length - 1 && chrono.every(o => o === m || o.maxDate < m.minDate || o.minDate > m.maxDate));

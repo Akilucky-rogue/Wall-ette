@@ -47,6 +47,12 @@ export interface PayeeRule {
   /** Words to look for in the payee, e.g. "ravi kumar". Matched as whole words. */
   match: string;
   kind: PayeeKind;
+  /**
+   * For a payee that counts: the category its payments show under instead of
+   * the importer's "Transfer Out" (a landlord's as Rent, say). Set by the
+   * review after an import; payments with a category of their own keep it.
+   */
+  category?: string;
 }
 
 export interface UserProfile {
@@ -91,12 +97,12 @@ export const CATEGORIES = [
   'Healthcare', 'Pharmacy', 'Doctor & Hospital', 'Insurance',
   'Education', 'Books', 'Courses',
   'Bills', 'Rent', 'Loan & EMI', 'Credit Card',
-  'Subscriptions', 'Gym', 'Charity',
+  'Subscriptions', 'Software', 'Gym', 'Charity',
   'Travel', 'Hotel', 'Vacation',
   'Personal Care', 'Beauty',
   'Pets', 'Gifts',
   'Salary', 'Freelance', 'Bonus', 'Interest Income', 'Dividend',
-  'Investment Returns', 'Rental Income', 'Refunds',
+  'Investment Returns', 'Redemption proceeds', 'Rental Income', 'Refunds',
   'Investment', 'Transfer Out', 'Transfer In', 'Cash Withdrawal', 'Adjustment',
   'Other', 'Uncategorized',
 ] as const;

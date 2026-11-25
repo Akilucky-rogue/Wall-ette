@@ -155,7 +155,9 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         </div>
         <DenimFigure className="mt-4">{formatWhole(r.spent)}</DenimFigure>
         <p className="text-[12px] font-medium text-denim-mut mt-3 min-h-[18px]">
-          {empty ? `No entries for ${r.name}` : compareLine ?? (r.isCurrent ? `Day ${p.through} of ${p.daysInMonth}` : `${p.daysInMonth} days`)}
+          {empty ? `No entries for ${r.name}`
+            : r.review ? (r.review.amount >= 1000 ? `${formatWhole(r.review.amount)} of this is still to review` : `${r.prevName} has ${formatWhole(r.review.prevAmount)} still to review`)
+            : compareLine ?? (r.isCurrent ? `Day ${p.through} of ${p.daysInMonth}` : `${p.daysInMonth} days`)}
         </p>
         <div className="grid grid-cols-2 gap-2.5 mt-4">
           <Pocket

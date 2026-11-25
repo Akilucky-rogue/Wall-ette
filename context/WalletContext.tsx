@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
-import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, canonicalCategory } from '../types';
+import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, CATEGORIES, canonicalCategory } from '../types';
 import { auth, db } from '../services/firebase';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -9,6 +9,9 @@ import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spen
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
 import { mergeImport } from '../services/statementImport';
+import { reversalPairs } from '../services/reversals';
+import { categoryToStore, shownCategory, withShownCategories } from '../services/review';
+import { asImportReceipts, withReceipt, type ImportReceipt } from '../services/importReceipt';
 import type { BackupSettings } from '../services/backup';
 
 // Firestore refuses fields set to undefined; leave them out.
@@ -45,11 +48,18 @@ const asLoaded = (list: Transaction[]): Transaction[] =>
 const PAYEE_KINDS = new Set<PayeeKind>(['mine', 'family', 'investment', 'ignore', 'counts', 'salary']);
 
 // Payee rules as saved (Firestore or this device); anything malformed is dropped.
+// A rule's category, kept only on a rule that counts and only when it's a list name.
+const RULE_CATEGORIES = new Set<string>(CATEGORIES);
 const asPayeeRules = (raw: unknown): PayeeRule[] =>
   Array.isArray(raw)
-    ? raw.filter((r): r is PayeeRule =>
-        !!r && typeof r.id === 'string' && typeof r.match === 'string' &&
-        matchText(r.match).length >= MIN_MATCH && PAYEE_KINDS.has(r.kind))
+    ? raw
+        .filter((r): r is PayeeRule =>
+          !!r && typeof r.id === 'string' && typeof r.match === 'string' &&
+          matchText(r.match).length >= MIN_MATCH && PAYEE_KINDS.has(r.kind))
+        .map(r => {
+          const { category, ...rule } = r;
+          return r.kind === 'counts' && typeof category === 'string' && RULE_CATEGORIES.has(category) ? { ...rule, category } : rule;
+        })
     : [];
 
 // A budget saved under a list name wins; budgets kept only under old names
@@ -77,6 +87,15 @@ interface WalletContextType {
   flowOf: (t: Transaction) => FlowInfo;
   /** The transactions that count as spending or income; money moved is left out. */
   counted: Transaction[];
+  /**
+   * The entries as saved. `transactions` shows each under the category it
+   * reads as (services/review.ts: "To review", a payee's category); backups
+   * and anything written back use these.
+   */
+  storedTransactions: Transaction[];
+  /** What each statement import did, newest first (services/importReceipt.ts). */
+  importReceipts: ImportReceipt[];
+  saveImportReceipt: (receipt: ImportReceipt) => void;
   dailyLimit: number;
   mfaEnabled: boolean;
   /** Per-category monthly budgets (INR base). */
@@ -106,15 +125,18 @@ interface WalletContextType {
    * stale balance adjustments named in `removeIds`, and moves the opening
    * balance when this is now the earliest statement. One step, one list.
    */
-  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string, removeIds?: string[]) => void;
+  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string, removeIds?: string[]) => { added: number; removed: number };
   /**
    * Data Studio → Restore: puts back a backup's settings. The opening balance,
    * and each budget, goal and limit the file holds, replace the ones here;
    * Money moved rules are added unless one with the same match is here.
    */
   restoreSettings: (settings: BackupSettings) => void;
-  /** Adds a rule, or changes the kind of the rule with the same match. */
-  savePayeeRule: (match: string, kind: PayeeKind) => void;
+  /**
+   * Adds a rule, or changes the rule with the same match. A rule that counts
+   * may name the category its payments show under.
+   */
+  savePayeeRule: (match: string, kind: PayeeKind, category?: string) => void;
   deletePayeeRule: (id: string) => void;
   getBalance: () => number;
   getMonthlyIncome: () => number;
@@ -187,6 +209,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => { listRef.current = transactions; }, [transactions]);
   const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
   const [payeeRules, setPayeeRules] = useState<PayeeRule[]>([]);
+  const [importReceipts, setImportReceipts] = useState<ImportReceipt[]>([]);
   const [dailyLimit, setDailyLimitState] = useState<number>(0);
   const [mfaEnabled, setMfaEnabledState] = useState<boolean>(false);
   const [budgets, setBudgetsState] = useState<Record<string, number>>({});
@@ -448,6 +471,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (!user) {
               setCurrencyState('INR');
               setPayeeRules([]);
+              setImportReceipts([]);
               setDailyLimitState(0);
               setMfaEnabledState(false);
               setOpeningBalanceState(0);
@@ -456,6 +480,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                if (localCurrency) setCurrencyState(localCurrency);
 
                setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
+               setImportReceipts(asImportReceipts(loadFromLocal('importReceipts')));
 
                const localLimit = loadFromLocal('dailyLimit');
                if (localLimit) setDailyLimitState(localLimit);
@@ -492,6 +517,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       const rules = asPayeeRules(data.payeeRules);
                       setPayeeRules(rules);
                       saveToLocal('payeeRules', rules);
+                  }
+                  if (data.importReceipts !== undefined) {
+                      const receipts = asImportReceipts(data.importReceipts);
+                      setImportReceipts(receipts);
+                      saveToLocal('importReceipts', receipts);
                   }
                   if (data.dailyLimit !== undefined) {
                       setDailyLimitState(data.dailyLimit);
@@ -532,6 +562,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               if (localCurrency) setCurrencyState(localCurrency);
 
               setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
+              setImportReceipts(asImportReceipts(loadFromLocal('importReceipts')));
 
               const localOpeningBalance = loadFromLocal('openingBalance');
               if (localOpeningBalance !== null) {
@@ -544,6 +575,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
            if (localCurrency) setCurrencyState(localCurrency);
 
            setPayeeRules(asPayeeRules(loadFromLocal('payeeRules')));
+           setImportReceipts(asImportReceipts(loadFromLocal('importReceipts')));
 
            const localOpeningBalance = loadFromLocal('openingBalance');
            if (localOpeningBalance !== null) {
@@ -626,10 +658,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // ── Spending, income and money moved (audit H3) ───────────────────────────
   // One classifier per rule set. counted leaves money moved out, so totals,
   // charts and insights see only real spending and income.
-  const flowOf = useMemo(() => flowClassifier(payeeRules), [payeeRules]);
+  // A payment and its reversal (same bank reference and amount) cancel out.
+  const reversed = useMemo(() => reversalPairs(transactions), [transactions]);
+  const flowOf = useMemo(() => flowClassifier(payeeRules, reversed), [payeeRules, reversed]);
+  // Every screen sees each entry under the category it reads as: a transfer
+  // nobody has sorted is "To review", a sorted payee's under its category.
+  const shown = useMemo(() => withShownCategories(transactions, flowOf), [transactions, flowOf]);
   const counted = useMemo(
-    () => transactions.filter(t => flowOf(t).flow !== 'moved'),
-    [transactions, flowOf]
+    () => shown.filter(t => flowOf(t).flow !== 'moved'),
+    [shown, flowOf]
   );
 
   // ── Aggregates ────────────────────────────────────────────────────────────
@@ -703,7 +740,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return false;
     }
 
-    const updatedTx = { ...transaction, ...updates, id: transaction.id };
+    // The Edit dialog starts from the category the entry shows ("To review",
+    // a payee's category); saved unchanged, the stored one stays.
+    const changes = updates.category === undefined ? updates
+      : { ...updates, category: categoryToStore(transaction, shownCategory(transaction, flowOf(transaction)), updates.category) };
+    const updatedTx = { ...transaction, ...changes, id: transaction.id };
     const newTxs = current.map(t => t.id === id ? updatedTx : t);
     if (updatedTx.date !== transaction.date) newTxs.sort(byNewest);
     listRef.current = newTxs;
@@ -717,7 +758,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       void sendToCloud(`tx:${id}`, 1, () => setDoc(txRef, forCloud(updatedTx)));
     }
     return true;
-  }, [persistTransactions, user]);
+  }, [persistTransactions, user, flowOf]);
 
   const deleteTransaction = useCallback((id: string) => {
     const newTxs = listRef.current.filter(t => t.id !== id);
@@ -824,7 +865,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
     if (result.added.length === 0 && result.removed.length === 0) {
         log.warn('No new unique transactions to import');
-        return;
+        return { added: 0, removed: 0 };
     }
 
     // Balance = opening + every entry, anchored to the earliest statement
@@ -850,7 +891,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
         log.debug(`Importing ${result.added.length} transactions, removing ${result.removed.length}`);
     }
+    return { added: result.added.length, removed: result.removed.length };
   }, [openingBalance, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, deleteInBatches]);
+
+  // Receipts save on this device at once and to the cloud through Firestore's queue.
+  const saveImportReceipt = useCallback((receipt: ImportReceipt) => {
+    setImportReceipts(prev => {
+      const next = withReceipt(prev, receipt);
+      saveToLocal('importReceipts', next);
+      saveSetting('importReceipts', { importReceipts: next });
+      return next;
+    });
+  }, [saveToLocal, saveSetting]);
 
   // Payee rules save on this device at once and to the cloud through
   // Firestore's queue, which also holds the write while offline.
@@ -860,14 +912,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     saveSetting('payeeRules', { payeeRules: rules });
   }, [saveToLocal, saveSetting]);
 
-  const savePayeeRule = useCallback((match: string, kind: PayeeKind) => {
+  const savePayeeRule = useCallback((match: string, kind: PayeeKind, category?: string) => {
     const key = matchText(match);
     if (key.length < MIN_MATCH) return;
     const same = payeeRules.find(r => matchText(r.match) === key);
     const id = `rule-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
+    const withCategory = (rule: PayeeRule): PayeeRule => {
+      const { category: _old, ...rest } = rule;
+      return kind === 'counts' && category && RULE_CATEGORIES.has(category) ? { ...rest, kind, category } : { ...rest, kind };
+    };
     persistPayeeRules(same
-        ? payeeRules.map(r => (r === same ? { ...r, kind } : r))
-        : [...payeeRules, { id, match: match.trim(), kind }]);
+        ? payeeRules.map(r => (r === same ? withCategory(r) : r))
+        : [...payeeRules, withCategory({ id, match: match.trim(), kind })]);
   }, [payeeRules, persistPayeeRules]);
 
   const deletePayeeRule = useCallback((id: string) => {
@@ -894,7 +950,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         matches.add(key);
         const id = ids.has(r.id) ? `rule-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${extra.length}`}` : r.id;
         ids.add(id);
-        extra.push({ id, match: r.match, kind: r.kind });
+        extra.push(r.kind === 'counts' && r.category && RULE_CATEGORIES.has(r.category)
+          ? { id, match: r.match, kind: r.kind, category: r.category }
+          : { id, match: r.match, kind: r.kind });
       }
       if (extra.length > 0) persistPayeeRules([...payeeRules, ...extra]);
     }
@@ -903,7 +961,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Memoized provider value (audit Phase 2.1) — consumers no longer re-render
   // from identity churn alone.
   const value = useMemo<WalletContextType>(() => ({
-      transactions,
+      transactions: shown,
+      storedTransactions: transactions,
+      importReceipts,
+      saveImportReceipt,
       currency,
       payeeRules,
       flowOf,
@@ -950,7 +1011,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       refresh,
       lastLoginTime
   }), [
-      transactions, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
+      shown, transactions, importReceipts, saveImportReceipt, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
       isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,

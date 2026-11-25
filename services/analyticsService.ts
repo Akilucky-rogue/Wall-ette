@@ -8,8 +8,8 @@
 
 import { Transaction, TransactionType } from '../types';
 import { parseDay } from '../utils/dates';
-import { payeeName } from './spend';
-import { narrationFields } from './narration';
+import { BANK_CODES, GATEWAYS, payeeName } from './spend';
+import { payeeFields } from './narration';
 import { tidyName } from '../utils/names';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ const RAIL_TOKENS = new Set([
 export function prettyMerchant(raw: string | undefined | null): string {
   if (!raw) return 'Unknown';
   const clip = (s: string) => (s.length > 32 ? s.slice(0, 31) + '…' : s);
-  const fields = narrationFields(raw);
+  const fields = payeeFields(raw);
   if (fields.length <= 1) return clip(tidyName(raw));
 
   const isRef = (s: string) =>
@@ -46,7 +46,7 @@ export function prettyMerchant(raw: string | undefined | null): string {
     /^[A-Z]{2,6}\d{4,}/i.test(s) ||             // AXNH2536…, IN226…
     (/^[A-Z0-9]{9,}$/i.test(s) && /\d{2,}/.test(s)); // mixed long refs
   const isRail = (s: string) =>
-    RAIL_TOKENS.has(s.toUpperCase()) ||
+    RAIL_TOKENS.has(s.toUpperCase()) || BANK_CODES.has(s.toUpperCase()) ||
     /^[A-Z]{4}0[A-Z0-9]{5,}$/i.test(s);         // IFSC codes
   const isHandle = (s: string) => s.includes('@');
   const hasLongWord = (s: string) => s.split(' ').some(w => w.replace(/[^A-Za-z]/g, '').length > 3);
@@ -59,9 +59,13 @@ export function prettyMerchant(raw: string | undefined | null): string {
   if (!best && candidates.length) best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
   if (!best) {
     const handle = fields.find(isHandle);
-    return handle ? clip(tidyName(handle.split('@')[0])) : clip(raw);
+    if (handle) return clip(tidyName(handle.split('@')[0]));
+    // Nothing but the rail and numbers ("UPI/DR/…/98765432/BARB/…"): say the rail.
+    return RAIL_TOKENS.has(fields[0].toUpperCase()) ? `${fields[0].toUpperCase()} payment` : clip(raw);
   }
-  return clip(tidyName(best));
+  // A gateway with no shop named after it: say whose gateway, not its code.
+  const gateway = GATEWAYS[best.toUpperCase()];
+  return gateway ? `${gateway} payment` : clip(tidyName(best));
 }
 
 /** Normalize a merchant string for grouping (same rules as import dedup). */

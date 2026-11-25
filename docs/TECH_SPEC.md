@@ -304,6 +304,42 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   `importTransactions`, settings through `restoreSettings` (budgets, goal and limit in the
   file replace those here; Money moved rules are added unless one with the same match is
   here). Checked by `scripts/check-restore.mjs`.
+- **To review** (`services/review.ts`, from 1.5.8) — a statement transfer out the importer
+  couldn't name (stored as Transfer Out) and no payee rule covers shows as "To review" on every
+  screen, because WalletContext's `transactions` are each entry under the category it reads as
+  (`withShownCategories`); `storedTransactions` are the entries as saved, and backups use them.
+  A rule that counts may carry a category (`PayeeRule.category`: a landlord's payments as Rent),
+  which its payments show under. Nothing stored changes: an Edit saved without changing the
+  category keeps the stored one (`categoryToStore`). After each import, and in Money moved, the
+  review (`components/ReviewPayees.tsx`) lists the payees still to review with a guess from the
+  name (investment, rent or maintenance, software, family); a tap saves the rule. While
+  payments to review are a quarter or more of a month's spending, Pulse doesn't compare that
+  month with the one before (`PulseResult.review`). Checked by `check-spend` and `check-pulse`.
+- **Reversals** (`services/reversals.ts`, from 1.5.8) — a credit that says it reverses or refunds
+  a payment and names the same bank reference ("UPI/REV/…", "REV/UPI/…", HDFC's "REV-UPI-…")
+  for the same amount, on or after the payment's day, cancels it: both are money moved
+  ("Reversed"), so neither counts as spending or income. Each payment pairs once.
+- **Redemption proceeds** (from 1.5.8) — fund redemptions are filed as Redemption proceeds, not
+  Investment Returns, and are money moved (your own money coming back).
+- **Payee names** (from 1.5.8) — a bank's four-letter code before the payee (IDFC IMPS), a UPI
+  ID, or a payment gateway's code (PayU, BillDesk) is no longer read as the payee; HDFC's UPI
+  Lite top-ups read "UPI Lite top-up"; a narration with nothing but numbers shows its rail
+  ("UPI payment"). Vault shows the bank's whole narration once, under "From the bank".
+- **Import receipts** (`services/importReceipt.ts`, from 1.5.8) — every import leaves a receipt:
+  the statement's period, rows read, added, skipped as already in the wallet, left out on the
+  review, unreadable, adjustments replaced, and how the balance check read (with the bank's
+  closing balance and the difference). The last 20 are kept in the account's settings
+  (`importReceipts`) and on the device; Import lists the last three. No payees, narrations or
+  file names.
+- **First use** (from 1.5.8) — a wallet with no entries and no opening balance opens on "Start
+  your wallet" (import, add an entry, or restore a backup); Vault tells an empty wallet from a
+  search that matches nothing; Pulse runs no projection for a month with no spending. Home's
+  figure reads "Balance from your entries" (or "Balance on <day>" for an earlier month), the
+  status reads "Saved to your account" with "Data through <newest entry's day>", and the
+  Month / All time switch sits with the pockets it sets.
+- **Contrast** (from 1.5.8) — secondary text is #72716E (Sage), #6B7179 (Slate) and #796E66
+  (Terra) in the light themes, at least 4.6:1 on every surface; no text is drawn fainter than
+  that. Checked by `scripts/check-contrast.mjs`.
 - **Moved-vs-spent separation** — Transfer Out / Adjustment / Investment count in cash-flow
   totals but are excluded from every *spending* analysis (reports, Category Split, heatmaps).
 - **Feature screens** — Pulse (a hub and pages: Trends, Categories, Recurring with price rises,

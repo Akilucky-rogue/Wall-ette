@@ -4,6 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { getSymbol, inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
+import { narrationFields } from '../services/narration';
 import { WallEMascot, WallEEyes } from './SplashScreen';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
@@ -396,7 +397,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
             value={debouncedSearch}
             onChange={e => setDebouncedSearch(e.target.value)}
             placeholder="Search merchant, category, note..."
-            className="w-full pl-11 pr-10 py-2.5 bg-white border border-black/[0.06] rounded-2xl text-[13px] text-premium-charcoal placeholder:text-muted-taupe/60 focus:outline-none focus:ring-2 focus:ring-sage/30 shadow-sm"
+            className="w-full pl-11 pr-10 py-2.5 bg-white border border-black/[0.06] rounded-2xl text-[13px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30 shadow-sm"
           />
           {debouncedSearch && (
             <button
@@ -726,22 +727,42 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         {/* Details */}
                         {expanded && (
                             <div className="px-4 pb-4 pt-1 bg-zen-cream space-y-3">
-                                {t.merchant && name !== t.merchant && (
-                                    <div>
-                                        <p className="text-[11px] text-muted-taupe mb-0.5">From the bank</p>
-                                        <p className="text-[12px] text-premium-charcoal break-all leading-snug">{t.merchant}</p>
-                                    </div>
-                                )}
-                                {t.note && t.note.trim() && (
-                                    <div>
-                                        <p className="text-[11px] text-muted-taupe mb-0.5">Note</p>
-                                        <p className="text-[13px] text-premium-charcoal">{t.note}</p>
-                                    </div>
-                                )}
+                                {(() => {
+                                    // The bank's narration in full: imports keep it in the note
+                                    // (the payee field holds its first 100 characters, or the name
+                                    // it was renamed to), so the bank's own words are always here.
+                                    const isNarration = (s?: string) => !!s && narrationFields(s).length >= 2;
+                                    const narration = isNarration(t.note) ? t.note!.trim() : isNarration(t.merchant) ? (t.merchant ?? '').trim() : null;
+                                    const note = t.note && t.note.trim() && t.note.trim() !== narration ? t.note.trim() : null;
+                                    return (
+                                        <>
+                                            {narration && narration !== name && (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">From the bank</p>
+                                                    <p className="text-[12px] text-premium-charcoal break-all leading-snug">{narration}</p>
+                                                </div>
+                                            )}
+                                            {note && (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">Note</p>
+                                                    <p className="text-[13px] text-premium-charcoal">{note}</p>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                                 {(() => {
                                     // Money moved isn't spending or income (audit H3): say why
                                     const info = flowOf(t);
                                     if (info.flow !== 'moved' || !info.moved) return null;
+                                    if (info.moved === 'reversal') return (
+                                        <p className="flex items-center gap-1.5 text-[12px] text-lavender font-semibold">
+                                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">undo</span>
+                                            {t.type === TransactionType.INCOME
+                                              ? 'The bank sent back a payment of the same amount: both are left out of spending and income'
+                                              : 'Reversed by the bank: this and the money that came back are left out of spending and income'}
+                                        </p>
+                                    );
                                     return (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
@@ -910,7 +931,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.merchant}
                             onChange={(e) => setEditForm(prev => ({ ...prev, merchant: e.target.value }))}
                             placeholder="Enter merchant name"
-                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
@@ -924,7 +945,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.amount}
                             onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
                             placeholder="0.00"
-                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
@@ -965,7 +986,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             onChange={(e) => setEditForm(prev => ({ ...prev, note: e.target.value }))}
                             placeholder="Add a note (optional)"
                             rows={2}
-                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
                         />
                     </div>
 

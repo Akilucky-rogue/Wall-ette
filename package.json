@@ -15,7 +15,7 @@
     "android:release": "npm run android && npm run postandroid && cd android && .\\gradlew assembleRelease",
     "android:bundle": "npm run android && npm run postandroid && cd android && .\\gradlew bundleRelease -Pplay",
     "postandroid": "powershell -ExecutionPolicy Bypass -File patch-capacitor-gradle.ps1",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && npx firebase-tools deploy --only hosting --project wall-e-7a113"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",

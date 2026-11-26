@@ -60,8 +60,9 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 
 - Privacy policy: **https://wall-ette.com/privacy.html** → Play Console → App content → Privacy policy.
 - Delete account URL (asked in the Data safety form): **https://wall-ette.com/privacy.html#delete**. That section describes deleting the account in the app (Self → Delete account & all data up to 1.5.5; Self → Account and security → Delete account and all data from 1.5.6) and by email.
-- [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; don't use `ship.ps1`, it's retired.
+- [x] **Website and Firestore rules deployed on 19 Nov** (`npm run build`, then `npx firebase-tools deploy --only hosting,firestore:rules`): the current privacy policy is live, and account deletion erases the security log (audit M3). Deploy the same way after changing either; `npm run deploy` does the website alone. Don't use `ship.ps1`, it's retired.
 - [x] **Website deployed again on 20 Nov** (hosting only): the privacy policy of 20 Nov describes crash reports (Crashlytics), the product page no longer says "no trackers" and lists the banks Wall-ette reads, and the web app has the new Forgot Password and statement import.
+- [x] **Website deployed again on 26 Nov** (hosting only): the privacy policy of 25 Nov lists payee rules and import receipts among the app settings, and the web app is 1.5.8.
 - [x] **Data safety form and full description updated in Play Console on 20 Nov** to match sections 5 and 6, and saved. Not sent yet, so 1.5.5's review isn't pushed back.
 - [ ] **[YOU]** Once 1.5.5 is approved: Publishing overview → **Send 2 changes for review** (Data safety, full description).
 - The old APK at `/downloads/wall-ette.apk` is gone. The site's "Get the Android app" banner stays hidden until the Play listing is public (section 8).

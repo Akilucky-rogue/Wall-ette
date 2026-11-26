@@ -405,7 +405,10 @@ sideloading. Dormant by decision — Android + web are the active targets.
   is retired: any new one would be `com.wallette.app` signed with the old key, which
   blocks installing the Play version.
 - **Website and Firestore rules:** `npm run build`, then
-  `npx firebase-tools deploy --only hosting,firestore:rules`.
+  `npx firebase-tools deploy --only hosting,firestore:rules`. `npm run deploy` builds and
+  deploys the website alone. wall-ette.com is Firebase Hosting; the Cloudflare Worker
+  `wall-et` (`wrangler.jsonc`, July) is not the site, and `wrangler deploy` updates only
+  that Worker.
 - **`ship.ps1` is retired** (it exits at once) until audit item 14 reworks it; it used to
   build and host the APK, deploy, install on the phone and `git add -A` + push.
 

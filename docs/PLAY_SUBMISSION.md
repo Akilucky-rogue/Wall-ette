@@ -127,6 +127,7 @@ The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026).
 - [x] App icon 512×512 — `store-assets/icon-512.png` (1.5.9: the brand kit's icon, drawn by `scripts/brand-icons.mjs`; upload it with the 1.5.9 release)
 - [x] Feature graphic 1024×500 — `store-assets/feature-graphic-1024x500.png` (1.5.9: the mascot, wordmark and tagline; upload it with the 1.5.9 release)
 - [x] Phone screenshots for the 1.5.6 look — `store-assets/screenshots-1.5.6/` (8 × 1080×1920: Home, Pulse, Left to spend, Trends, Categories, Import, Vault, Flow). Sample data only, never a real account. The Play build blocks screenshots (audit M11), so they're taken from the web build with made-up data (the 19 Nov set in `store-assets/screenshots/` is the old look).
+- [ ] Phone screenshots for the 1.5.9 brand look — `store-assets/screenshots-1.5.9/`, the same eight screens with the same made-up data; upload them with the 1.5.9 release to replace the 1.5.6 set.
 
 ## 7. Remaining Play Console forms (~20 min, all simple)
 

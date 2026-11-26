@@ -24,6 +24,7 @@ import {
 } from '../services/appUpdates';
 import type { UpdateFinding } from '../services/appUpdatePolicy';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
+import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 import { openAt } from '../utils/screenSection';
@@ -378,6 +379,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     try { await deleteDoc(doc(db, 'users', uid)); } catch { /* best-effort */ }
   };
 
+  // An account made with Google has no password: deleting it is confirmed
+  // with Google instead.
+  const delWithPassword = hasPassword(user) || !signsInWithGoogle(user);
+
   const handleDeleteAccount = async () => {
     if (!user || !user.email || delConfirm.toUpperCase() !== 'DELETE') return;
     setDelBusy(true); setDelError('');
@@ -386,9 +391,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
         await resolveTotpSignIn(delResolver, delTotp);
       } else {
         try {
-          await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, delPassword));
+          if (delWithPassword) await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, delPassword));
+          else await reauthenticateWithGoogle(user);
         } catch (e: any) {
           if (isMfaRequiredError(e)) { setDelResolver(mfaResolverFromError(e)); setDelBusy(false); return; }
+          if (!delWithPassword) {
+            if (!isGoogleCancel(e)) setDelError(googleErrorMessage(e));
+            setDelBusy(false);
+            return;
+          }
           throw e;
         }
       }
@@ -540,16 +551,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                 {bioSupported && <Toggle checked={bioOn} onChange={toggleBiometric} label="Biometric unlock" />}
               </Row>
             )}
-            <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change password"
-                 sub="Enter your current password, then a new one" onClick={openPwModal}>
-              {chevron}
-            </Row>
+            {hasPassword(user) && (
+              <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change password"
+                   sub="Enter your current password, then a new one" onClick={openPwModal}>
+                {chevron}
+              </Row>
+            )}
             <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-factor sign-in"
                  sub="A code from an authenticator app">
               <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-zen-bg text-muted-taupe shadow-pressed">Coming soon</span>
             </Row>
           </Card>
-          <p className="text-[12px] text-muted-taupe px-1">Signed in as {user?.email}. Last signed in {lastSignIn}.</p>
+          <p className="text-[12px] text-muted-taupe px-1">
+            Signed in as {user?.email}{signsInWithGoogle(user) ? (hasPassword(user) ? ', with Google or your password' : ' with Google') : ''}. Last signed in {lastSignIn}.
+          </p>
 
           <div className="pt-4">
             <button
@@ -879,15 +894,19 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                 <input type="text" value={delConfirm} onChange={e => setDelConfirm(e.target.value)}
                        className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-3"
                        placeholder='Type "DELETE" to confirm' />
-                <input type="password" value={delPassword} onChange={e => setDelPassword(e.target.value)}
-                       className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-4"
-                       placeholder="Your password" />
+                {delWithPassword ? (
+                  <input type="password" value={delPassword} onChange={e => setDelPassword(e.target.value)}
+                         className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-4"
+                         placeholder="Your password" />
+                ) : (
+                  <p className="text-[12px] text-muted-taupe mb-4">Google will ask you to confirm it's you.</p>
+                )}
               </>
             )}
 
             <button
               onClick={handleDeleteAccount}
-              disabled={delBusy || (delResolver ? delTotp.length < 6 : (delConfirm.toUpperCase() !== 'DELETE' || delPassword.length === 0))}
+              disabled={delBusy || (delResolver ? delTotp.length < 6 : (delConfirm.toUpperCase() !== 'DELETE' || (delWithPassword && delPassword.length === 0)))}
               className="w-full bg-rose text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 mb-2"
             >
               {delBusy ? 'Deleting…' : 'Permanently Delete Everything'}

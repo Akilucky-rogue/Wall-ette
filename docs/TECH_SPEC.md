@@ -106,6 +106,13 @@ Plain React context — no Redux/Zustand.
   since sign-in is email + password and TOTP) and `getAuth` with session persistence on the
   web. With `getAuth`, Firebase on Android loads `apis.google.com/js/api.js` and an auth
   iframe before it reports the signed-in user, which held start-up on a bad connection.
+  **Sign in with Google** (`services/googleSignIn.ts`): on Android, Android's account picker
+  (Credential Manager, through `@capgo/capacitor-social-login`, built with Google only) returns
+  an ID token for the project's web client and Firebase signs in with
+  `signInWithCredential`; on the web, `signInWithPopup`. A first Google sign-in creates the
+  account and records the terms consent the note beside the button asks for. The lock screen,
+  Change password and Delete account follow the account's providers (password, Google or
+  both). Setup outside the code: docs/PLAY_SUBMISSION.md §5a.
   Signing out and account deletion go
   through `services/session.ts`, which also removes the user's data from the device: the
   `localStorage` mirror (keys ending in `_<uid>`) and Firestore's offline cache, then

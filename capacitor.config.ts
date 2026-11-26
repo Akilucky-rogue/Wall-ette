@@ -20,6 +20,14 @@ const config: CapacitorConfig = {
       smallIcon: 'ic_stat_wallette',
       iconColor: '#7D937A',
     },
+    // Sign in with Google (services/googleSignIn.ts). Only Google is built in:
+    // no Facebook SDK (it would add the advertising-ID permission Play asks
+    // about), no Apple or X. android/gradle.properties says the same, so a
+    // build without `cap sync` leaves them out too.
+    SocialLogin: {
+      providers: { google: true, facebook: false, apple: false, twitter: false },
+      logLevel: 1,
+    },
   },
 };
 

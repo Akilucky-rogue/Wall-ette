@@ -56,6 +56,13 @@ h1, h2, h3, h4, h5, h6 {
 [data-theme-dark="1"] .wordmark-light { display: none; }
 [data-theme-dark="1"] .wordmark-dark { display: block; }
 
+/* Google's sign-in button (components/ui/GoogleButton.tsx), in the colours
+   Google's branding guidelines give for light and dark surfaces. */
+.google-btn { background: #FFFFFF; color: #1F1F1F; border: 1px solid #747775; }
+.google-btn:hover:not(:disabled) { background: #F8F8F8; }
+[data-theme-dark="1"] .google-btn { background: #131314; color: #E3E3E3; border-color: #8E918F; }
+[data-theme-dark="1"] .google-btn:hover:not(:disabled) { background: #1C1C1E; }
+
 /* Material Symbols Outlined icon font (thin, minimalist) */
 .material-symbols-outlined {
 	font-family: 'Material Symbols Outlined';

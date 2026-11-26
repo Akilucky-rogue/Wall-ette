@@ -4,9 +4,11 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { AuthLayout } from "@/components/site/AuthLayout";
 import { AuthField, PasswordField } from "@/components/site/AuthFields";
+import { GoogleButton } from "@/components/site/GoogleButton";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_URL, firebaseAuth, firestore } from "@/lib/firebase";
 import { PASSWORD_HINT, PASSWORD_RULE, TERMS_VERSION, authMessage, errorCode } from "@/lib/auth-rules";
+import { continueWithGoogle } from "@/lib/google";
 import { COMPANY } from "@/lib/site";
 
 const accountSchema = z.object({
@@ -41,6 +43,23 @@ function SignUp() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ text: string; signIn?: boolean } | null>(null);
   const { user, loading, signOut } = useAuth();
+  const [googlePending, setGooglePending] = useState(false);
+  const [googleError, setGoogleError] = useState("");
+
+  async function google() {
+    setGoogleError("");
+    setError(null);
+    setGooglePending(true);
+    const outcome = await continueWithGoogle();
+    if (outcome.status === "signed-in") {
+      window.location.assign(APP_URL);
+      return;
+    }
+    // An existing account with two-step sign-in: its code is asked on Sign in.
+    if (outcome.status === "second-factor") setGoogleError("This account uses two-step sign-in. Continue on the Sign in page.");
+    else if (outcome.status === "failed") setGoogleError(outcome.message);
+    setGooglePending(false);
+  }
 
   async function createAccount(event: FormEvent) {
     event.preventDefault();
@@ -76,12 +95,13 @@ function SignUp() {
     }
   }
 
-  if (!loading && user && !pending) {
+  if (!loading && user && !pending && !googlePending) {
     return <AuthLayout mode="signup" title="Your wallet is ready" lead={`You’re signed in as ${user.email ?? "your Wall·ette account"}.`}><div className="space-y-3"><Button asChild variant="hero" size="xl" className="w-full"><a href={APP_URL}>Open Wall·ette</a></Button><Button type="button" variant="soft" size="xl" className="w-full" onClick={() => void signOut()}>Use another account</Button></div></AuthLayout>;
   }
 
   return (
     <AuthLayout mode="signup" title="Create your wallet" lead="One account for the web app and the Android app." footer={<p className="text-center text-sm text-muted-foreground">Already have an account? <Link to="/signin" className="font-semibold text-forest hover:underline">Sign in</Link></p>}>
+      <GoogleButton pending={googlePending} disabled={pending} onClick={() => void google()} error={googleError} />
       <form onSubmit={(event) => void createAccount(event)} noValidate className="space-y-4">
         <AuthField id="signup-email" label="Email" type="email" inputMode="email" autoComplete="email" value={form.email} onChange={(event) => setForm((old) => ({ ...old, email: event.target.value }))} error={errors.email} />
         <PasswordField id="signup-password" label="Password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((old) => ({ ...old, password: event.target.value }))} error={errors.password} />

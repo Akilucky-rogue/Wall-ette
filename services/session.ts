@@ -16,6 +16,7 @@
 import { signOut } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { forgetGoogleAccount, signsInWithGoogle } from './googleSignIn';
 import { clearPhoneNotes } from './phoneNotifier';
 import { log } from '../utils/log';
 
@@ -73,9 +74,12 @@ function reloadQuietly(): void {
  */
 export async function signOutOfDevice(): Promise<void> {
   const uid = auth.currentUser?.uid ?? null;
+  const google = signsInWithGoogle(auth.currentUser);
   // Checked before signing out: the queue belongs to the signed-in user.
   const synced = uid ? await changesSynced() : true;
   await signOut(auth);
+  // The next Google sign-in on this phone asks which account again.
+  if (google) await forgetGoogleAccount();
   // Bill reminders and alerts are this user's; none may show after sign-out.
   await clearPhoneNotes();
   if (uid) removeUserKeys(uid);

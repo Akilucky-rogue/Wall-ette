@@ -3,11 +3,13 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type MultiF
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
+import { googleErrorMessage, isGoogleCancel, signInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
 import { isEmailLike, suggestEmail } from '../utils/emailHints';
 import { log } from '../utils/log';
 import { ACCOUNT_EMAIL_FROM, PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { Mascot, TAGLINE, Wordmark } from './ui/Brand';
+import { GoogleButton } from './ui/GoogleButton';
 import { FloatingLeaf, Paisley, RangoliCorner } from './ui/Decor';
 
 // Bump when the website's terms or privacy policy change materially —
@@ -68,6 +70,39 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       setTotpCode('');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sign in with Google: an existing account signs in; a new one is created,
+  // with the consent the note beside the button asks for recorded the same
+  // way as an email sign-up's.
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const handleGoogle = async () => {
+    setError('');
+    setGoogleBusy(true);
+    try {
+      const { credential, isNewUser } = await signInWithGoogle();
+      if (isNewUser) {
+        setDoc(doc(db, 'users', credential.user.uid), {
+            termsAccepted: true,
+            termsVersion: TERMS_VERSION,
+            termsAcceptedAt: serverTimestamp(),
+            termsAcceptedVia: 'google',
+        }, { merge: true }).catch(() => log.warn('Consent record write failed'));
+        onAuthSuccess?.('register');
+      } else {
+        onAuthSuccess?.('login');
+      }
+    } catch (err: any) {
+      if (isMfaRequiredError(err)) {
+        setTotpResolver(mfaResolverFromError(err));
+        setError('');
+      } else if (!isGoogleCancel(err)) {
+        log.warn('Google sign-in failed:', err?.code ?? err?.message);
+        setError(googleErrorMessage(err));
+      }
+    } finally {
+      setGoogleBusy(false);
     }
   };
 
@@ -338,6 +373,21 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           </button>
         </div>
         ) : (
+        <>
+        <div className="space-y-3 mb-5">
+          <GoogleButton label="Continue with Google" busy={googleBusy} disabled={loading} onClick={handleGoogle} />
+          <p className="text-[11px] text-muted-taupe leading-relaxed text-center px-1">
+            Continuing with Google signs you in, or creates your wallet the first time, and means you agree to the{' '}
+            <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline">Terms &amp; Conditions</a>{' '}
+            and{' '}
+            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline">Privacy policy</a>.
+          </p>
+          <div className="flex items-center gap-3 pt-1" aria-hidden="true">
+            <span className="h-px flex-1 bg-premium-charcoal/[0.08]" />
+            <span className="text-[10px] text-muted-taupe uppercase tracking-widest">or use email</span>
+            <span className="h-px flex-1 bg-premium-charcoal/[0.08]" />
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
@@ -388,12 +438,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
           <button
             type="submit"
-            disabled={loading || (!isLogin && !agreed)}
+            disabled={loading || googleBusy || (!isLogin && !agreed)}
             className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
             {loading ? 'Processing...' : (isLogin ? 'Sign in' : 'Sign up')}
           </button>
         </form>
+        </>
         )}
 
         {!totpResolver && !resetMode && (

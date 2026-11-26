@@ -60,6 +60,7 @@ const documents = {
         title: "Everything else we keep",
         paragraphs: [
           "Your account: your email address and a password, handled by Google Firebase Authentication (we never see your password), and, if you turn it on, two-step sign-in with an authenticator app. When you sign up we record which version of the terms you accepted, and when.",
+          "If you sign in with Google instead, Google tells us your email address, your name and the address of your profile picture, and confirms it’s you; we never see your Google password and get no access to your Gmail, Drive, contacts or anything else in your Google account. We use your email address to run your account; your name and picture stay in your sign-in record. You can remove Wall·ette’s access at any time in your Google Account (Security → Your connections to third-party apps and services).",
           "Your settings: currency, daily limit, budgets, savings goal, alerts, and which payees count as spending. Security log (Android app): the time and method (password or biometric) of each unlock, kept in your account so you can see who opened your wallet.",
           "Crash reports (Android app): when the app crashes or hits an error, it sends what went wrong (the error, with email addresses, IDs and numbers removed), where in the app’s code it happened, the screens opened just before, the app version, device details such as model, Android version and free memory, and a random ID for this installation. Reports never include your transactions, statements, balances, payee names or account details, and aren’t linked to your account. Turn them off in Self → Your data.",
           "This website: what you send in the contact form (name, email, topic and message), and, if you subscribe to the Monthly Check-in, your email address and where you signed up. Website forms are optional.",
@@ -96,7 +97,7 @@ const documents = {
         id: "delete",
         title: "Keeping and deleting your data",
         paragraphs: [
-          "Your data is kept for as long as your account exists. To delete everything yourself: in the app open Self → Account and security → Delete account and all data, type DELETE and enter your password. Your transactions, settings, security log and account are erased at once, from our servers and from that device. To remove only transactions, use Vault → Clear all history.",
+          "Your data is kept for as long as your account exists. To delete everything yourself: in the app open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are erased at once, from our servers and from that device. To remove only transactions, use Vault → Clear all history.",
           "If you can no longer use the app, email us from your registered address with the subject “Data deletion request” and we will delete everything within 30 days. See the data-deletion page for details.",
           "Each device keeps an offline copy of your wallet so the app works without a connection. Signing out (once your changes have synced), deleting your account or uninstalling the app removes it from that device.",
           "Contact messages are kept while we need them to answer you. Newsletter addresses are kept until you unsubscribe. Crash reports are deleted after 90 days. Google, which runs our database, removes deleted data from its own systems on its usual schedule.",
@@ -362,7 +363,7 @@ const documents = {
         id: "in-the-app",
         title: "Delete it yourself, in the app",
         paragraphs: [
-          "Open Self → Account and security → Delete account and all data, type DELETE and enter your password. Your transactions, settings, security log and account are erased at once, from our servers and from that device.",
+          "Open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are erased at once, from our servers and from that device.",
           "Want a copy first? Data Studio → Export → Full backup saves everything as a file you keep. To remove only transactions and keep the account, use Vault → Clear all history.",
         ],
       },

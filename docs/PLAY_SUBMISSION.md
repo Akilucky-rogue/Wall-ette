@@ -73,20 +73,36 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 |---|---|
 | Does your app collect or share user data? | Collects: yes. Shares: **no** |
 | Email address | Collected · App functionality (account management) · Not shared |
+| Name (from 1.5.9) | Collected, **optional** (only for people who sign in with Google: Google sends their name and profile-picture address with the sign-in; kept in Firebase Authentication's sign-in record) · App functionality (account management) · Not shared |
 | Financial info → "Other financial info" | Collected (user-entered/imported transactions; from 1.5.9 also each bank account's opening balance, bank name and the last four digits of its number, to tell accounts apart) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
 | App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Self → Crash reports (Self → Your data from 1.5.6) turns it off |
 | App info and performance → "Diagnostics" (from 1.5.5) | Collected (device details at the time of a crash, such as model, Android version, free memory and storage) · Analytics · Not shared · Optional |
 | Device or other IDs (from 1.5.5) | Collected (the Crashlytics installation ID, which counts how many installs a crash affects; no user ID is set) · Analytics · Not shared · Optional |
-| Account creation | **Username and password** only (two-factor sign-in is still Coming Soon; the fingerprint unlock is on the device, not a way to sign in) |
-| Personal info | **Email address** only. No name or phone number is asked for, and statement files are read on the phone, so Files and docs isn't collected either |
+| Account creation | **Username and password**, and from 1.5.9 **OAuth** (Sign in with Google). Two-factor sign-in is still Coming Soon; the fingerprint unlock is on the device, not a way to sign in |
+| Personal info | **Email address**, and from 1.5.9 **Name** for Google sign-ins (above). No phone number is asked for, and statement files are read on the phone, so Files and docs isn't collected either |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
 | Can users request deletion? | **Yes** — in the app (Self → Account and security → Delete account and all data from 1.5.6), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |
 | Ads / advertising ID | **None** |
 
 From 1.5.6 the app can show phone notifications (bill reminders, budget and daily-limit alerts), switched on in Self → Alerts and limits. They are made on the device from data the app already holds, so nothing new is collected and these answers don't change. The manifest gains `POST_NOTIFICATIONS` (asked for on Android 13+ when switched on), `RECEIVE_BOOT_COMPLETED` and `WAKE_LOCK` (reminders survive a restart) and `VIBRATE` (taps); `SCHEDULE_EXACT_ALARM`, which the notifications plugin declares, is removed, so there is no exact-alarm declaration to make.
+
+## 5a. Sign in with Google (from 1.5.9) — set up before building the 1.5.9 bundle
+
+The app signs in with Google through Android's own account picker (Credential Manager), then Firebase (`services/googleSignIn.ts`); the web app and website use Firebase's Google popup. Nothing here is a secret.
+
+- [ ] **[YOU]** Firebase console → Authentication → Sign-in method → **Google** → Enable; support email akshatbvora@gmail.com. Its "Web client ID" must read `881370415293-3n8j6fo1j38ch0mq1m2588osgpp2ddub.apps.googleusercontent.com` (`GOOGLE_WEB_CLIENT_ID` in `services/googleSignIn.ts`).
+- [ ] **[YOU]** Firebase console → Project settings → Your apps → Android `com.wallette.app` → **Add fingerprint**, SHA-1 and SHA-256, for each key that signs a copy people install:
+  - the **Play app signing key** (Play Console → Test and release → App integrity → App signing): every copy installed from Google Play;
+  - the **upload key**: a bundle you install yourself;
+  - the PC's **debug key**: builds from Android Studio, such as the emulator's.
+  Without the right one, Google's picker says Wall·ette isn't set up (`[28444] Developer console is not set up correctly`). A new fingerprint can take a while to work, sometimes hours.
+- [ ] **[YOU]** Authentication → Settings → **Authorized domains**: `wall-ette.com` and `www.wall-ette.com` (and `localhost`, already there), so the popup works on the website and the web app.
+- [ ] **[YOU]** Google Cloud console (project wall-e-7a113) → APIs & Services → **OAuth consent screen** (Google Auth Platform → Branding/Audience): app name "Wall·ette", support email, links to wall-ette.com/privacy and /terms, authorized domain `wall-ette.com`; publishing status **In production** (in Testing only listed test users can sign in). With only the email and profile scopes no Google review is needed; adding a logo starts one.
+- [ ] Play Console → **Data safety**: the Name row and "OAuth" under account creation (section 5).
+- Accounts: a Google sign-in with the same Gmail address as an existing email-and-password account opens that same wallet. If that email address was never verified, Firebase replaces the password with Google for it (Google is trusted for Gmail addresses), so from then on it unlocks with Google: the lock screen, Change password and Delete account follow whichever ways in the account has.
 
 ## 6. Store listing — ready to paste
 

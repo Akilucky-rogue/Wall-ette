@@ -5,8 +5,10 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
+import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
 import { BrandIcon } from './ui/Brand';
+import { GoogleButton } from './ui/GoogleButton';
 import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
 
 interface SecurityLockProps {
@@ -19,6 +21,11 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  // How this account signs in: a password, Google, or both. An account made
+  // with Google has no password to type here.
+  const google = signsInWithGoogle(auth.currentUser);
+  const withPassword = hasPassword(auth.currentUser) || !google;
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   // Real TOTP second factor: set when reauth reports the account has 2FA
   const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
@@ -60,7 +67,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  const logAttempt = async (success: boolean, method: 'PASSWORD' | 'MFA' | 'BIOMETRIC') => {
+  const logAttempt = async (success: boolean, method: 'PASSWORD' | 'MFA' | 'BIOMETRIC' | 'GOOGLE') => {
       if (!auth.currentUser) return;
       try {
           await addDoc(collection(db, `users/${auth.currentUser.uid}/security_logs`), {
@@ -94,12 +101,46 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             setTotpResolver(mfaResolverFromError(err));
             setError('');
         } else {
-            void logAttempt(false, 'PASSWORD');
-            setError("Incorrect password.");
-            setPassword('');
+            const code = err?.code;
+            if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+                // Only a wrong password counts as a failed unlock (and can
+                // raise the bell's "failed unlock attempts" note).
+                void logAttempt(false, 'PASSWORD');
+                setError("Incorrect password.");
+                setPassword('');
+            } else if (code === 'auth/network-request-failed') {
+                setError("You're offline. Connect to the internet and try again.");
+            } else if (code === 'auth/too-many-requests') {
+                setError('Too many attempts. Wait a few minutes, or reset your password.');
+            } else {
+                setError("Couldn't check your password. Try again.");
+            }
         }
     } finally {
         setLoading(false);
+    }
+  };
+
+  const handleGoogleUnlock = async () => {
+    if (!auth.currentUser) return;
+    setGoogleBusy(true);
+    setError('');
+    setInfo('');
+    try {
+        await reauthenticateWithGoogle(auth.currentUser);
+        onUnlock();
+        void logAttempt(true, 'GOOGLE');
+    } catch (err: any) {
+        if (isMfaRequiredError(err)) {
+            setTotpResolver(mfaResolverFromError(err));
+        } else if (!isGoogleCancel(err)) {
+            // Another person's Google account is a failed unlock; being
+            // offline or Google not answering is not.
+            if (err?.code === 'auth/user-mismatch') void logAttempt(false, 'GOOGLE');
+            setError(googleErrorMessage(err));
+        }
+    } finally {
+        setGoogleBusy(false);
     }
   };
 
@@ -201,7 +242,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                 onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); setPassword(''); }}
                 className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
             >
-                Back to Password
+                Back
             </button>
         </form>
         ) : (
@@ -209,6 +250,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
             {info && <div className="mb-4 text-center text-sage text-xs font-medium">{info}</div>}
 
+            {withPassword && (
+            <>
             <div className="mb-4">
                 <input
                     type="password"
@@ -228,11 +271,26 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
 
             <button
                 type="submit"
-                disabled={loading || password.length === 0}
+                disabled={loading || googleBusy || password.length === 0}
                 className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {loading ? 'Verifying...' : 'Unlock wallet'}
             </button>
+            </>
+            )}
+
+            {google && (
+                <>
+                    {withPassword && (
+                        <div className="relative flex items-center gap-2 py-4">
+                            <div className="h-px bg-black/5 flex-1"></div>
+                            <span className="text-[10px] text-muted-taupe uppercase tracking-widest">Or</span>
+                            <div className="h-px bg-black/5 flex-1"></div>
+                        </div>
+                    )}
+                    <GoogleButton label="Unlock with Google" busyLabel="Checking with Google…" busy={googleBusy} disabled={loading} onClick={handleGoogleUnlock} />
+                </>
+            )}
 
             {bioReady && (
                 <>

@@ -5,9 +5,11 @@ import type { MultiFactorResolver } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { AuthLayout } from "@/components/site/AuthLayout";
 import { AuthField, PasswordField } from "@/components/site/AuthFields";
+import { GoogleButton } from "@/components/site/GoogleButton";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_URL, firebaseAuth } from "@/lib/firebase";
 import { authMessage, errorCode } from "@/lib/auth-rules";
+import { continueWithGoogle } from "@/lib/google";
 import { COMPANY } from "@/lib/site";
 
 const schema = z.object({ email: z.string().trim().email("Enter a valid email address"), password: z.string().min(1, "Enter your password") });
@@ -37,6 +39,22 @@ function SignIn() {
   const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
   const [code, setCode] = useState("");
   const { user, loading, signOut } = useAuth();
+  const [googlePending, setGooglePending] = useState(false);
+  const [googleError, setGoogleError] = useState("");
+
+  async function google() {
+    setGoogleError("");
+    setError("");
+    setGooglePending(true);
+    const outcome = await continueWithGoogle();
+    if (outcome.status === "signed-in") {
+      window.location.assign(APP_URL);
+      return;
+    }
+    if (outcome.status === "second-factor") setResolver(outcome.resolver);
+    else if (outcome.status === "failed") setGoogleError(outcome.message);
+    setGooglePending(false);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -79,7 +97,7 @@ function SignIn() {
     }
   }
 
-  if (!loading && user && !pending) {
+  if (!loading && user && !pending && !googlePending) {
     return <AuthLayout mode="signin" title="You’re already signed in" lead={`Continue as ${user.email ?? "your Wall·ette account"}.`}><div className="space-y-3"><Button asChild variant="hero" size="xl" className="w-full"><a href={APP_URL}>Open Wall·ette</a></Button><Button type="button" variant="soft" size="xl" className="w-full" onClick={() => void signOut()}>Sign out</Button></div></AuthLayout>;
   }
 
@@ -98,6 +116,7 @@ function SignIn() {
 
   return (
     <AuthLayout mode="signin" title="Welcome back" lead="Sign in to see your money clearly again." footer={<p className="text-center text-sm text-muted-foreground">New to Wall·ette? <Link to="/signup" className="font-semibold text-forest hover:underline">Create your wallet</Link></p>}>
+      <GoogleButton pending={googlePending} disabled={pending} onClick={() => void google()} error={googleError} />
       <form onSubmit={(event) => void submit(event)} noValidate className="space-y-4">
         <AuthField id="signin-email" label="Email" type="email" inputMode="email" autoComplete="email" value={form.email} onChange={(event) => setForm((old) => ({ ...old, email: event.target.value }))} error={errors.email} />
         <div>

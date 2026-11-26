@@ -7,6 +7,8 @@ import ReviewPayees from './ReviewPayees';
 
 interface MoneyMovedProps {
   onNavigate: (screen: AppScreen) => void;
+  /** The screen it was opened from; Back returns there. */
+  backTo?: AppScreen;
 }
 
 // Static class strings: dynamic Tailwind names are purged at build time.
@@ -26,7 +28,16 @@ const RULE_KINDS: PayeeKind[] = ['mine', 'family', 'investment', 'ignore', 'coun
 
 const SHOW_FIRST = 6;
 
-const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
+// What Back names, by where it goes.
+const BACK_LABEL: Partial<Record<AppScreen, string>> = {
+  [AppScreen.DASHBOARD]: 'Back to Home',
+  [AppScreen.HISTORY]: 'Back to the Vault',
+  [AppScreen.ANALYSIS]: 'Back to Pulse',
+  [AppScreen.CATEGORY_SPLIT]: 'Back to Category split',
+  [AppScreen.SELF_DATA]: 'Back to Your data',
+};
+
+const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate, backTo = AppScreen.SELF_DATA }) => {
   const { transactions, payeeRules, flowOf, savePayeeRule, deletePayeeRule, formatAmountCompact } = useWallet();
   const [showAll, setShowAll] = useState(false);
   const [newMatch, setNewMatch] = useState('');
@@ -84,9 +95,9 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
-          onClick={() => onNavigate(AppScreen.SELF_DATA)}
+          onClick={() => onNavigate(backTo)}
           className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
-          aria-label="Back to Your data"
+          aria-label={BACK_LABEL[backTo] ?? 'Back'}
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>

@@ -58,6 +58,8 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.SELF_DATA]: AppScreen.SELF,
   [AppScreen.SELF_APPEARANCE]: AppScreen.SELF,
   [AppScreen.SELF_ABOUT]: AppScreen.SELF,
+  // Money moved opens from Home, Pulse, Category split, the Vault and Your
+  // data; Back returns to whichever it came from (AppContent's backOf).
   [AppScreen.MONEY_MOVED]: AppScreen.SELF_DATA,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
   [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
@@ -66,10 +68,10 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
 // How a screen enters (tailwind animations, motion-safe only): deeper pages
 // slide in from the right, going back slides in from the left, and tabs rise
 // a little into place.
-function motionFor(prev: AppScreen, next: AppScreen): string {
+function motionFor(prev: AppScreen, next: AppScreen, backOf: (screen: AppScreen) => AppScreen | undefined): string {
   if (prev === next) return '';
-  if (BACK_TARGET[next] === prev || next === AppScreen.NEW_ENTRY || next === AppScreen.IMPORT) return 'motion-safe:animate-page-in';
-  if (BACK_TARGET[prev] === next) return 'motion-safe:animate-page-back';
+  if (backOf(next) === prev || next === AppScreen.NEW_ENTRY || next === AppScreen.IMPORT) return 'motion-safe:animate-page-in';
+  if (backOf(prev) === next) return 'motion-safe:animate-page-back';
   return 'motion-safe:animate-tab-in';
 }
 
@@ -90,7 +92,11 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   // The screen before this one, for the entrance motion.
   const shownScreenRef = useRef<AppScreen>(AppScreen.DASHBOARD);
-  const screenMotion = useMemo(() => motionFor(shownScreenRef.current, currentScreen), [currentScreen]);
+  // Where Money moved was opened from, for its Back.
+  const movedFromRef = useRef<AppScreen>(AppScreen.SELF_DATA);
+  const backOf = (screen: AppScreen): AppScreen | undefined =>
+    screen === AppScreen.MONEY_MOVED ? movedFromRef.current : BACK_TARGET[screen];
+  const screenMotion = useMemo(() => motionFor(shownScreenRef.current, currentScreen, backOf), [currentScreen]);
   useEffect(() => { shownScreenRef.current = currentScreen; }, [currentScreen]);
   const [showSplash, setShowSplash] = useState(!QUIET_START && !IS_WEB);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
@@ -143,7 +149,7 @@ function AppContent() {
       // background lock.
       backHandle = await CapacitorApp.addListener('backButton', () => {
         const cur = currentScreenRef.current;
-        const back = BACK_TARGET[cur];
+        const back = backOf(cur);
         if (back) {
           setCurrentScreen(back);
           window.scrollTo(0, 0);
@@ -242,12 +248,14 @@ function AppContent() {
       const next = dx < 0 ? tabIdx + 1 : tabIdx - 1;
       if (next >= 0 && next < TAB_ORDER.length) handleNavigate(TAB_ORDER[next]);
     } else if (dx > 0) {
-      const back = BACK_TARGET[cur];
+      const back = backOf(cur);
       if (back) handleNavigate(back);
     }
   };
 
   const handleNavigate = (screen: AppScreen) => {
+    const from = currentScreenRef.current;
+    if (screen === AppScreen.MONEY_MOVED && from !== AppScreen.MONEY_MOVED) movedFromRef.current = from;
     setCurrentScreen(screen);
     window.scrollTo(0,0);
   };
@@ -344,7 +352,7 @@ function AppContent() {
       case AppScreen.CATEGORY_SPLIT:
         return <CategorySplit onNavigate={handleNavigate} />;
       case AppScreen.MONEY_MOVED:
-        return <MoneyMoved onNavigate={handleNavigate} />;
+        return <MoneyMoved onNavigate={handleNavigate} backTo={movedFromRef.current} />;
       case AppScreen.IMPORT:
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:

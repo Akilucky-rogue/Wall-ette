@@ -23,12 +23,13 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: '1.5.9',
     items: [
       "A new look: Wall·ette's own icon, logo and mascot, and clearer type.",
-      'Four colour themes from the new brand: Sage, Teal, Midnight and Terracotta.',
+      'Four colour themes: Sage, Teal, Midnight and Terracotta.',
       'Money in and money out are easier to read in every theme.',
       'Each bank account keeps its own opening balance, so statements from two banks add up.',
       'Import statements from Equitas Small Finance Bank.',
-      'Entries from Excel statements no longer carry a stray "UPI ID" note.',
-      "Money moved's Back button returns to the screen you opened it from.",
+      'Excel imports no longer add a stray "UPI ID" note.',
+      "Money moved's Back returns to the screen you came from.",
+      'Less waiting at start-up on a slow connection.',
     ],
   },
   {

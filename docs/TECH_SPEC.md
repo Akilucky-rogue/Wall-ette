@@ -101,7 +101,12 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
 
 ### 2.3 State management
 Plain React context — no Redux/Zustand.
-- **`AuthContext`** — Firebase Auth session state. Signing out and account deletion go
+- **`AuthContext`** — Firebase Auth session state. `services/firebase.ts` starts Auth with
+  `initializeAuth` on Android/iOS (IndexedDB, then localStorage; no popup/redirect helper,
+  since sign-in is email + password and TOTP) and `getAuth` with session persistence on the
+  web. With `getAuth`, Firebase on Android loads `apis.google.com/js/api.js` and an auth
+  iframe before it reports the signed-in user, which held start-up on a bad connection.
+  Signing out and account deletion go
   through `services/session.ts`, which also removes the user's data from the device: the
   `localStorage` mirror (keys ending in `_<uid>`) and Firestore's offline cache, then
   reloads. On sign-out the cache is only cleared once unsynced changes reach the cloud

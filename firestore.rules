@@ -50,6 +50,32 @@ service cloud.firestore {
       allow get: if request.auth != null;
     }
 
+    // ========== WEBSITE FORMS (wall-ette.com) ==========
+    // Anyone may send a contact message or join the Monthly Check-in; no one
+    // can read, change or delete them from outside (read them in the Firebase
+    // console). Fields and sizes are checked here (site/src/lib/forms.ts).
+    function isEmail(v) {
+      return v is string && v.size() <= 254 && v.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+    }
+    match /site_messages/{messageId} {
+      allow create: if request.resource.data.keys().hasOnly(['name', 'email', 'topic', 'message', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+                    && isEmail(request.resource.data.email)
+                    && request.resource.data.topic in ['support', 'bank', 'feedback', 'privacy', 'press', 'other']
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() >= 10 && request.resource.data.message.size() <= 2000
+                    && request.resource.data.createdAt == request.time;
+    }
+    // One document per address (its id), so subscribing twice is refused.
+    match /newsletter/{address} {
+      allow create: if request.resource.data.keys().hasOnly(['email', 'source', 'createdAt'])
+                    && isEmail(request.resource.data.email)
+                    && request.resource.data.email == address
+                    && request.resource.data.source is string && request.resource.data.source.size() <= 40
+                    && request.resource.data.createdAt == request.time;
+    }
+
     // ========== DENY BY DEFAULT ==========
     // Anything not explicitly matched above is rejected.
   }

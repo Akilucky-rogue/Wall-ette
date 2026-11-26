@@ -1,11 +1,13 @@
 /**
- * The app's public web address (Firebase Hosting, custom domain). The
- * policy pages are in public/; wall-e-7a113.web.app serves the same site.
+ * The public web address (Firebase Hosting, custom domain): the website
+ * (site/) with the web app at /app; wall-e-7a113.web.app serves the same.
+ * The policy pages are the website's; /privacy.html and /terms.html, where
+ * they used to be, redirect to them (firebase.json).
  */
 export const SITE_HOST = 'wall-ette.com';
 export const SITE_URL = `https://${SITE_HOST}`;
-export const PRIVACY_URL = `${SITE_URL}/privacy.html`;
-export const TERMS_URL = `${SITE_URL}/terms.html`;
+export const PRIVACY_URL = `${SITE_URL}/privacy`;
+export const TERMS_URL = `${SITE_URL}/terms`;
 
 /**
  * Sender of the password-reset email (Firebase's default for this project).

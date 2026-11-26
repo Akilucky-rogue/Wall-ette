@@ -27,5 +27,14 @@
     "noEmit": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "site",
+    "dist",
+    "dist-web",
+    "hosting",
+    "android",
+    "ios"
+  ]
 }

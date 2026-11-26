@@ -9,9 +9,10 @@ import { log } from '../utils/log';
 import { ACCOUNT_EMAIL_FROM, PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
 
-// Bump when terms.html / privacy.html change materially — recorded with
-// each registration as the version the user agreed to.
-const TERMS_VERSION = '2026-06-11';
+// Bump when the website's terms or privacy policy change materially —
+// recorded with each registration as the version the user agreed to. The
+// website's sign-up records the same (site/src/lib/auth-rules.ts).
+const TERMS_VERSION = '2026-11-27';
 
 export type AuthType = 'login' | 'register';
 

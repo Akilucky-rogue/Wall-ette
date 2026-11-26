@@ -31,14 +31,13 @@ const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
 const LeftToSpend = React.lazy(() => import('./components/LeftToSpend'));
 const Profile = React.lazy(() => import('./components/Profile'));
-const Landing = React.lazy(() => import('./components/Landing'));
-
-// The website shows the product page (components/Landing.tsx) to visitors
-// who aren't signed in; "#signin" in the address shows the sign-in screen
-// instead, so the browser's Back button returns to the page. The Android app
-// never shows it, and only it plays the launch splash.
+// On the web the app lives at wall-ette.com/app; the website around it
+// (site/) is the product page. Visitors who aren't signed in see sign-in,
+// with a way back to the website. Only the Android app plays the launch splash.
 const IS_WEB = !Capacitor.isNativePlatform();
+// Links from before the app moved to /app ("wall-ette.com/#signin") arrive here.
 const SIGN_IN_HASH = '#signin';
+const WEBSITE_URL = '/';
 
 // ── Swipe navigation ──────────────────────────────────────────────────────
 // Swipe left/right on the four main tabs to move between them; swipe right
@@ -94,7 +93,6 @@ function AppContent() {
   const screenMotion = useMemo(() => motionFor(shownScreenRef.current, currentScreen), [currentScreen]);
   useEffect(() => { shownScreenRef.current = currentScreen; }, [currentScreen]);
   const [showSplash, setShowSplash] = useState(!QUIET_START && !IS_WEB);
-  const [showLanding, setShowLanding] = useState(() => IS_WEB && window.location.hash !== SIGN_IN_HASH);
   const [splashVariant, setSplashVariant] = useState<SplashVariant>('launch');
   const [authSplashPending, setAuthSplashPending] = useState<AuthType | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -104,35 +102,14 @@ function AppContent() {
   // an update.
   const [signedInThisRun, setSignedInThisRun] = useState(false);
 
-  // Product page ↔ sign-in screen follows the address, so Back works.
-  useEffect(() => {
-    if (!IS_WEB) return;
-    const sync = () => setShowLanding(window.location.hash !== SIGN_IN_HASH);
-    window.addEventListener('hashchange', sync);
-    window.addEventListener('popstate', sync);
-    return () => {
-      window.removeEventListener('hashchange', sync);
-      window.removeEventListener('popstate', sync);
-    };
-  }, []);
-  const openSignIn = () => { window.location.hash = SIGN_IN_HASH; };
   // Signed in, the address drops "#signin" so it no longer reads as the
-  // sign-in page; signed out on the sign-in screen, it carries it again, so
-  // Back still returns to the product page. replaceState fires no hashchange.
+  // sign-in page. replaceState fires no hashchange.
   useEffect(() => {
     if (!IS_WEB || loading) return;
-    const hash = window.location.hash;
-    if (user && hash === SIGN_IN_HASH) {
+    if (user && window.location.hash === SIGN_IN_HASH) {
       window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
-    } else if (!user && !showLanding && hash !== SIGN_IN_HASH) {
-      window.history.replaceState(window.history.state, '', SIGN_IN_HASH);
     }
-  }, [user, loading, showLanding]);
-  const openProductPage = () => {
-    window.history.pushState(null, '', window.location.pathname + window.location.search);
-    setShowLanding(true);
-    window.scrollTo(0, 0);
-  };
+  }, [user, loading]);
 
   // Ref mirror so long-lived native listeners read the current screen without
   // re-registering on every navigation (audit Phase 6.2).
@@ -323,24 +300,16 @@ function AppContent() {
   }
 
   if (!user) {
-      if (showLanding) {
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <Landing onOpenApp={openSignIn} />
-          </Suspense>
-        );
-      }
       return (
         <>
           {IS_WEB && (
-            <button
-              type="button"
-              onClick={openProductPage}
+            <a
+              href={WEBSITE_URL}
               className="fixed left-4 top-[calc(var(--sat)_+_1rem)] z-50 flex items-center gap-1 rounded-full bg-white/80 px-3.5 py-2 text-[13px] font-medium text-zen-charcoal shadow-soft backdrop-blur hover:text-premium-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage"
             >
               <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
               About Wall·ette
-            </button>
+            </a>
           )}
           <Auth onAuthSuccess={handleAuthSuccess} />
           <AndroidInstallBanner />

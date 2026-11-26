@@ -743,7 +743,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
               </>
             ) : mfaBusy && !enrollment ? (
               <div className="flex justify-center py-10">
-                <div className="size-8 rounded-full border-4 border-sage/20 border-t-sage animate-spin" />
+                <div className="h-8 w-8 rounded-full border-4 border-sage/20 border-t-sage animate-spin" />
               </div>
             ) : enrollment ? (
               <>

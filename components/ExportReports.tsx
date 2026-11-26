@@ -266,7 +266,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
                   >
                     <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${card.iconCls}`}>
                       {busy === card.id
-                        ? <span className="size-5 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" aria-label="Working" />
+                        ? <span className="h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" aria-label="Working" />
                         : <span className="material-symbols-outlined icon-fill text-[24px]" aria-hidden="true">{card.icon}</span>}
                     </span>
                     <span className="flex-1 min-w-0">

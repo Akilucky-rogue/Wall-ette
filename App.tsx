@@ -262,7 +262,7 @@ function AppContent() {
 
   const LoadingFallback = () => (
       <div className="h-full min-h-screen bg-zen-bg flex items-center justify-center">
-           <div className="size-10 rounded-full border-4 border-sage/20 border-t-sage animate-spin"></div>
+           <div className="h-10 w-10 rounded-full border-4 border-sage/20 border-t-sage animate-spin"></div>
       </div>
   );
 

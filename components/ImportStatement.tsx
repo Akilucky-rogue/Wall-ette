@@ -778,7 +778,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
                 <h3 className="text-xl font-display font-bold text-premium-charcoal mb-2">{loadingMessage}</h3>
                 <p className="text-muted-taupe text-xs">The file is read on this device and never uploaded</p>
-                <div className="mt-5 size-6 rounded-full border-[3px] border-sage/20 border-t-sage animate-spin" aria-hidden="true" />
+                <div className="mt-5 h-6 w-6 rounded-full border-[3px] border-sage/20 border-t-sage animate-spin" aria-hidden="true" />
             </div>
         )}
 

@@ -119,7 +119,7 @@ For 1.5.9 (the brand kit), replace it with:
 >
 > Wall-ette — your mindful money companion.
 
-For 1.5.9, three changes to paste: the first paragraph becomes "🌿 CALM BY DESIGN — Wall·ette's sage look, four colour themes and a friendly mascot make checking your money a pleasant ritual instead of a chore."; the bank list in the import paragraph becomes "IDFC FIRST, HDFC, SBI, Kotak, Union Bank, Saraswat Bank or Equitas"; and the last line becomes "Wall·ette — your personal finance companion."
+For 1.5.9, three changes to paste: the first paragraph becomes "🌿 CALM BY DESIGN — Wall·ette's sage look, a choice of colour themes and a friendly mascot make checking your money a pleasant ritual instead of a chore."; the bank list in the import paragraph becomes "IDFC FIRST, HDFC, SBI, Kotak, Union Bank, Saraswat Bank or Equitas"; and the last line becomes "Wall·ette — your personal finance companion."
 
 The "KNOW WHAT'S LEFT" paragraph went into the listing with 1.5.6 (24 Nov 2026). The currency line was rewritten on 25 Nov 2026: the old one named only INR, USD, EUR and GBP, but since 1.5.6 any currency can be shown, at live rates. The owner put it into the listing on 25 Nov 2026 (Play Console → Grow users → Store presence → Main store listing → Full description).
 

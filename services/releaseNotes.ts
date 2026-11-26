@@ -23,7 +23,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: '1.5.9',
     items: [
       "A new look: Wall·ette's own icon, logo and mascot, and clearer type.",
-      'Four colour themes: Sage, Teal, Midnight and Terracotta.',
+      'Brand colours in Sage and Terracotta; new Teal and Navy themes.',
       'Money in and money out are easier to read in every theme.',
       'Each bank account keeps its own opening balance, so statements from two banks add up.',
       'Import statements from Equitas Small Finance Bank.',

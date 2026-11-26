@@ -35,8 +35,9 @@ Last reviewed for 1.5.9 (November 2026).
 ## Tokens
 
 All colours resolve through CSS variables set by `utils/theme.ts` on `<html>`
-(themes: the brand kit's Sage, Teal, Midnight and Terracotta, then Slate,
-Techie and custom). Tailwind classes read them (`bg-white` is the card,
+(themes: Sage and Midnight, its dark twin with sage-green accents, which
+"Match system theme" uses in dark mode; the brand kit's Teal, Terracotta
+and Navy; then Slate, Techie and custom). Tailwind classes read them (`bg-white` is the card,
 `text-premium-charcoal` the ink). `scripts/check-contrast.mjs` holds every
 theme to 4.5:1 for text, the accent as text and behind text, and money out.
 

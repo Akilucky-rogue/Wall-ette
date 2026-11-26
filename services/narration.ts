@@ -32,3 +32,20 @@ export function narrationFields(narration: string): string[] {
  * entries already imported never change.
  */
 export const payeeFields = (narration: string): string[] => narrationFields(narration.replace(/\bA\/C\b/gi, 'AC'));
+
+// The note the IDFC Excel reader saves on a UPI row: the field after "UPI/",
+// which is usually DR or CR ("UPI ID: DR"). It isn't the bank's text.
+const EXCEL_UPI_NOTE = /^UPI ID: [A-Z0-9]+$/i;
+
+/**
+ * What an entry's details show: the bank's narration in full, and a note of
+ * its own. Imports keep the narration in the note; the payee field holds its
+ * first 100 characters, or the name the payee was renamed to. Either is null
+ * when there is nothing to show.
+ */
+export function bankWords(merchant: string | undefined, note: string | undefined): { narration: string | null; note: string | null } {
+  const own = note?.trim() && !EXCEL_UPI_NOTE.test(note.trim()) ? note.trim() : '';
+  const isNarration = (s: string) => narrationFields(s).length >= 2;
+  const narration = own && isNarration(own) ? own : merchant?.trim() && isNarration(merchant) ? merchant.trim() : null;
+  return { narration, note: own && own !== narration ? own : null };
+}

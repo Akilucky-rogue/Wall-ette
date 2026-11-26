@@ -4,7 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { getSymbol, inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
-import { narrationFields } from '../services/narration';
+import { bankWords } from '../services/narration';
 import { WallEMascot, WallEEyes } from './SplashScreen';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
@@ -728,12 +728,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         {expanded && (
                             <div className="px-4 pb-4 pt-1 bg-zen-cream space-y-3">
                                 {(() => {
-                                    // The bank's narration in full: imports keep it in the note
-                                    // (the payee field holds its first 100 characters, or the name
-                                    // it was renamed to), so the bank's own words are always here.
-                                    const isNarration = (s?: string) => !!s && narrationFields(s).length >= 2;
-                                    const narration = isNarration(t.note) ? t.note!.trim() : isNarration(t.merchant) ? (t.merchant ?? '').trim() : null;
-                                    const note = t.note && t.note.trim() && t.note.trim() !== narration ? t.note.trim() : null;
+                                    // The bank's narration in full, and the entry's own note (services/narration.ts).
+                                    const { narration, note } = bankWords(t.merchant, t.note);
                                     return (
                                         <>
                                             {narration && narration !== name && (

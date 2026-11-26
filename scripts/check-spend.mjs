@@ -16,7 +16,8 @@
  *     counting shows under its rule's category; the label never becomes
  *     data; the review's guesses from a name; a payment and its reversal
  *     (same reference and amount) cancel out, and only an exact pair does;
- *     fund redemptions are money coming back, not income
+ *     fund redemptions are money coming back, not income; Vault shows the
+ *     bank's narration, never the IDFC Excel reader's "UPI ID: DR" note
  *
  * Usage (after `npm ci`):
  *   node scripts/check-spend.mjs
@@ -43,6 +44,7 @@ await build({
       `export * from ${JSON.stringify(join(root, 'services', 'review.ts'))};`,
       `export { reversalPairs } from ${JSON.stringify(join(root, 'services', 'reversals.ts'))};`,
       `export { categorizeNarration } from ${JSON.stringify(join(root, 'services', 'categorize.ts'))};`,
+      `export { bankWords } from ${JSON.stringify(join(root, 'services', 'narration.ts'))};`,
     ].join('\n'),
     resolveDir: root,
     loader: 'ts',
@@ -54,7 +56,7 @@ await build({
   logLevel: 'error',
 });
 const { analyzeIncome, detectRecurringCharges, flowClassifier, matchText, payeeName, paymentRail, prettyMerchant, suggestPayees, tidyName,
-  shownCategory, withShownCategories, categoryToStore, suggestChoice, reviewPayees, toReviewTotal, REVIEW_CHOICES, reversalPairs, categorizeNarration } =
+  shownCategory, withShownCategories, categoryToStore, suggestChoice, reviewPayees, toReviewTotal, REVIEW_CHOICES, reversalPairs, categorizeNarration, bankWords } =
   await import(pathToFileURL(bundle).href);
 rmSync(tmp, { recursive: true, force: true });
 
@@ -283,6 +285,18 @@ eq('rail: from the first field', ['UPI/DR/1/X', 'NEFT/2/Y', 'MB/IMPS/3/Z', 'POS 
     ['Redemption proceeds', 'Investment Returns', 'Redemption proceeds']);
   const red = i('red', 'Bluechip fund', 40000, 'Redemption proceeds');
   eq('… money moved even when typed by hand', none(red).moved, 'investment');
+
+  // Vault's details: the bank's words and a note of the entry's own
+  const upiRow = 'UPI/DR/612300000001/ZOMATO LTD/UTIB/zomato@axis/UPI';
+  eq('details: an IDFC Excel row shows its narration, not the reader\'s "UPI ID: DR" note',
+    bankWords(upiRow, 'UPI ID: DR'), { narration: upiRow, note: null });
+  eq('… renamed payee with that note: nothing to show', bankWords('Zomato', 'UPI ID: CR'), { narration: null, note: null });
+  eq('… the reversal form too', bankWords('UPI/REV/612300000002/ZOMATO LTD/UTIB/zomato@axis/UPI', 'UPI ID: REV').note, null);
+  const longRow = `${upiRow}/A NOTE LONGER THAN THE PAYEE FIELD KEEPS`;
+  eq('… a PDF row: the full narration from the note', bankWords(longRow.slice(0, 40), longRow), { narration: longRow, note: null });
+  eq('… a renamed payee keeps its narration in the note', bankWords('Zomato', upiRow), { narration: upiRow, note: null });
+  eq('… typed by hand: the note is a note', bankWords('Coffee', 'with Ravi'), { narration: null, note: 'with Ravi' });
+  eq('… nothing at all', bankWords('Coffee', ''), { narration: null, note: null });
 }
 
 console.log(`${checks - failures}/${checks} checks passed.`);

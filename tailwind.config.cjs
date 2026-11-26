@@ -57,9 +57,11 @@ module.exports = {
       },
       // The brand's type (brand kit, 06 Typography): Manrope for headings
       // and the wordmark, Inter for everything else, figures included.
+      // Bundled (@fontsource-variable, index.tsx), so the names carry
+      // "Variable".
       fontFamily: {
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
-        'display': ['Manrope', 'Inter', 'system-ui', 'sans-serif'],
+        'sans': ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
+        'display': ['"Manrope Variable"', 'Manrope', '"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '1.25rem', // 20px

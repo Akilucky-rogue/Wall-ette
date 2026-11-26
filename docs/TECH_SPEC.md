@@ -25,7 +25,7 @@ calls — every insight is computed on the device. The Android app sends crash r
 | Excel parsing | SheetJS `xlsx` (pinned CDN tarball) | 0.20.3 |
 | QR generation | `qrcode` (TOTP enrollment) | 1.5 |
 | Android toolchain | AGP 8.13 · Gradle 8.14.3 · JDK 21 (Temurin) | SDK 24 → 35 |
-| Fonts | Inter (text and figures) · Manrope (headings) · Material Symbols Outlined | Google Fonts CDN |
+| Fonts | Inter (text and figures) · Manrope (headings) · Material Symbols Outlined | Inter and Manrope bundled (`@fontsource-variable`); Material Symbols from the Google Fonts CDN, loaded without holding up the first paint |
 
 Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for node/react/qrcode.
 

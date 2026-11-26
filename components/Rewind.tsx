@@ -154,7 +154,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       const ctx = canvas.getContext('2d')!;
 
       // The brand's type, loaded before drawing so the canvas uses it.
-      await Promise.all(['700 76px Manrope', '600 13px Inter', '700 32px Inter'].map(f => document.fonts?.load(f).catch(() => undefined)));
+      await Promise.all(['700 76px "Manrope Variable"', '600 13px "Inter Variable"', '700 32px "Inter Variable"'].map(f => document.fonts?.load(f).catch(() => undefined)));
 
       // background
       ctx.fillStyle = '#F9F3ED';
@@ -178,14 +178,14 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         ctx.fillText(text, W / 2, y);
       };
 
-      center('W A L L · E T T E   W R A P P E D', 270, '600 15px Inter, sans-serif', '#646859');
-      center(String(wrapped.year), 344, '700 76px Manrope, Inter, sans-serif', '#282C20');
+      center('W A L L · E T T E   W R A P P E D', 270, '600 15px "Inter Variable", Inter, sans-serif', '#646859');
+      center(String(wrapped.year), 344, '700 76px "Manrope Variable", Manrope, sans-serif', '#282C20');
 
       // stats
       const row = (label: string, value: string, y: number, color = '#282C20', big = false) => {
-        ctx.font = '600 13px Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
+        ctx.font = '600 13px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = `700 ${big ? 44 : 32}px Inter, sans-serif`; ctx.fillStyle = color;
+        ctx.font = `700 ${big ? 44 : 32}px "Inter Variable", Inter, sans-serif`; ctx.fillStyle = color;
         ctx.fillText(value, W / 2, y + (big ? 50 : 40));
       };
 
@@ -200,9 +200,9 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       ctx.beginPath(); ctx.moveTo(80, 690); ctx.lineTo(W - 80, 690); ctx.stroke();
 
       const small = (label: string, value: string, y: number) => {
-        ctx.font = '600 11px Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
+        ctx.font = '600 11px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = '600 19px Inter, sans-serif'; ctx.fillStyle = '#282C20';
+        ctx.font = '600 19px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#282C20';
         const v = value.length > 34 ? value.slice(0, 33) + '…' : value;
         ctx.fillText(v, W / 2, y + 26);
       };
@@ -212,7 +212,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       if (wrapped.topCat) { small('top category', `${wrapped.topCat[0]} · ${fmt(wrapped.topCat[1])}`, sy); sy += 62; }
       small('busiest month · no-spend days', `${wrapped.busiestMonth} · ${wrapped.noSpendDays} days`, sy);
 
-      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px Inter, sans-serif', '#8C8F80');
+      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px "Inter Variable", Inter, sans-serif', '#8C8F80');
 
       const base64 = canvas.toDataURL('image/png').split(',')[1];
       const outcome = await exportImage(`wall-ette-wrapped-${wrapped.year}.png`, base64);

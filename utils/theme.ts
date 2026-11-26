@@ -5,7 +5,7 @@
 // inline SVG/chart colors read the `--*` hex aliases directly.
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
-export type ThemeId = 'sage' | 'midnight' | 'teal' | 'terra' | 'navy' | 'slate' | 'techie' | 'custom';
+export type ThemeId = 'sage' | 'midnight' | 'teal' | 'terra' | 'slate' | 'techie' | 'custom';
 export type ThemeMode = ThemeId | 'auto';
 
 export interface CustomTheme {
@@ -58,11 +58,11 @@ const DARK_BASE: Palette = {
 // ── Preset themes (sage-* aliases are the app's "accent" slots) ───────────
 // Sage and Midnight are Wall·ette's own look, light and dark: Midnight is
 // the dark base with sage-green accents, as it has been since it shipped,
-// and "Match system theme" uses it in dark mode, so it stays green (the
-// brand kit's navy palette is Navy, not Midnight). Teal, Terracotta and
-// Navy are the kit's other palettes (05 Palette Variations), to pick on
-// purpose. All are set so text, the accent as text and behind text, and
-// money out reach 4.5:1 (scripts/check-contrast.mjs).
+// and "Match system theme" uses it in dark mode, so it stays green. The
+// brand kit's navy palette is not a theme. Teal and Terracotta are the
+// kit's other palettes (05 Palette Variations). All are set so text, the
+// accent as text and behind text, and money out reach 4.5:1
+// (scripts/check-contrast.mjs).
 // Terracotta's accent is the clay money out uses elsewhere, so it takes a
 // berry for money out. `wallet` and `wallet-2` colour Home's wallet; without
 // them it is a deep shade of the accent.
@@ -111,18 +111,6 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeDef> = {
       'sand': '#E4C3A3', 'sand-soft': '#FBE6D2', 'sand-ink': '#8A5A35', 'gold-1': '#C99A6E', 'gold-2': '#DDB48C',
       'rose': '#8A3F55', 'rose-2': '#B97A8B', 'rose-3': '#73344A', 'rose-soft': '#F4E1E6',
       'wallet': '#9A5A4A', 'wallet-2': '#644150',
-    },
-  },
-  navy: {
-    name: 'Navy', dark: true,
-    vars: {
-      'bg': '#0F1828', 'card': '#16223A', 'card-alt': '#1B2944',
-      'ink': '#F2EEE6', 'ink-2': '#D9D5CC', 'mut': '#9EA8B8', 'mut-2': '#66718A',
-      'line': '#22314A', 'line-2': '#2A3A56',
-      'sage': '#8FA9C9', 'sage-2': '#7893B6', 'sage-3': '#B3C6DD',
-      'sage-deep': '#C3D3E6', 'sage-soft': '#1E3150', 'sage-line': '#2D4468',
-      'sand': '#D9A07C', 'sand-soft': '#3A2A22', 'sand-ink': '#E7B08C', 'gold-1': '#D28459', 'gold-2': '#E0A27E',
-      'wallet': '#22406A', 'wallet-2': '#193152',
     },
   },
   slate: {

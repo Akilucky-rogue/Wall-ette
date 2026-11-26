@@ -68,8 +68,8 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   - `--c-*` channel triplets (`r g b`) feed Tailwind via `rgb(var(--c-x) / <alpha-value>)` —
     the entire utility palette (including remapped `white` and the `gray` scale) follows the theme;
   - `--*` hex aliases feed inline SVG/chart colors (`stroke="var(--sage)"`).
-- **Seven themes:** Sage (default), Midnight (dark, sage-green accents), Teal, Terracotta,
-  Navy (dark), Slate, Techie (dark terminal-green), and Custom — a user-picked accent + light/dark base, derived at runtime with color-mix math.
+- **Six themes:** Sage (default), Midnight (dark, sage-green accents), Teal, Terracotta,
+  Slate, Techie (dark terminal-green), and Custom — a user-picked accent + light/dark base, derived at runtime with color-mix math.
 - **Auto mode** follows `prefers-color-scheme` (light → Sage, dark → Midnight) with a live
   media-query listener. Choice persists per device in `localStorage`.
 - Native side: on every Android version the page draws behind both system bars, so they

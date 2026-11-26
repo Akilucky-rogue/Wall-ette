@@ -123,7 +123,7 @@ const BalanceTrend: React.FC<BalanceTrendProps> = ({ endMonth, className = '' })
       <div className="mt-3 pt-3 border-t border-premium-charcoal/[0.08] flex items-center justify-between gap-2">
         <div className="shrink-0">
           <p className="text-[11px] text-muted-taupe">End of {sel.fullLabel}</p>
-          <p className="text-[15px] font-serif font-semibold text-premium-charcoal tabular-nums">{money(sel.value)}</p>
+          <p className="text-[15px] font-semibold text-premium-charcoal tabular-nums">{money(sel.value)}</p>
         </div>
         {quiet ? (
           <p className="text-[11px] text-muted-taupe text-right">Nothing came in or went out</p>

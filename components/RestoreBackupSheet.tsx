@@ -74,7 +74,7 @@ const RestoreBackupSheet: React.FC<RestoreBackupSheetProps> = ({ plan, walletEmp
             <div className="w-10 h-10 rounded-2xl bg-sand-light flex items-center justify-center">
               <span className="material-symbols-outlined text-sand-ink text-[22px]" aria-hidden="true">settings_backup_restore</span>
             </div>
-            <h3 id="restore-title" className="text-lg font-serif font-semibold text-premium-charcoal">Restore from a backup</h3>
+            <h3 id="restore-title" className="text-lg font-display font-bold text-premium-charcoal">Restore from a backup</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" aria-label="Close">
             <span className="material-symbols-outlined text-muted-taupe" aria-hidden="true">close</span>
@@ -131,7 +131,7 @@ const RestoreBackupSheet: React.FC<RestoreBackupSheetProps> = ({ plan, walletEmp
         <button
           onClick={() => onRestore(withSettings && plan.hasSettings)}
           disabled={!canRestore}
-          className="mt-6 w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-6 w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {canRestore ? action : 'Nothing to restore'}
         </button>

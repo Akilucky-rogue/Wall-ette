@@ -5,7 +5,7 @@ import { getSymbol, inputDigits, toBase, toShown } from '../utils/currencyUtils'
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
 import { bankWords } from '../services/narration';
-import { WallEMascot, WallEEyes } from './SplashScreen';
+import { Mascot } from './ui/Brand';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import DuplicateEntries from './DuplicateEntries';
@@ -331,7 +331,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
         <div className="flex items-center justify-between mb-5 -mt-0.5">
-          <h1 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Vault</h1>
+          <h1 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Vault</h1>
           <div className="flex items-center gap-0.5 -mr-2">
              <button
                 onClick={() => setShowClearConfirm(true)}
@@ -450,11 +450,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 pb-4 border-b border-premium-charcoal/[0.08]">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-sage/10 flex items-center justify-center">
-                        <WallEEyes size="sm" />
+                      <div className="w-10 h-10 rounded-full bg-sage-light text-sage flex items-center justify-center" aria-hidden="true">
+                        <span className="material-symbols-outlined text-[20px]">tune</span>
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg font-semibold text-premium-charcoal">Filter & Sort</h3>
+                        <h3 className="font-display text-lg font-bold text-premium-charcoal">Filter and sort</h3>
                         <p className="text-[10px] text-muted-taupe">{filteredTransactions.length} transactions match</p>
                       </div>
                     </div>
@@ -609,7 +609,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 <div className="p-6 pt-4 border-t border-premium-charcoal/[0.08] bg-white">
                     <button 
                         onClick={() => setShowFilters(false)}
-                        className="w-full bg-premium-charcoal text-white py-4 rounded-3xl font-serif text-lg font-medium active:scale-95 transition-transform flex items-center justify-center gap-2"
+                        className="w-full bg-premium-charcoal text-white py-4 rounded-3xl text-lg font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px]">check</span>
                         Show {filteredTransactions.length} Results
@@ -643,8 +643,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
             <div className="flex flex-col items-center justify-center py-16">
                 {transactions.length === 0 ? (
                   <>
-                    <WallEMascot mood="happy" size="md" />
-                    <p className="mt-4 font-serif text-lg font-semibold text-premium-charcoal">No entries yet</p>
+                    <Mascot pose="welcome" height={120} />
+                    <p className="mt-4 font-display text-lg font-bold text-premium-charcoal">No entries yet</p>
                     <p className="mt-1 text-muted-taupe text-sm text-center max-w-[280px] leading-relaxed">
                       Every entry you add or import shows up here, newest first.
                     </p>
@@ -665,7 +665,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                   </>
                 ) : (
                   <>
-                    <WallEMascot mood="thinking" size="md" />
+                    <Mascot pose="think" height={104} />
                     <p className="mt-4 text-premium-charcoal text-sm font-semibold">
                       {searchQuery ? `Nothing matches “${searchQuery}”` : 'No entries match these filters'}
                     </p>
@@ -808,7 +808,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-12 h-12 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4">
                         <span className="material-symbols-outlined text-[24px]">delete</span>
                     </div>
-                    <h3 className="text-premium-charcoal font-serif text-xl font-semibold mb-2">Delete this entry?</h3>
+                    <h3 className="text-premium-charcoal font-display text-xl font-bold mb-2">Delete this entry?</h3>
                     <p className="text-muted-taupe text-xs mb-6 leading-relaxed">
                         This action cannot be undone. The transaction will be permanently removed.
                     </p>
@@ -839,7 +839,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-14 h-14 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4 animate-pulse">
                         <span className="material-symbols-outlined text-[32px]">warning</span>
                     </div>
-                    <h3 className="text-rose font-serif text-xl font-bold mb-2">Clear all history?</h3>
+                    <h3 className="text-rose font-display text-xl font-bold mb-2">Clear all history?</h3>
                     <p className="text-premium-charcoal text-xs mb-4 leading-relaxed font-medium">
                         This will permanently delete <span className="underline decoration-rose">ALL</span> transactions. This action is irreversible.
                     </p>
@@ -883,7 +883,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             <div className="w-12 h-12 bg-sage-light text-sage rounded-full flex items-center justify-center">
                                 <span className="material-symbols-outlined text-[24px]">edit</span>
                             </div>
-                            <h3 className="text-premium-charcoal font-serif text-xl font-semibold">Edit entry</h3>
+                            <h3 className="text-premium-charcoal font-display text-xl font-bold">Edit entry</h3>
                         </div>
                         <button onClick={closeEditModal} className="text-muted-taupe hover:text-premium-charcoal">
                             <span className="material-symbols-outlined">close</span>
@@ -1018,7 +1018,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {showToast && (
           <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
               <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
-              <span className="text-[13px] font-medium font-serif">{toastMsg}</span>
+              <span className="text-[13px] font-medium">{toastMsg}</span>
           </div>
       )}
     </div>

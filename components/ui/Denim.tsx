@@ -28,7 +28,7 @@ export const DenimLabel: React.FC<{ children: React.ReactNode; className?: strin
 
 /** The key figure on denim, embossed. */
 export const DenimFigure: React.FC<{ children: React.ReactNode; className?: string; size?: 'lg' | 'md' }> = ({ children, className = '', size = 'lg' }) => (
-  <p className={`wallet-emboss font-serif leading-none tabular-nums truncate ${size === 'lg' ? 'text-[40px]' : 'text-[30px]'} ${className}`}>
+  <p className={`wallet-emboss font-semibold leading-none tabular-nums truncate ${size === 'lg' ? 'text-[40px]' : 'text-[30px]'} ${className}`}>
     {children}
   </p>
 );
@@ -46,7 +46,7 @@ export const Pocket: React.FC<{
       {icon && <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{icon}</span>}
       {label}
     </p>
-    <p className="font-serif text-[22px] leading-tight tabular-nums mt-1 truncate">{value}</p>
+    <p className="font-semibold text-[22px] leading-tight tabular-nums mt-1 truncate">{value}</p>
     {note != null && <p className="text-[11px] tabular-nums truncate mt-0.5 text-denim-mut">{note}</p>}
   </div>
 );

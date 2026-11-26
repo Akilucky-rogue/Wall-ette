@@ -24,6 +24,6 @@ One-off development and debugging tools. None of these ship with the app.
 | `test-parser.mjs`, `test-summary.mjs` | Exercise the IDFC statement parsers against local statement files |
 | `analyze-excel.mjs`, `analyze-excel-detailed.mjs` | Inspect raw Excel statement structure while developing the parser |
 | `analyze-last-transactions.mjs`, `compare-dashboard-vs-statement.mjs` | Reconciliation checks between parsed data and statement totals |
-| `generate-icon.html`, `generate-icons.cjs`, `resize-icon.cjs` | App icon generation. **Note:** the icon scripts need `npm i -D canvas sharp` (removed from devDependencies during the dependency cleanup) |
+| `brand-icons.mjs` | Wall·ette's icon, drawn once as SVG (traced from the brand kit's approved icon) and rendered at every size it ships in: Android's adaptive layers, themed and legacy icons and the launch icon, the Play and App Store icons, the iOS icon and launch image, and the web app's and website's favicons. Needs `rsvg-convert` (librsvg) and ImageMagick's `convert` |
 
 Statement files used by these scripts live in `../private/statements/` (gitignored — personal data).

@@ -6,7 +6,7 @@ import { useWallet } from '../context/WalletContext';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { done } from '../utils/haptics';
-import { FloatingLeaf, Sprout, RangoliCorner, Diya } from './SplashScreen';
+import { Diya, FloatingLeaf, RangoliCorner, Sprout } from './ui/Decor';
 
 interface NewEntryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -179,7 +179,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
-      <FloatingLeaf className="top-20 right-5 opacity-35" delay={0.3} />
+      <FloatingLeaf className="top-20 right-5 opacity-35" />
       <Sprout className="absolute top-32 left-4 opacity-40" />
       <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="var(--gold-1)" mirror />
 
@@ -192,7 +192,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">New entry</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight flex-1 truncate">New entry</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pt-2 flex flex-col gap-6 pb-4">
@@ -201,8 +201,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           <div className="absolute top-2 right-8"><Diya className="opacity-50" /></div>
           <p className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-2">Amount</p>
           <div className="flex items-center justify-center gap-1">
-            <span className={`font-serif text-3xl mb-2 ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{getSymbol(shownCurrency)}</span>
-            <span className={`font-serif leading-none ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{amount}</span>
+            <span className={`text-3xl mb-2 font-medium ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{getSymbol(shownCurrency)}</span>
+            <span className={`font-semibold leading-none tabular-nums ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{amount}</span>
           </div>
           {/* Quick amounts */}
           <div className="flex justify-center gap-1.5 mt-4 flex-wrap">
@@ -250,7 +250,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   value={merchant}
                   onChange={e => applyMerchant(e.target.value)}
                   placeholder={type === TransactionType.EXPENSE ? 'e.g. Swiggy, Amazon' : 'e.g. Employer, Client'}
-                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif font-semibold outline-none placeholder:text-muted-taupe placeholder:font-sans placeholder:font-normal placeholder:text-sm"
+                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-semibold outline-none placeholder:text-muted-taupe placeholder:font-sans placeholder:font-normal placeholder:text-sm"
                 />
               </div>
             </div>
@@ -310,7 +310,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             </div>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
-              <p className="text-premium-charcoal text-[15px] font-serif font-semibold">{dateLabel}</p>
+              <p className="text-premium-charcoal text-[15px] font-semibold">{dateLabel}</p>
             </div>
             <span className="material-symbols-outlined text-muted-taupe opacity-40" aria-hidden="true">expand_more</span>
           </div>
@@ -342,7 +342,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   value={localDay(selectedDate)}
                   max={localDay()}
                   onChange={(e) => { if (isDay(e.target.value)) setSelectedDate(parseDay(e.target.value)); }}
-                  className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal font-serif"
+                  className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal"
                   title="Custom date"
                   aria-label="Custom date"
                 />
@@ -364,7 +364,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
               <input
-                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-serif placeholder:text-muted-taupe"
+                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] placeholder:text-muted-taupe"
                 placeholder="Add details..."
                 type="text"
                 value={note}
@@ -392,12 +392,12 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       <div className="bg-white/80 backdrop-blur-xl border-t border-black/[0.05] rounded-t-[40px] px-8 pt-6 pb-10 shadow-soft">
         <div className="grid grid-cols-3 gap-y-1 gap-x-4">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-            <button key={num} onClick={() => handleKeypad(num.toString())} className="py-3 flex items-center justify-center text-2xl font-serif text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
+            <button key={num} onClick={() => handleKeypad(num.toString())} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
               {num}
             </button>
           ))}
-          <button onClick={() => handleKeypad('.')} className="py-3 flex items-center justify-center text-2xl font-serif text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">.</button>
-          <button onClick={() => handleKeypad('0')} className="py-3 flex items-center justify-center text-2xl font-serif text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">0</button>
+          <button onClick={() => handleKeypad('.')} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">.</button>
+          <button onClick={() => handleKeypad('0')} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">0</button>
           <button onClick={() => handleKeypad('backspace')} aria-label="Delete the last digit" className="py-3 flex items-center justify-center text-muted-taupe rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
             <span className="material-symbols-outlined text-[24px]" aria-hidden="true">backspace</span>
           </button>
@@ -420,7 +420,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
         <button
           onClick={handleSave}
           disabled={numAmount <= 0 || saving}
-          className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] font-serif text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-[22px]" aria-hidden="true">{saveAndAdd ? 'add' : 'check'}</span>
           {saveAndAdd ? 'Save and add another' : 'Save entry'}
@@ -430,7 +430,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       {toast && (
         <div className="fixed bottom-[calc(7rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
           <span className="material-symbols-outlined text-sage text-[20px]" aria-hidden="true">check_circle</span>
-          <span className="text-[13px] font-medium font-serif">{toast}</span>
+          <span className="text-[13px] font-medium">{toast}</span>
         </div>
       )}
     </div>

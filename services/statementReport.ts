@@ -1,7 +1,7 @@
 /**
  * The statement report (Data Studio): one self-contained HTML page that
- * opens anywhere and prints to PDF, in Wall-ette's own look (the stitched
- * wallet, Crimson Pro figures, small caps labels) and with the same numbers
+ * opens anywhere and prints to PDF, in Wall·ette's own look (the stitched
+ * wallet, Manrope headings, Inter figures, small caps labels) and with the same numbers
  * as Pulse: every month in it is worked out by services/pulseAnalysis.ts, so
  * spending, what came in, what was kept and bills / everyday / one-offs mean
  * the same thing on the phone and on paper.
@@ -16,6 +16,7 @@ import { Transaction, TransactionType } from '../types';
 import { analyzePulse, wholeShares, type Insight } from './pulseAnalysis';
 import { analyzeIncome, detectRecurringCharges, prettyMerchant } from './analyticsService';
 import { parseDay } from '../utils/dates';
+import { BRAND_ICON_SVG } from '../utils/brandIcon';
 
 export type ReportPeriod = 'MONTH' | 'QUARTER' | 'ALL';
 
@@ -149,8 +150,8 @@ export function reportData({ transactions, isMoved, period, now = new Date(), op
 // The report's colours: the app's light Sage theme and the chart palette
 // (utils/theme.ts), fixed so the page prints the same from any theme.
 const C = {
-  bg: '#FAF9F6', card: '#FFFFFF', ink: '#333333', mut: '#72716E', line: '#EFEDE8', line2: '#E8E5DE',
-  sage: '#9BAE93', wallet: '#5D6758', wallet2: '#4B5247',
+  bg: '#F9F3ED', card: '#FFFDFA', ink: '#282C20', mut: '#646859', line: '#EEE7DC', line2: '#E6DDD0',
+  sage: '#49693E', wallet: '#5B7543', wallet2: '#3E5430',
   in: '#1D7AA3', out: '#C0714A', out1: '#8A4A2C', out3: '#E2A685',
 };
 
@@ -221,34 +222,31 @@ export function buildStatementHtml(input: ReportInput): { html: string; data: Re
   const maxPayee = Math.max(1, ...d.payees.map(p => p.amount));
   const toneLabel: Record<Insight['tone'], string> = { watch: 'Worth a look', good: 'Going well', info: 'Good to know' };
   const toneColor: Record<Insight['tone'], string> = { watch: '#C98989', good: '#7D937A', info: '#6F8E9C' };
-  const eyes = `<span class="eyes" aria-hidden="true"><span><b></b></span><span><b></b></span></span>`;
+  const logo = BRAND_ICON_SVG;
 
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wall-ette statement, ${esc(d.periodLabel.toLowerCase())}</title>
+<title>Wall·ette statement, ${esc(d.periodLabel.toLowerCase())}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
   body{margin:0;background:${C.bg};color:${C.ink};font:14px/1.55 Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;padding:24px 12px}
   .page{max-width:760px;margin:0 auto}
-  .serif{font-family:'Crimson Pro',Georgia,'Times New Roman',serif}
   header{display:flex;align-items:center;gap:12px;margin:0 4px 20px}
-  .logo{width:44px;height:44px;border-radius:50%;background:${C.sage};display:flex;align-items:center;justify-content:center;flex:none}
-  .eyes{display:flex;gap:2px}.eyes>span{width:12px;height:15px;border-radius:5px;background:rgb(51 51 51/.9);display:flex;align-items:center;justify-content:center}
-  .eyes b{width:7px;height:7px;border-radius:50%;background:#E3EAE0;box-shadow:inset 0 0 0 2px #E3EAE0,inset 0 0 0 4px ${C.sage}}
-  h1{font:600 24px/1.1 'Crimson Pro',Georgia,serif;margin:0;letter-spacing:-.01em}
+  .logo{width:44px;height:44px;flex:none;display:block}.logo svg{width:100%;height:100%;display:block}
+  h1{font:700 24px/1.1 Manrope,Inter,system-ui,sans-serif;margin:0;letter-spacing:-.02em}
   .meta{color:${C.mut};font-size:12px}
   .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${C.mut};margin:0 0 12px}
   .wallet{position:relative;isolation:isolate;color:#FBFAF6;background:linear-gradient(155deg,${C.wallet} 0%,${C.wallet2} 100%);border-radius:30px;padding:24px 24px 20px;box-shadow:0 1px 2px rgb(62 52 40/.10),0 6px 12px -4px rgb(62 52 40/.14),0 22px 40px -16px rgb(62 52 40/.40);overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .wallet::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background-image:repeating-linear-gradient(45deg,rgb(255 255 255/.03) 0 1px,transparent 1px 4px),repeating-linear-gradient(-45deg,rgb(0 0 0/.035) 0 1px,transparent 1px 4px)}
   .wallet::after{content:'';position:absolute;inset:7px;border-radius:22px;border:1.5px dashed rgb(255 255 255/.24);pointer-events:none}
   .wallet .wl{font-size:12px;font-weight:500;letter-spacing:.025em;color:rgb(251 250 246/.85);margin:0}
-  .wallet .fig{font:400 40px/1 'Crimson Pro',Georgia,serif;margin:16px 0 0;text-shadow:0 1px 0 rgb(0 0 0/.22)}
+  .wallet .fig{font:600 40px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:16px 0 0;text-shadow:0 1px 0 rgb(0 0 0/.22)}
   .pockets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:18px}
   .pocket{background:rgb(0 0 0/.16);box-shadow:inset 0 2px 4px rgb(0 0 0/.22),0 1px 0 rgb(255 255 255/.10);border-radius:20px;padding:12px 14px}
   .pocket p{margin:0}.pocket .pl{font-size:11px;font-weight:500;color:rgb(251 250 246/.85)}
-  .pocket .pv{font:400 22px/1.2 'Crimson Pro',Georgia,serif;margin-top:4px}
+  .pocket .pv{font:600 22px/1.2 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin-top:4px}
   .pocket .pn{font-size:11px;color:rgb(251 250 246/.85);margin-top:2px}
   .card{background:${C.card};border-radius:28px;padding:20px;margin-top:16px;box-shadow:0 0 0 1px rgb(62 52 40/.035),0 1px 2px rgb(62 52 40/.06),0 10px 24px -12px rgb(62 52 40/.22);break-inside:avoid;page-break-inside:avoid}
   .grid2{display:grid;grid-template-columns:1fr;gap:0 16px}
@@ -283,7 +281,7 @@ export function buildStatementHtml(input: ReportInput): { html: string; data: Re
 </style></head><body><div class="page">
 
   <header>
-    <span class="logo">${eyes}</span>
+    <span class="logo" aria-hidden="true">${logo}</span>
     <div><h1>Wall·ette statement</h1>
     <div class="meta">${esc(d.periodLabel)} · ${esc(span)} · ${d.entries} ${d.entries === 1 ? 'entry' : 'entries'} · made ${esc(generated)}${input.currency !== 'INR' ? ` · amounts in ${esc(input.currency)} at today's rate` : ''}</div></div>
   </header>

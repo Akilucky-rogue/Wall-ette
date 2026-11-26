@@ -92,7 +92,7 @@ const CurrencySelector: React.FC<{ variant?: 'pill' | 'field' }> = ({ variant = 
           >
             <div className="px-5 pt-5 pb-3">
               <div className="flex items-center justify-between gap-3">
-                <h3 id="currency-title" className="font-serif text-[20px] font-semibold text-premium-charcoal">Show amounts in</h3>
+                <h3 id="currency-title" className="font-display text-[20px] font-bold text-premium-charcoal">Show amounts in</h3>
                 <button onClick={close} className="w-9 h-9 rounded-full flex items-center justify-center text-muted-taupe hover:bg-zen-bg" aria-label="Close">
                   <span className="material-symbols-outlined text-[22px]" aria-hidden="true">close</span>
                 </button>

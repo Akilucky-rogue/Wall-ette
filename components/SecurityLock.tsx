@@ -6,7 +6,8 @@ import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloa
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
 import { sendResetLink } from '../services/passwordReset';
-import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
+import { BrandIcon } from './ui/Brand';
+import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
 
 interface SecurityLockProps {
   onUnlock: () => void;
@@ -142,9 +143,9 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   return (
     <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
       {/* Eco & Indian decorative elements - guardians of wealth */}
-      <FloatingLeaf className="top-16 right-8 opacity-40" delay={0} />
-      <FloatingLeaf className="top-32 left-6 opacity-30" delay={1.5} color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-24 right-6 opacity-35" delay={2.5} />
+      <FloatingLeaf className="top-16 right-8 opacity-40" />
+      <FloatingLeaf className="top-32 left-6 opacity-30" color="var(--sage-3)" />
+      <FloatingLeaf className="bottom-24 right-6 opacity-35" />
       <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
       <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
       <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="var(--gold-1)" mirror />
@@ -153,23 +154,19 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       <MandalaDots className="absolute bottom-32 left-8 opacity-15" />
       <LotusFlower className="absolute top-28 left-8 opacity-30" size="sm" />
       <Diya className="absolute bottom-24 left-12 opacity-40" />
-      
+
       <div className="relative text-center mb-8">
-        {/* Wall-ette Guard Mode */}
         <div className="relative inline-flex items-center justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg animate-pulse">
-            <WallEEyes size="md" expression="sleepy" />
-          </div>
+          <BrandIcon size={80} className="drop-shadow-md" />
           {/* Lock badge */}
-          <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
-            <span className="material-symbols-outlined text-sage text-[16px]">lock</span>
+          <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
+            <span className="material-symbols-outlined text-sage text-[16px]" aria-hidden="true">lock</span>
           </div>
         </div>
-        <h1 className="text-premium-charcoal font-serif text-2xl font-semibold mb-2">Session locked</h1>
+        <h1 className="text-premium-charcoal font-display text-2xl font-bold mb-2">Session locked</h1>
         <p className="text-muted-taupe text-[14px] leading-relaxed max-w-[280px] mx-auto">
           For your security, please verify your identity to continue.
         </p>
-        <p className="text-[10px] text-muted-taupe mt-2 italic">"I'm guarding your finances!"</p>
       </div>
 
       <div className="w-full bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02]">
@@ -195,9 +192,9 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             <button
                 type="submit"
                 disabled={loading || totpCode.length < 6}
-                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
             >
-                {loading ? 'Verifying...' : 'Verify Code'}
+                {loading ? 'Verifying...' : 'Verify code'}
             </button>
             <button
                 type="button"
@@ -218,23 +215,23 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-lg tracking-widest outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base"
-                    placeholder="Enter Password"
+                    placeholder="Enter password"
                     autoFocus
                 />
             </div>
 
             <div className="flex justify-end mb-6">
                 <button type="button" onClick={handleForgotPassword} disabled={resetBusy} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide disabled:opacity-50">
-                    {resetBusy ? 'Sending…' : 'Forgot Password?'}
+                    {resetBusy ? 'Sending…' : 'Forgot password?'}
                 </button>
             </div>
 
             <button
                 type="submit"
                 disabled={loading || password.length === 0}
-                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                {loading ? 'Verifying...' : 'Unlock Wallet'}
+                {loading ? 'Verifying...' : 'Unlock wallet'}
             </button>
 
             {bioReady && (
@@ -247,10 +244,10 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                     <button
                         type="button"
                         onClick={tryBiometric}
-                        className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-base font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl text-base font-semibold shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px] text-sage">fingerprint</span>
-                        Unlock with Biometrics
+                        Unlock with biometrics
                     </button>
                 </>
             )}
@@ -263,7 +260,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                 disabled={signingOut}
                 className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
-                {signingOut ? 'Signing out…' : 'Sign Out'}
+                {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
         </div>
       </div>

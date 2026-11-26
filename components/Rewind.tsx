@@ -6,7 +6,8 @@ import { prettyMerchant } from '../services/analyticsService';
 import { exportImage } from '../utils/exportFile';
 import { log } from '../utils/log';
 import { SITE_HOST } from '../utils/site';
-import { WallEMascot, FloatingLeaf, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
+import { Mascot, mascotImage } from './ui/Brand';
+import { Diya, FloatingLeaf, LotusFlower, RangoliCorner } from './ui/Decor';
 
 interface RewindProps {
   onNavigate: (screen: AppScreen) => void;
@@ -152,64 +153,56 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d')!;
 
+      // The brand's type, loaded before drawing so the canvas uses it.
+      await Promise.all(['700 76px Manrope', '600 13px Inter', '700 32px Inter'].map(f => document.fonts?.load(f).catch(() => undefined)));
+
       // background
-      ctx.fillStyle = '#FAF9F6';
+      ctx.fillStyle = '#F9F3ED';
       ctx.fillRect(0, 0, W, H);
 
       // soft sage blobs
-      ctx.fillStyle = 'rgba(155,174,147,0.10)';
+      ctx.fillStyle = 'rgba(151,169,109,0.12)';
       ctx.beginPath(); ctx.arc(W - 40, 120, 140, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(30, H - 160, 120, 0, Math.PI * 2); ctx.fill();
 
-      // robot mark
-      const cx = W / 2, cy = 150, R = 64;
-      const grad = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
-      grad.addColorStop(0, '#9BAE93'); grad.addColorStop(1, '#8B9E82');
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-      const eye = (ex: number) => {
-        const ew = 30, eh = 38;
-        ctx.fillStyle = 'rgba(51,51,51,0.92)';
-        ctx.beginPath();
-        (ctx as any).roundRect ? (ctx as any).roundRect(ex, cy - eh / 2, ew, eh, 9) : ctx.rect(ex, cy - eh / 2, ew, eh);
-        ctx.fill();
-        ctx.fillStyle = '#E3EAE0';
-        ctx.beginPath(); ctx.arc(ex + ew / 2, cy + 4, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#9BAE93';
-        ctx.beginPath(); ctx.arc(ex + ew / 2, cy + 4, 4.5, 0, Math.PI * 2); ctx.fill();
-      };
-      eye(cx - 36); eye(cx + 6);
+      // The mascot: celebrating a year that kept money, cheering one that didn't.
+      const pose = mascotImage(wrapped.saved >= 0 ? 'celebrate' : 'encourage');
+      const img = new Image();
+      img.src = pose.src;
+      await img.decode();
+      const mh = 196, mw = Math.round(mh * pose.w / pose.h);
+      ctx.drawImage(img, (W - mw) / 2, 40, mw, mh);
 
       const center = (text: string, y: number, font: string, color: string) => {
         ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center';
         ctx.fillText(text, W / 2, y);
       };
 
-      center('W A L L · E T T E   W R A P P E D', 262, '600 15px Verdana, sans-serif', '#72716E');
-      center(String(wrapped.year), 340, 'bold 76px Georgia, serif', '#333333');
+      center('W A L L · E T T E   W R A P P E D', 270, '600 15px Inter, sans-serif', '#646859');
+      center(String(wrapped.year), 344, '700 76px Manrope, Inter, sans-serif', '#282C20');
 
       // stats
-      const row = (label: string, value: string, y: number, color = '#333333', big = false) => {
-        ctx.font = '600 13px Verdana, sans-serif'; ctx.fillStyle = '#72716E'; ctx.textAlign = 'center';
+      const row = (label: string, value: string, y: number, color = '#282C20', big = false) => {
+        ctx.font = '600 13px Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = `bold ${big ? 44 : 32}px Georgia, serif`; ctx.fillStyle = color;
+        ctx.font = `700 ${big ? 44 : 32}px Inter, sans-serif`; ctx.fillStyle = color;
         ctx.fillText(value, W / 2, y + (big ? 50 : 40));
       };
 
-      row('came in', `+${fmt(wrapped.inc)}`, 420, '#7d937a');
-      row('went out', `−${fmt(wrapped.out)}`, 510, '#c98989');
+      row('came in', `+${fmt(wrapped.inc)}`, 420, '#49693E');
+      row('went out', `−${fmt(wrapped.out)}`, 510, '#A35B48');
       row(wrapped.saved >= 0 ? `kept · ${wrapped.rate}% of income` : 'overspent',
           `${wrapped.saved >= 0 ? '+' : '−'}${fmt(Math.abs(wrapped.saved))}`, 600,
-          wrapped.saved >= 0 ? '#7d937a' : '#c98989', true);
+          wrapped.saved >= 0 ? '#49693E' : '#A35B48', true);
 
       // divider
       ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(80, 690); ctx.lineTo(W - 80, 690); ctx.stroke();
 
       const small = (label: string, value: string, y: number) => {
-        ctx.font = '600 11px Verdana, sans-serif'; ctx.fillStyle = '#72716E'; ctx.textAlign = 'center';
+        ctx.font = '600 11px Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
         ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = 'bold 19px Georgia, serif'; ctx.fillStyle = '#333333';
+        ctx.font = '600 19px Inter, sans-serif'; ctx.fillStyle = '#282C20';
         const v = value.length > 34 ? value.slice(0, 33) + '…' : value;
         ctx.fillText(v, W / 2, y + 26);
       };
@@ -219,7 +212,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       if (wrapped.topCat) { small('top category', `${wrapped.topCat[0]} · ${fmt(wrapped.topCat[1])}`, sy); sy += 62; }
       small('busiest month · no-spend days', `${wrapped.busiestMonth} · ${wrapped.noSpendDays} days`, sy);
 
-      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px Verdana, sans-serif', '#b9b7b2');
+      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px Inter, sans-serif', '#8C8F80');
 
       const base64 = canvas.toDataURL('image/png').split(',')[1];
       const outcome = await exportImage(`wall-ette-wrapped-${wrapped.year}.png`, base64);
@@ -235,8 +228,8 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.5} color="#A8B89E" />
+      <FloatingLeaf className="top-24 right-6 opacity-40" />
+      <FloatingLeaf className="top-56 left-4 opacity-30" color="#A8B89E" />
       <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
       <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="#D4B896" />
       <Diya className="absolute bottom-44 left-8 opacity-30" />
@@ -250,13 +243,13 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">Rewind</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight flex-1 truncate">Rewind</h2>
       </div>
 
       {!life ? (
         <div className="flex flex-col items-center py-16 px-6 text-center">
-          <WallEMascot mood="thinking" size="md" />
-          <p className="text-premium-charcoal font-serif text-lg font-semibold mt-4">No history yet</p>
+          <Mascot pose="think" height={112} />
+          <p className="text-premium-charcoal font-display text-lg font-bold mt-4">No history yet</p>
           <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">Import your bank statements and Wall-ette will rebuild your entire money timeline.</p>
         </div>
       ) : (
@@ -264,21 +257,21 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
           {/* Lifetime hero */}
           <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] break-inside-avoid">
             <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Your money since {parseDay(life.first).getFullYear()}</p>
-            <p className="text-premium-charcoal font-serif text-[26px] font-bold leading-tight">
+            <p className="text-premium-charcoal font-display text-[26px] font-bold leading-tight">
               {life.yearsCount} {life.yearsCount === 1 ? 'year' : 'years'} · {life.txCount.toLocaleString('en-IN')} entries
             </p>
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div>
                 <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Earned</p>
-                <p className="text-[14px] font-serif font-bold text-sage whitespace-nowrap">{formatAmountCompact(life.totalInc)}</p>
+                <p className="text-[14px] font-semibold text-sage whitespace-nowrap tabular-nums">{formatAmountCompact(life.totalInc)}</p>
               </div>
               <div>
                 <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Spent</p>
-                <p className="text-[14px] font-serif font-bold text-rose whitespace-nowrap">{formatAmountCompact(life.totalOut)}</p>
+                <p className="text-[14px] font-semibold text-rose whitespace-nowrap tabular-nums">{formatAmountCompact(life.totalOut)}</p>
               </div>
               <div>
                 <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Kept</p>
-                <p className="text-[14px] font-serif font-bold text-premium-charcoal whitespace-nowrap">{life.lifeRate}%</p>
+                <p className="text-[14px] font-semibold text-premium-charcoal whitespace-nowrap tabular-nums">{life.lifeRate}%</p>
               </div>
             </div>
           </div>
@@ -378,25 +371,25 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
                   ))}
                 </div>
               </div>
-              <p className="text-white font-serif text-3xl font-bold">{wrapped.year}{wrapped.isCurrent ? <span className="text-white/40 text-base font-sans font-medium"> so far</span> : ''}</p>
+              <p className="text-white font-display text-3xl font-bold">{wrapped.year}{wrapped.isCurrent ? <span className="text-white/40 text-base font-sans font-medium"> so far</span> : ''}</p>
               <div className="grid grid-cols-3 gap-3 mt-4 mb-5">
                 <div>
                   <p className="text-[9px] text-white/50 uppercase tracking-wider">In</p>
-                  <p className="text-[14px] font-serif font-bold text-sage-light whitespace-nowrap">{formatAmountCompact(wrapped.inc)}</p>
+                  <p className="text-[14px] font-semibold text-sage-light whitespace-nowrap tabular-nums">{formatAmountCompact(wrapped.inc)}</p>
                 </div>
                 <div>
                   <p className="text-[9px] text-white/50 uppercase tracking-wider">Out</p>
-                  <p className="text-[14px] font-serif font-bold text-rose-light whitespace-nowrap">{formatAmountCompact(wrapped.out)}</p>
+                  <p className="text-[14px] font-semibold text-rose-light whitespace-nowrap tabular-nums">{formatAmountCompact(wrapped.out)}</p>
                 </div>
                 <div>
                   <p className="text-[9px] text-white/50 uppercase tracking-wider">Kept</p>
-                  <p className="text-[14px] font-serif font-bold text-white whitespace-nowrap">{wrapped.rate}%</p>
+                  <p className="text-[14px] font-semibold text-white whitespace-nowrap tabular-nums">{wrapped.rate}%</p>
                 </div>
               </div>
               <button
                 onClick={shareWrapped}
                 disabled={sharing}
-                className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif text-[15px] font-semibold active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
+                className="w-full bg-sage text-white py-3.5 rounded-2xl text-[15px] font-semibold active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 <span className="material-symbols-outlined text-[18px]">{sharing ? 'progress_activity' : 'ios_share'}</span>
                 {sharing ? 'Creating card…' : 'Share your Wrapped'}
@@ -411,7 +404,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
       {toast && (
         <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
           <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
-          <span className="text-[13px] font-medium font-serif">{toast}</span>
+          <span className="text-[13px] font-medium">{toast}</span>
         </div>
       )}
     </div>

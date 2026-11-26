@@ -8,6 +8,11 @@
  * every preset theme. A custom theme changes only the accent of the light or
  * dark base, which Sage and Midnight cover.
  *
+ * Then the colours that carry meaning, at 4.5:1 too: the accent as text on
+ * the page and cards (money in, links), text on the accent (buttons; Tailwind's
+ * `white` is the card colour), the accent on its own tint (chips), money out
+ * (rose) as text and behind text, and the sand chips' ink.
+ *
  * Usage (after `npm ci`): node scripts/check-contrast.mjs
  * Exits with code 1 if any check fails.
  */
@@ -52,6 +57,23 @@ for (const [name, p] of palettes) {
   }
   const mutWorst = Math.min(...['bg', 'card', 'card-alt'].filter(s => p[s]).map(s => ratio(p['mut'], p[s])));
   console.log(`${worst.length ? 'FAIL' : 'ok  '}  ${name.padEnd(14)} secondary text ${mutWorst.toFixed(2)}:1 at worst${worst.length ? `  ${worst.join('; ')}` : ''}`);
+}
+
+console.log('');
+for (const [name, p] of palettes) {
+  const pairs = {
+    'accent on page': [p['sage'], p['bg']], 'accent on card': [p['sage'], p['card']],
+    'text on accent': [p['card'], p['sage']], 'accent on its tint': [p['sage'], p['sage-soft']],
+    'money out on card': [p['rose'], p['card']], 'text on money out': [p['card'], p['rose']],
+    'sand ink on sand': [p['sand-ink'], p['sand-soft']],
+  };
+  const worst = [];
+  for (const [label, [a, b]] of Object.entries(pairs)) {
+    checks++;
+    const r = ratio(a, b);
+    if (r < 4.5) { failures++; worst.push(`${label} ${r.toFixed(2)}:1`); }
+  }
+  console.log(`${worst.length ? 'FAIL' : 'ok  '}  ${name.padEnd(14)} accent and money colours${worst.length ? `  ${worst.join('; ')}` : ''}`);
 }
 
 console.log(`\n${checks - failures}/${checks} contrast checks passed`);

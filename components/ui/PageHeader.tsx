@@ -26,7 +26,7 @@ const PageHeader: React.FC<{
       </button>
     )}
     <div className="min-w-0 flex-1">
-      <h2 className="text-premium-charcoal text-[22px] lg:text-[26px] font-serif font-semibold tracking-tight leading-tight truncate">{title}</h2>
+      <h2 className="text-premium-charcoal text-[22px] lg:text-[26px] font-display font-bold tracking-tight leading-tight truncate">{title}</h2>
       {subtitle != null && <p className="text-[12px] text-muted-taupe truncate">{subtitle}</p>}
     </div>
     {right}

@@ -178,7 +178,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
             className="fixed z-[60] flex flex-col bg-white rounded-3xl shadow-2xl border border-premium-charcoal/[0.08] overflow-hidden motion-safe:animate-slide-down"
           >
             <div className="flex items-center justify-between pl-5 pr-3 pt-4 pb-1 shrink-0">
-              <h2 id="notifications-title" ref={titleRef} tabIndex={-1} className="font-serif text-[18px] font-semibold text-premium-charcoal outline-none">
+              <h2 id="notifications-title" ref={titleRef} tabIndex={-1} className="font-display text-[18px] font-bold text-premium-charcoal outline-none">
                 Notifications
               </h2>
               <button type="button" onClick={close} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" aria-label="Close">
@@ -191,7 +191,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
                 <div className="mx-auto w-12 h-12 rounded-2xl bg-sage-light text-sage flex items-center justify-center mb-3">
                   <span className="material-symbols-outlined" aria-hidden="true">done_all</span>
                 </div>
-                <p className="font-serif text-[16px] font-semibold text-premium-charcoal">You're all caught up</p>
+                <p className="font-display text-[16px] font-bold text-premium-charcoal">You're all caught up</p>
                 <p className="text-[12px] text-muted-taupe leading-relaxed mt-1 max-w-[280px] mx-auto">
                   Budgets running low, bills due soon, bank charges and failed unlock attempts show up here.
                 </p>

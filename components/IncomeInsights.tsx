@@ -5,7 +5,7 @@ import { getSymbol, toBase, toShown, inputDigits } from '../utils/currencyUtils'
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
 import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
-import { WallEMascot } from './SplashScreen';
+import { Mascot } from './ui/Brand';
 import BalanceTrend from './BalanceTrend';
 import { tick } from '../utils/haptics';
 
@@ -270,13 +270,13 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Flow</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Flow</h2>
       </div>
 
       {!hasData ? (
         <div className="flex flex-col items-center py-16 px-6 text-center">
-          <WallEMascot mood="thinking" size="md" />
-          <p className="text-premium-charcoal font-serif text-lg font-semibold mt-4">Nothing to tell yet</p>
+          <Mascot pose="think" height={112} />
+          <p className="text-premium-charcoal font-display text-lg font-bold mt-4">Nothing to tell yet</p>
           <p className="text-muted-taupe text-[13px] mt-2 max-w-xs">
             Add entries or import a bank statement, and Wall-ette will write your money story and track your goals.
           </p>
@@ -330,7 +330,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                     <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">The {monthLabel(storyKey)} story</p>
                     {story.isCurrent && <span className="text-[9px] text-sage font-bold uppercase tracking-wider">In progress</span>}
                   </div>
-                  <p className={`font-serif text-2xl font-bold mb-4 ${story.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
+                  <p className={`text-2xl font-semibold mb-4 tabular-nums ${story.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
                     {story.saved >= 0 ? '+' : '−'}{formatWhole(Math.abs(story.saved))}
                     <span className="text-[12px] font-sans font-medium text-muted-taupe ml-2">{story.saved >= 0 ? 'kept' : 'overspent'}</span>
                   </p>
@@ -436,7 +436,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         strokeLinecap="round"
                       />
                     </svg>
-                    <p className="text-premium-charcoal font-serif text-xl font-bold -mt-1">{stability.score}</p>
+                    <p className="text-premium-charcoal text-xl font-semibold -mt-1 tabular-nums">{stability.score}</p>
                     <p className="text-[10px] text-muted-taupe">{stability.label} income</p>
                   </div>
                 )}
@@ -465,7 +465,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                 ) : salary?.confirmed ? (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02]">
                     <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Next Pay</p>
-                    <p className="text-premium-charcoal font-serif text-2xl font-bold">
+                    <p className="text-premium-charcoal text-2xl font-semibold tabular-nums">
                       {salary.daysUntil === 0 ? 'Today' : `${salary.daysUntil}d`}
                     </p>
                     <p className="text-[10px] text-muted-taupe mt-1">
@@ -479,7 +479,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                 ) : (
                   <div className="bg-white rounded-3xl p-4 shadow-soft border border-black/[0.02] flex flex-col justify-center">
                     <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-2">Avg / Month</p>
-                    <p className="text-premium-charcoal font-serif text-xl font-bold">
+                    <p className="text-premium-charcoal text-xl font-semibold tabular-nums">
                       {formatWhole(stability?.avgMonthly ?? 0)}
                     </p>
                     <p className="text-[10px] text-muted-taupe mt-1">across active months</p>
@@ -584,13 +584,13 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       )}
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[13px] font-serif font-bold text-premium-charcoal">
+                      <span className="text-[13px] font-semibold text-premium-charcoal tabular-nums">
                         {savingsGoal > 0 ? `${Math.max(0, Math.round((goalData.saved / savingsGoal) * 100))}%` : '—'}
                       </span>
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-[15px] font-serif font-bold ${goalData.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
+                    <p className={`text-[15px] font-semibold tabular-nums ${goalData.saved >= 0 ? 'text-sage' : 'text-rose'}`}>
                       {goalData.saved >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(goalData.saved))} saved
                     </p>
                     <div className="flex items-center gap-2 mt-2">

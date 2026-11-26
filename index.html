@@ -16,11 +16,12 @@
     <meta property="og:image:height" content="500" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Fonts: preconnect cuts ~1 RTT off first text paint (audit Phase 4.2).
          Material Symbols axis narrowed to the weights actually used (wght 200, FILL 0..1). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@200,0..1&display=block" rel="stylesheet" />
     <style>
         /* System bar insets (audit H6). The Android app draws edge to edge
@@ -36,7 +37,7 @@
         body {
             /* Shows behind the status and navigation bars, so it follows the
                theme (theme.ts sets --c-bg). */
-            background-color: rgb(var(--c-bg, 250 249 246));
+            background-color: rgb(var(--c-bg, 249 243 237));
             min-height: 100vh;
             padding-top: var(--sat);
             padding-bottom: var(--sab);
@@ -52,7 +53,7 @@
             position: fixed;
             left: 0;
             right: 0;
-            background-color: rgb(var(--c-bg, 250 249 246));
+            background-color: rgb(var(--c-bg, 249 243 237));
             z-index: 45;
             pointer-events: none;
         }

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { localDay, parseDay } from '../utils/dates';
-import { WallEMascot } from './SplashScreen';
+import { Mascot } from './ui/Brand';
 import { pulseView, usePulseView } from './pulseView';
 import { tick } from '../utils/haptics';
 import { openAt, type ScreenSection } from '../utils/screenSection';
@@ -188,7 +188,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
         </SectionTitle>
         {empty ? (
           <div className="flex flex-col items-center text-center py-4">
-            <WallEMascot mood="thinking" size="sm" />
+            <Mascot pose="think" height={84} />
             <p className="text-[13px] text-muted-taupe mt-3 max-w-[260px] leading-relaxed">Add an entry or import a statement and this month's findings show up here.</p>
             <div className="flex gap-2 mt-4">
               <button onClick={() => onNavigate(AppScreen.NEW_ENTRY)} className="px-4 py-2 rounded-full bg-sage text-white text-[12px] font-semibold shadow-soft">Add an entry</button>
@@ -306,7 +306,7 @@ const Trends: React.FC<{
         {tiles.map(t => (
           <Card key={t.label} className="!p-3.5 text-center">
             <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold">{t.label}</p>
-            <p className="font-serif text-[20px] leading-tight text-premium-charcoal mt-1 truncate">{t.value}</p>
+            <p className="font-semibold text-[20px] leading-tight text-premium-charcoal mt-1 truncate tabular-nums">{t.value}</p>
             {t.note && <p className="text-[11px] text-muted-taupe truncate">{t.note}</p>}
           </Card>
         ))}
@@ -407,7 +407,7 @@ const Recurring: React.FC = () => {
       {recurring.length === 0 ? (
         <Card className="text-center lg:col-span-7">
           <span className="material-symbols-outlined icon-fill text-lavender text-[28px]" aria-hidden="true">autorenew</span>
-          <p className="font-serif text-[18px] font-semibold text-premium-charcoal mt-2">No regular charges yet</p>
+          <p className="font-display text-[18px] font-bold text-premium-charcoal mt-2">No regular charges yet</p>
           <p className="text-[12px] text-muted-taupe mt-1 leading-relaxed">
             Bills and subscriptions show up here once a payee charges you about the same amount on a regular schedule.
           </p>
@@ -485,7 +485,7 @@ const Insights: React.FC<{ r: PulseResult; open: (screen: AppScreen, section?: S
       <div className="space-y-4 lg:col-span-7">
         {groups.length === 0 ? (
           <Card className="flex flex-col items-center text-center py-8">
-            <WallEMascot mood="thinking" size="sm" />
+            <Mascot pose="think" height={84} />
             <p className="text-[13px] text-muted-taupe mt-3 max-w-[280px] leading-relaxed">Nothing stands out in {r.name} yet. Findings show up as your entries build up.</p>
           </Card>
         ) : groups.map(g => (

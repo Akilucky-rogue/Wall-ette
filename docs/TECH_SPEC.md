@@ -25,7 +25,7 @@ calls — every insight is computed on the device. The Android app sends crash r
 | Excel parsing | SheetJS `xlsx` (pinned CDN tarball) | 0.20.3 |
 | QR generation | `qrcode` (TOTP enrollment) | 1.5 |
 | Android toolchain | AGP 8.13 · Gradle 8.14.3 · JDK 21 (Temurin) | SDK 24 → 35 |
-| Fonts | Inter (sans) · Crimson Pro (serif) · Material Symbols Outlined | Google Fonts CDN |
+| Fonts | Inter (text and figures) · Manrope (headings) · Material Symbols Outlined | Google Fonts CDN |
 
 Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for node/react/qrcode.
 
@@ -287,7 +287,7 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   a hand-worked example plus invariants on 300 random wallets (about 20,000 checks).
 - **Statement report** (`services/statementReport.ts`, from 1.5.6) — Data Studio's HTML
   statement and CSV, built from Pulse's analysis month by month, so the figures match. The page
-  uses the app's look (the stitched wallet, Crimson Pro figures, caps labels), escapes every
+  uses the app's look (the stitched wallet, Manrope headings, Inter figures, caps labels), escapes every
   payee and note, and prints to PDF; the CSV has ISO dates, rupees to the paisa, how each entry
   counts (spending, income or money moved) and writes formula-like text as text. Checked by
   `scripts/check-report.mjs`. The old health check (`insightsService.ts`) is gone.

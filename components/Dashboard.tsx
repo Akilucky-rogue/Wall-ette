@@ -10,7 +10,7 @@ import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
 import NotificationCenter from './NotificationCenter';
 import LeftToSpendCard from './LeftToSpendCard';
-import { WallEMascot } from './SplashScreen';
+import { BrandIcon, Mascot, Wordmark } from './ui/Brand';
 import styles from './Dashboard.module.css';
 
 interface DashboardProps {
@@ -183,7 +183,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const quickServices = (
     <>
-          <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight mb-5">Quick Services</h3>
+          <h3 className="text-premium-charcoal text-[15px] font-display font-bold tracking-tight mb-5">Quick services</h3>
           <div className="grid grid-cols-3 gap-4">
             <button
               onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
@@ -246,7 +246,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const startPanel = (
     <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-labelledby="start-title">
       <div className="bg-white rounded-[30px] p-6 shadow-raised border border-black/[0.02]">
-        <h1 id="start-title" className="font-serif text-[24px] leading-tight font-semibold text-premium-charcoal">Start your wallet</h1>
+        <div className="flex items-end justify-between gap-3">
+          <h1 id="start-title" className="font-display text-[24px] leading-tight font-bold text-premium-charcoal pb-2">Start your wallet</h1>
+          <Mascot pose="welcome" height={88} className="-mt-2 -mr-1" />
+        </div>
         <p className="text-[13px] text-muted-taupe leading-relaxed mt-2 max-w-[52ch]">
           Import a bank statement to bring in months of entries at once, or add one by hand. Statements are read on this device and checked against the bank's balance before anything is saved.
         </p>
@@ -279,8 +282,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 lg:px-8 pb-2 sticky top-0 z-30">
         {/* Left: Logo and Name */}
         <div className="flex items-center gap-3 min-w-0">
-          <WallEMascot mood="happy" size="sm" />
-          <span className="text-premium-charcoal font-serif text-xl font-bold tracking-tight select-none">Wall-ette</span>
+          <BrandIcon size={36} />
+          <Wordmark height={22} />
         </div>
         {/* Right: currency and the notification bell */}
         <div className="relative flex items-center ml-auto min-w-0 gap-2">
@@ -297,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden">
           <p className="relative text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>{balanceLabel}</p>
 
-          <h1 className="relative wallet-emboss font-serif text-[40px] leading-none tabular-nums mt-3 truncate">
+          <h1 className="relative wallet-emboss font-sans font-semibold text-[40px] leading-none tabular-nums mt-3 truncate">
             {formatWhole(balance)}
           </h1>
 
@@ -374,7 +377,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{pocket.icon}</span>
                   {pocket.label}
                 </p>
-                <p className="font-serif text-[22px] leading-tight tabular-nums mt-1 truncate">
+                <p className="font-semibold text-[22px] leading-tight tabular-nums mt-1 truncate">
                   {pocket.sign}{formatAmountCompact(pocket.amount)}
                 </p>
                 <p className="text-[11px] tabular-nums truncate mt-0.5" style={{ color: 'var(--wallet-mut)' }}>
@@ -474,7 +477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </button>
         </div>
       )}
-      {/* Quick Services (on wide screens they sit beside the wallet instead) */}
+      {/* Quick services (on wide screens they sit beside the wallet instead) */}
       <div className="px-6 py-8 break-inside-avoid lg:hidden">
         {quickServices}
       </div>
@@ -494,7 +497,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   className={styles.savingsGauge}
                 />
               </svg>
-              <p className="text-premium-charcoal font-serif text-xl font-bold -mt-2">{savingsRate}%</p>
+              <p className="text-premium-charcoal text-xl font-semibold -mt-2 tabular-nums">{savingsRate}%</p>
               <p className="text-[10px] text-muted-taupe text-center leading-snug">
                 {showingThisMonth ? "of this month's income" : showAllTime ? 'of all income' : `of ${monthLong}'s income`}
               </p>

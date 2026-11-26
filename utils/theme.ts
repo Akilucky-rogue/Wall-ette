@@ -1,15 +1,15 @@
-// Theme engine — Wall-ette themes.
+// Theme engine — Wall·ette themes.
 // Every color in the app resolves through CSS variables set here on <html>.
 // Tailwind's palette (tailwind.config.cjs) reads the `--c-*` channel vars so
 // utility classes (bg-white, text-sage, …) follow the active theme, and
 // inline SVG/chart colors read the `--*` hex aliases directly.
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
-export type ThemeId = 'sage' | 'midnight' | 'slate' | 'terra' | 'techie' | 'custom';
+export type ThemeId = 'sage' | 'teal' | 'midnight' | 'terra' | 'slate' | 'techie' | 'custom';
 export type ThemeMode = ThemeId | 'auto';
 
 export interface CustomTheme {
-  accent: string; // hex like #9BAE93
+  accent: string; // hex like #49693E
   dark: boolean;
 }
 
@@ -25,8 +25,11 @@ const LIGHT_BASE: Palette = {
   // AA); the audits found the earlier #8E8D8A too pale at 3.2:1.
   'ink': '#333333', 'ink-2': '#4A4947', 'mut': '#72716E', 'mut-2': '#B9B7B2',
   'line': '#EFEDE8', 'line-2': '#E8E5DE',
-  'rose': '#D4A5A5', 'rose-2': '#E8A5A5', 'rose-3': '#C98989', 'rose-strong': '#E57373', 'rose-soft': '#F5E6E6',
-  'sand': '#D6C6B2', 'sand-soft': '#F4EFE9', 'sand-ink': '#A8844F', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
+  // Money out and warnings: the brand's clay (the website's "spend"), dark
+  // enough to read as text and behind white text (the pastel pink before
+  // reached 2.1:1).
+  'rose': '#A35B48', 'rose-2': '#C98A79', 'rose-3': '#8E4C3B', 'rose-strong': '#E57373', 'rose-soft': '#F6E4DE',
+  'sand': '#D6C6B2', 'sand-soft': '#F4EFE9', 'sand-ink': '#806030', 'gold-1': '#C4A98E', 'gold-2': '#D4B896',
   'amber': '#FBBF24', 'amber-2': '#F5D485', 'amber-3': '#F59E42',
   'lavender': '#B8B5D0', 'lavender-soft': '#EBEAF2',
   'ocean': '#9CB5C1', 'ocean-soft': '#E6EEF2',
@@ -52,22 +55,62 @@ const DARK_BASE: Palette = {
   'viz-in': '#3D98BC', 'viz-out': '#C8744D', 'viz-out-1': '#A35A37', 'viz-out-3': '#E2A584', 'viz-ctx': '#A35A37',
 };
 
-// ── Preset accents (sage-* aliases are the app's "accent" slots) ──────────
+// ── Preset themes (sage-* aliases are the app's "accent" slots) ───────────
+// The first four are the brand kit's palettes (05 Palette Variations), set
+// so text, the accent as text and behind text, and money out all reach 4.5:1
+// (scripts/check-contrast.mjs). Terracotta's accent is the clay money out
+// uses elsewhere, so it takes a berry for money out. `wallet` and `wallet-2`
+// colour Home's wallet; without them it is a deep shade of the accent.
 interface ThemeDef { name: string; dark: boolean; vars: Palette; }
 
 export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeDef> = {
   sage: {
     name: 'Sage', dark: false,
     vars: {
-      'sage': '#9BAE93', 'sage-2': '#8B9E82', 'sage-3': '#A8B89E',
-      'sage-deep': '#7D937A', 'sage-soft': '#E3EAE0', 'sage-line': '#D1DDCB',
+      'bg': '#F9F3ED', 'card': '#FFFDFA', 'card-alt': '#FCF8F2',
+      'ink': '#282C20', 'ink-2': '#3E4334', 'mut': '#646859',
+      'line': '#EEE7DC', 'line-2': '#E6DDD0',
+      'sage': '#49693E', 'sage-2': '#3D5934', 'sage-3': '#97A96D',
+      'sage-deep': '#345640', 'sage-soft': '#E5EBD6', 'sage-line': '#CCD8B6',
+      'sand': '#DCC39A', 'sand-soft': '#F9EEDD', 'sand-ink': '#8A6423', 'gold-1': '#BF9240', 'gold-2': '#D3AE62',
+      'wallet': '#5B7543', 'wallet-2': '#3E5430',
+    },
+  },
+  teal: {
+    name: 'Teal', dark: false,
+    vars: {
+      'bg': '#F4F3EF', 'card': '#FFFFFF', 'card-alt': '#FAF9F6',
+      'ink': '#22302E', 'ink-2': '#384744', 'mut': '#5C6866',
+      'line': '#E9E7E1', 'line-2': '#E0DDD5',
+      'sage': '#1C706D', 'sage-2': '#165C59', 'sage-3': '#86BF9F',
+      'sage-deep': '#134F4C', 'sage-soft': '#DCEDE6', 'sage-line': '#BCDBCF',
+      'sand': '#E6C9A4', 'sand-soft': '#F6ECDF', 'sand-ink': '#8A6233', 'gold-1': '#C9A57A', 'gold-2': '#DDBE96',
+      'wallet': '#1F6E6A', 'wallet-2': '#154F4C',
     },
   },
   midnight: {
     name: 'Midnight', dark: true,
     vars: {
-      'sage': '#9BAE93', 'sage-2': '#86997E', 'sage-3': '#B4C4AB',
-      'sage-deep': '#B9CCB0', 'sage-soft': '#273226', 'sage-line': '#39463A',
+      'bg': '#0F1828', 'card': '#16223A', 'card-alt': '#1B2944',
+      'ink': '#F2EEE6', 'ink-2': '#D9D5CC', 'mut': '#9EA8B8', 'mut-2': '#66718A',
+      'line': '#22314A', 'line-2': '#2A3A56',
+      'sage': '#8FA9C9', 'sage-2': '#7893B6', 'sage-3': '#B3C6DD',
+      'sage-deep': '#C3D3E6', 'sage-soft': '#1E3150', 'sage-line': '#2D4468',
+      'sand': '#D9A07C', 'sand-soft': '#3A2A22', 'sand-ink': '#E7B08C', 'gold-1': '#D28459', 'gold-2': '#E0A27E',
+      'wallet': '#22406A', 'wallet-2': '#193152',
+    },
+  },
+  terra: {
+    name: 'Terracotta', dark: false,
+    vars: {
+      'bg': '#FBF6F1', 'card': '#FFFFFF', 'card-alt': '#FDF9F5',
+      'ink': '#3A2C30', 'ink-2': '#4F3F43', 'mut': '#76666A',
+      'line': '#F0E6DE', 'line-2': '#E9DDD3',
+      'sage': '#A05A4A', 'sage-2': '#8E4F40', 'sage-3': '#CD9087',
+      'sage-deep': '#644150', 'sage-soft': '#F9EDE8', 'sage-line': '#EAC9BE',
+      'sand': '#E4C3A3', 'sand-soft': '#FBE6D2', 'sand-ink': '#8A5A35', 'gold-1': '#C99A6E', 'gold-2': '#DDB48C',
+      'rose': '#8A3F55', 'rose-2': '#B97A8B', 'rose-3': '#73344A', 'rose-soft': '#F4E1E6',
+      'wallet': '#9A5A4A', 'wallet-2': '#644150',
     },
   },
   slate: {
@@ -75,18 +118,8 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeDef> = {
     vars: {
       'bg': '#F7F8FA', 'card-alt': '#FBFCFD', 'ink': '#24272B', 'ink-2': '#3A3F45',
       'mut': '#6B7179', 'line': '#ECEEF1', 'line-2': '#E3E6EA',
-      'sage': '#647E9C', 'sage-2': '#54708E', 'sage-3': '#7E94AE',
-      'sage-deep': '#4E6884', 'sage-soft': '#E4EAF2', 'sage-line': '#CDD9E6',
-    },
-  },
-  terra: {
-    name: 'Terra', dark: false,
-    vars: {
-      'bg': '#FBF6F0', 'card-alt': '#FDF9F4', 'ink': '#3A3230', 'ink-2': '#4E4542',
-      'mut': '#796E66', 'line': '#F0E7DC', 'line-2': '#EADFD2',
-      'sage': '#C0764F', 'sage-2': '#A9633F', 'sage-3': '#D08F6C',
-      'sage-deep': '#9C5A38', 'sage-soft': '#F4E2D6', 'sage-line': '#E8CDBC',
-      'sand': '#D2A65B', 'sand-soft': '#F6ECD9',
+      'sage': '#52698A', 'sage-2': '#465C7B', 'sage-3': '#7E94AE',
+      'sage-deep': '#3F5674', 'sage-soft': '#E4EAF2', 'sage-line': '#CDD9E6',
     },
   },
   techie: {
@@ -129,7 +162,7 @@ function mix(a: string, b: string, t: number): string {
 
 export function deriveCustomVars(c: CustomTheme): Palette {
   const base = c.dark ? DARK_BASE : LIGHT_BASE;
-  const a = /^#[0-9a-fA-F]{6}$/.test(c.accent) ? c.accent : '#9BAE93';
+  const a = /^#[0-9a-fA-F]{6}$/.test(c.accent) ? c.accent : '#49693E';
   return {
     'sage': a,
     'sage-2': mix(a, '#000000', 0.15),
@@ -154,7 +187,7 @@ export function getCustomTheme(): CustomTheme {
       if (typeof p.accent === 'string' && typeof p.dark === 'boolean') return p;
     }
   } catch { /* fall through */ }
-  return { accent: '#9BAE93', dark: false };
+  return { accent: '#49693E', dark: false };
 }
 
 // ── Apply ──────────────────────────────────────────────────────────────────
@@ -187,12 +220,12 @@ function applyPalette(palette: Palette, dark: boolean) {
   const depth: Record<string, string> = dark ? {
     'shadow-rgb': '0 0 0', 'edge-hi': 'rgb(255 255 255 / 0.05)',
     'card-top': palette['card-alt'], 'card-bottom': palette['card'],
-    'wallet': mix(palette['card-alt'], accent, 0.2), 'wallet-2': mix(palette['card'], accent, 0.1),
+    'wallet': palette['wallet'] ?? mix(palette['card-alt'], accent, 0.2), 'wallet-2': palette['wallet-2'] ?? mix(palette['card'], accent, 0.1),
     'wallet-ink': palette['ink'], 'wallet-mut': 'rgb(236 234 228 / 0.72)', 'wallet-stitch': 'rgb(255 255 255 / 0.14)',
   } : {
     'shadow-rgb': '62 52 40', 'edge-hi': 'rgb(255 255 255 / 0.9)',
     'card-top': palette['card'], 'card-bottom': palette['card-alt'],
-    'wallet': mix(accent, '#1A1A18', 0.48), 'wallet-2': mix(accent, '#1A1A18', 0.62),
+    'wallet': palette['wallet'] ?? mix(accent, '#1A1A18', 0.48), 'wallet-2': palette['wallet-2'] ?? mix(accent, '#1A1A18', 0.62),
     'wallet-ink': '#FBFAF6', 'wallet-mut': 'rgb(251 250 246 / 0.85)', 'wallet-stitch': 'rgb(255 255 255 / 0.24)',
   };
   for (const [name, value] of Object.entries(depth)) root.style.setProperty(`--${name}`, value);
@@ -225,7 +258,7 @@ function applyPalette(palette: Palette, dark: boolean) {
  * does by itself):
  * - 'page': the page, painted by index.html in the theme colour. iOS, and
  *   Android with WebView 140 or newer, where Capacitor hands the insets to CSS.
- * - 'cream': the window background (#FAF9F6, styles.xml). Older WebViews get
+ * - 'cream': the window background (#F9F3ED, styles.xml). Older WebViews get
  *   the insets as padding around the page instead, and that shows through.
  */
 function barBackgrounds(): 'page' | 'cream' {

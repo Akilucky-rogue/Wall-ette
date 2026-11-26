@@ -8,7 +8,8 @@ import { accountKey, accountLabel } from '../services/accounts';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
-import { WallEEyes, FloatingLeaf, Sprout, RangoliCorner, PottedPlant, Diya } from './SplashScreen';
+import { Mascot } from './ui/Brand';
+import { Diya, FloatingLeaf, PottedPlant, RangoliCorner, Sprout } from './ui/Decor';
 import ReviewPayees from './ReviewPayees';
 import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
 import { receiptLines, type ImportReceipt } from '../services/importReceipt';
@@ -39,7 +40,7 @@ const ReceiptCard: React.FC<{ receipt: ImportReceipt; money: (n: number) => stri
   const when = new Date(r.at);
   return (
     <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
-      {heading && <p className="font-serif text-[20px] font-semibold text-premium-charcoal mb-0.5">{heading}</p>}
+      {heading && <p className="font-display text-[20px] font-bold text-premium-charcoal mb-0.5">{heading}</p>}
       <p className="text-[12px] text-muted-taupe">
         {r.bank ?? 'Statement'}{r.last4 ? ` ••${r.last4}` : ''} {r.format} · {showDay(r.from)} to {showDay(r.to)}
       </p>
@@ -607,13 +608,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.5} />
-      <FloatingLeaf className="top-48 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
+      <FloatingLeaf className="top-24 right-5 opacity-35" />
+      <FloatingLeaf className="top-48 left-4 opacity-25" color="var(--sage-3)" />
       <Sprout className="absolute top-36 left-6 opacity-40" />
       <PottedPlant className="absolute bottom-32 right-6 opacity-35" />
       <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
       <Diya className="absolute bottom-40 left-8 opacity-30" />
-      
+
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
@@ -622,7 +623,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight flex-1 truncate">Import a statement</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight flex-1 truncate">Import a statement</h2>
       </div>
 
       <div className="flex flex-col px-6 py-6 flex-1">
@@ -667,20 +668,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     aria-label="Choose a statement file"
                     className={`relative w-full aspect-[4/3] rounded-4xl flex flex-col items-center justify-center gap-4 bg-white/30 border-2 border-dashed border-sage/20 hover:border-sage/40 transition-all active:scale-[0.98] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage`}
                 >
-                    {/* Wall-ette Upload Helper */}
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg">
-                        <WallEEyes size="md" />
-                      </div>
-                      {/* Upload arrow */}
-                      <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
-                        <span className="material-symbols-outlined text-sage text-[18px]">upload</span>
-                      </div>
-                    </div>
+                    <Mascot pose="review" height={116} />
                     <div className="text-center px-6">
-                        <p className="text-premium-charcoal font-serif text-lg font-semibold">Choose statement</p>
+                        <p className="text-premium-charcoal font-display text-lg font-bold inline-flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sage text-[20px]" aria-hidden="true">upload</span>
+                            Choose statement
+                        </p>
                         <p className="text-muted-taupe text-xs mt-1">Excel (.xlsx/.xls) or PDF</p>
-                        <p className="text-[10px] text-muted-taupe mt-2 italic">"Let me analyze your finances!"</p>
                     </div>
                     <input
                         ref={fileInputRef}
@@ -752,7 +746,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 {/* The payments this statement leaves to review */}
                 {toReviewAfter.length > 0 && (
                     <section aria-labelledby="review-title">
-                        <h3 id="review-title" className="font-serif text-[20px] font-semibold text-premium-charcoal px-1">What were these payments?</h3>
+                        <h3 id="review-title" className="font-display text-[20px] font-bold text-premium-charcoal px-1">What were these payments?</h3>
                         <p className="text-muted-taupe text-[13px] leading-relaxed mt-1 mb-4 px-1">
                             {toReviewAfter.length === 1 ? 'One payee' : `${toReviewAfter.length} payees`} in this statement {toReviewAfter.length === 1 ? 'is a transfer' : 'are transfers'} Wall-ette can't name. They count as spending until you say what they were; your answer covers every payment to that payee, now and in later statements.
                         </p>
@@ -779,24 +773,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'PROCESSING' && (
             <div className="flex flex-col items-center justify-center flex-1 h-[60vh] animate-slide-up">
-                {/* Wall-ette Processing Animation */}
-                <div className="relative mb-8">
-                    {/* Outer spinning ring */}
-                    <div className="absolute inset-0 w-28 h-28 border-4 border-sage-light rounded-full"></div>
-                    <div className="absolute inset-0 w-28 h-28 border-4 border-sage rounded-full border-t-transparent animate-spin"></div>
-                    
-                    {/* Wall-ette face in center */}
-                    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-xl">
-                      <WallEEyes size="lg" animate={true} />
-                    </div>
-                    
-                    {/* Sparkles */}
-                    <div className="absolute -top-2 -right-2 text-lg animate-pulse">✨</div>
-                    <div className="absolute -bottom-1 -left-3 text-sm animate-pulse animation-delay-03s">✨</div>
+                <div className="mb-7">
+                    <Mascot pose="review" height={148} className="animate-pulse motion-reduce:animate-none" />
                 </div>
-                <h3 className="text-xl font-serif font-semibold text-premium-charcoal mb-2">{loadingMessage}</h3>
-                <p className="text-muted-taupe text-xs animate-pulse">Wall-ette is analyzing your document</p>
-                <p className="text-[10px] text-muted-taupe mt-3 italic">"Processing... beep boop!"</p>
+                <h3 className="text-xl font-display font-bold text-premium-charcoal mb-2">{loadingMessage}</h3>
+                <p className="text-muted-taupe text-xs">The file is read on this device and never uploaded</p>
+                <div className="mt-5 size-6 rounded-full border-[3px] border-sage/20 border-t-sage animate-spin" aria-hidden="true" />
             </div>
         )}
 
@@ -917,7 +899,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-[10px] text-muted-taupe uppercase tracking-wider">Statement closing</p>
-                                <p className="text-[15px] font-serif font-bold text-premium-charcoal">{formatAmount(tally.closing)}</p>
+                                <p className="text-[15px] font-semibold text-premium-charcoal tabular-nums">{formatAmount(tally.closing)}</p>
                             </div>
                             <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
                             <div className="text-right">
@@ -926,7 +908,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                         ? (tally.hasNewer ? `This account on ${showDay(tally.endDate)}` : 'This account after import')
                                         : (tally.hasNewer ? `Wallet on ${showDay(tally.endDate)}` : 'Wallet after import')}
                                 </p>
-                                <p className={`text-[15px] font-serif font-bold ${
+                                <p className={`text-[15px] font-semibold tabular-nums ${
                                     tallyTone === 'ok' ? 'text-sage' : tallyTone === 'note' ? 'text-premium-charcoal' : 'caution-ink'
                                 }`}>{formatAmount(tally.projected)}</p>
                             </div>
@@ -958,7 +940,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
                 <div className="flex justify-between items-end mb-6 px-2">
                     <div>
-                        <h3 className="text-premium-charcoal text-lg font-serif font-semibold">Review transactions</h3>
+                        <h3 className="text-premium-charcoal text-lg font-display font-bold">Review transactions</h3>
                         <p className="text-muted-taupe text-xs mt-1">
                             {selectedIds.size} of {extractedData.length} selected
                             {duplicateIds.size > 0 && (
@@ -1051,7 +1033,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     </span>
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate">{t.merchant}</p>
+                                    <p className="text-premium-charcoal font-semibold text-[14px] truncate">{t.merchant}</p>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] bg-gray-100 text-muted-taupe px-2 py-0.5 rounded-full uppercase tracking-wide">{t.category}</span>
                                         <span className="text-[10px] text-muted-taupe">{t.date}</span>
@@ -1067,7 +1049,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     <span className="material-symbols-outlined text-[16px] text-muted-taupe">edit</span>
                                 </button>
                                 <div className="text-right">
-                                    <p className={`font-serif font-bold ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
+                                    <p className={`font-semibold tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
                                         {t.type === TransactionType.EXPENSE ? '-' : '+'}₹{t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </p>
                                 </div>
@@ -1084,7 +1066,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Edit transaction</h3>
+                                <h3 className="text-lg font-display font-bold text-premium-charcoal">Edit transaction</h3>
                                 <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
                                     <span className="material-symbols-outlined text-muted-taupe">close</span>
                                 </button>
@@ -1175,7 +1157,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             {/* Save Button */}
                             <button
                                 onClick={saveEdit}
-                                className="w-full bg-sage text-white font-serif font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
+                                className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-[20px]">check</span>
                                 Save changes
@@ -1236,7 +1218,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <button 
                         onClick={confirmImport}
                         disabled={nothingToAdd && !canUpdate}
-                        className="w-full bg-sage text-white font-serif font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span className="material-symbols-outlined text-[20px]">check</span>
                         {!nothingToAdd

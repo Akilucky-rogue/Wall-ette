@@ -55,9 +55,11 @@ module.exports = {
           900: 'rgb(var(--c-ink) / <alpha-value>)',
         },
       },
+      // The brand's type (brand kit, 06 Typography): Manrope for headings
+      // and the wordmark, Inter for everything else, figures included.
       fontFamily: {
-        'sans': ['Inter', 'sans-serif'],
-        'serif': ['Crimson Pro', 'serif'],
+        'sans': ['Inter', 'system-ui', 'sans-serif'],
+        'display': ['Manrope', 'Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '1.25rem', // 20px

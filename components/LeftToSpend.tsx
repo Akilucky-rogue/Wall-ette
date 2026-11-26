@@ -36,7 +36,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
         <div className="min-w-0">
-          <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Left to spend</h2>
+          <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Left to spend</h2>
           {left && (
             <p className="text-[12px] text-muted-taupe">
               {left.basis === 'pay' ? `Pay to pay · ${shortDay(left.from)} to ${shortDay(left.until)}` : `${parseDay(left.from).toLocaleDateString('en-GB', { month: 'long' })}`}
@@ -49,7 +49,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
         <div className="px-6 pt-6">
           <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] text-center">
             <span className="material-symbols-outlined icon-fill text-sage text-[30px]" aria-hidden="true">account_balance_wallet</span>
-            <p className="font-serif text-[17px] font-semibold text-premium-charcoal mt-2">Nothing has come in yet</p>
+            <p className="font-display text-[17px] font-bold text-premium-charcoal mt-2">Nothing has come in yet</p>
             <p className="text-[12px] text-muted-taupe mt-1 leading-relaxed">
               Once your pay or other money comes in, this shows what you can still spend after bills and your savings goal.
             </p>
@@ -64,7 +64,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
           <div className="bg-white rounded-[28px] p-6 shadow-raised border border-black/[0.02]">
             {left.left >= 0 ? (
               <>
-                <p className="font-serif text-[44px] leading-none text-premium-charcoal tabular-nums">{money(left.left)}</p>
+                <p className="font-semibold text-[44px] leading-none text-premium-charcoal tabular-nums">{money(left.left)}</p>
                 <p className="text-[13px] text-muted-taupe mt-2">
                   About <span className="text-premium-charcoal font-semibold">{money(left.perDay)} a day</span>
                   {left.daysLeft === 1 ? ' for today' : ` for the next ${left.daysLeft} days`}.
@@ -72,7 +72,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
               </>
             ) : (
               <>
-                <p className="font-serif text-[44px] leading-none text-rose tabular-nums">{money(-left.left)} over</p>
+                <p className="font-semibold text-[44px] leading-none text-rose tabular-nums">{money(-left.left)} over</p>
                 <p className="text-[13px] text-muted-taupe mt-2 leading-relaxed">
                   Spending, bills and your savings goal come to more than came in {left.basis === 'pay' ? 'since your last pay' : 'this month'}.
                 </p>

@@ -46,7 +46,7 @@ const ReviewPayees: React.FC<ReviewPayeesProps> = ({ onlyIds, first = 6, classNa
           {shown.map(p => (
             <li key={p.match} className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="text-premium-charcoal font-serif font-semibold text-[15px] truncate" title={p.name}>{p.name}</p>
+                <p className="text-premium-charcoal font-semibold text-[15px] truncate" title={p.name}>{p.name}</p>
                 <p className="text-premium-charcoal text-[13px] font-semibold tabular-nums shrink-0">{formatAmountCompact(p.out)} out</p>
               </div>
               <p className="text-muted-taupe text-[11px] mt-0.5">

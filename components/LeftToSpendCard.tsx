@@ -59,7 +59,7 @@ const LeftToSpendCard: React.FC<{ onNavigate: (screen: AppScreen) => void; class
           <span className="material-symbols-outlined text-muted-taupe/60 text-[18px]" aria-hidden="true">chevron_right</span>
         </span>
         <span className="flex items-baseline justify-between gap-3 mt-1">
-          <span className={`font-serif text-[30px] leading-tight tabular-nums ${over ? 'text-rose' : 'text-premium-charcoal'}`}>
+          <span className={`font-semibold text-[30px] leading-tight tabular-nums ${over ? 'text-rose' : 'text-premium-charcoal'}`}>
             {over ? `${money(-left.left)} over` : money(left.left)}
           </span>
           {!over && (

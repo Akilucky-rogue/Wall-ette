@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The brand's surface cream (the Sage theme's page, utils/theme.ts):
+         behind the launch icon, and behind the system bars until the page
+         paints them. -->
+    <color name="brand_surface">#F9F3ED</color>
+</resources>

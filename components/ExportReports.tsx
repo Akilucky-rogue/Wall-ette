@@ -8,10 +8,10 @@ import { takeSection } from '../utils/screenSection';
 import { buildStatementHtml, PERIOD_LABELS, transactionsCsv, type ReportPeriod } from '../services/statementReport';
 import { buildBackup, MAX_BACKUP_CHARS, planRestore, PROBLEM_TEXT, readBackup, type RestorePlan } from '../services/backup';
 import RestoreBackupSheet from './RestoreBackupSheet';
-import { WallEEyes, FloatingLeaf, PottedPlant, RangoliCorner, LotusFlower, Diya } from './SplashScreen';
 import PageHeader from './ui/PageHeader';
 import { Denim, DenimFigure, DenimLabel, Pocket } from './ui/Denim';
 import { Card, IconChip, SectionTitle, Segmented } from './ui/Paper';
+import { Diya, FloatingLeaf, LotusFlower, PottedPlant, RangoliCorner } from './ui/Decor';
 
 interface ExportReportsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -200,8 +200,8 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.4} />
-      <FloatingLeaf className="top-52 left-4 opacity-30" delay={1.6} color="#A8B89E" />
+      <FloatingLeaf className="top-24 right-6 opacity-40" />
+      <FloatingLeaf className="top-52 left-4 opacity-30" color="#A8B89E" />
       <PottedPlant className="absolute bottom-40 right-6 opacity-40" />
       <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
       <LotusFlower className="absolute bottom-52 left-8 opacity-35" size="sm" />
@@ -233,7 +233,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
           <Denim aria-label={`${PERIOD_LABELS[period]} in figures`}>
             <div className="flex items-center justify-between gap-3">
               <DenimLabel className="tracking-wide">{PERIOD_LABELS[period]}</DenimLabel>
-              <span className="w-9 h-9 rounded-full bg-black/15 flex items-center justify-center shrink-0"><WallEEyes size="sm" /></span>
+              <span className="w-9 h-9 rounded-full bg-black/15 flex items-center justify-center shrink-0" aria-hidden="true"><span className="material-symbols-outlined text-[20px]">description</span></span>
             </div>
             <DenimFigure className="mt-3">{summary.entries.toLocaleString('en-IN')} <span className="text-[22px]">{summary.entries === 1 ? 'entry' : 'entries'}</span></DenimFigure>
             <div className="grid grid-cols-2 gap-2.5 mt-4">
@@ -270,7 +270,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
                         : <span className="material-symbols-outlined icon-fill text-[24px]" aria-hidden="true">{card.icon}</span>}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block font-serif text-[17px] font-semibold text-premium-charcoal">{card.title}</span>
+                      <span className="block font-display text-[17px] font-bold text-premium-charcoal">{card.title}</span>
                       <span className="block text-[12px] text-muted-taupe leading-relaxed mt-0.5">{card.desc}</span>
                       <span className="block text-[10px] text-sage font-bold uppercase tracking-wider mt-1.5">{card.meta}</span>
                     </span>

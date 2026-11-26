@@ -1,12 +1,16 @@
-# Wall-ette design system
+# Wall·ette design system
 
-How Wall-ette looks and why, for anyone adding a screen. The look is settled:
-a calm, eco-inspired wallet with the WALL-E eyes, a stitched wallet card for
-each screen's key figure, Crimson Pro figures over Inter text, small caps
-labels, and little sprouts, lotuses and leaves around the edges. New work
-follows it; it doesn't reinvent it.
+How Wall·ette looks and why, for anyone adding a screen. The look is settled:
+a calm, eco-inspired wallet with the brand's leaf-headed mascot, a stitched
+wallet card for each screen's key figure, Manrope headings over Inter text
+and figures, small caps labels, and little sprouts, lotuses and leaves around
+the edges. New work follows it; it doesn't reinvent it.
 
-Last reviewed for 1.5.6 (November 2026).
+The brand kit (identity board, guide, palettes and type) came in 1.5.9; its
+marks live in `assets/brand` and `components/ui/Brand.tsx`, and the icon is
+drawn by `scripts/brand-icons.mjs`.
+
+Last reviewed for 1.5.9 (November 2026).
 
 ## Principles
 
@@ -17,9 +21,13 @@ Last reviewed for 1.5.6 (November 2026).
 2. **Minimal and premium.** A fine weave and one soft stitch, never more
    ornament on the wallet (no gold thread, rivets or seams: tried in 1.5.6 and
    dropped as too busy). Pockets are plain pressed-in panels.
-3. **The mascot and the garden stay.** The WALL-E eyes are the logo; the dock
-   carries a sprout and a lotus; data screens keep their low-opacity leaves,
-   rangoli, diya and potted plant. They are part of the brand, not clutter.
+3. **The mascot and the garden stay.** The icon, the wordmark and the mascot
+   are the brand (`ui/Brand.tsx`): Welcome greets (sign-in, the splash, an
+   empty wallet), Think sits with insights and empty screens, Review with
+   statements, Encourage and Celebrate are kept for progress and real
+   achievements. The dock carries a sprout and a lotus; screens keep their
+   low-opacity leaves, rangoli, diya and potted plant (`ui/Decor.tsx`). They
+   are part of the brand, not clutter, and stay clear of the mascot.
 4. **Numbers are exact.** Whatever a screen, chart or report shows is worked
    out once (`services/pulseAnalysis.ts`, `services/statementReport.ts`) and
    checked by scripts (`check-pulse`, `check-report`, `check-entry`).
@@ -27,16 +35,18 @@ Last reviewed for 1.5.6 (November 2026).
 ## Tokens
 
 All colours resolve through CSS variables set by `utils/theme.ts` on `<html>`
-(themes: Sage, Midnight, Slate, Terra, Techie, custom). Tailwind classes read
-them (`bg-white` is the card, `text-premium-charcoal` the ink).
+(themes: the brand kit's Sage, Teal, Midnight and Terracotta, then Slate,
+Techie and custom). Tailwind classes read them (`bg-white` is the card,
+`text-premium-charcoal` the ink). `scripts/check-contrast.mjs` holds every
+theme to 4.5:1 for text, the accent as text and behind text, and money out.
 
 | Group | Tokens | Use |
 |---|---|---|
 | Surfaces | `bg`, `card`, `card-alt`, `line`, `line-2` | Page, paper, hairlines |
 | Ink | `ink`, `ink-2`, `mut`, `mut-2` | Text; `mut` for secondary text |
-| Accent | `sage` (+ `-soft`, `-line`, `-deep`) | The theme's accent: active tab, buttons, actions |
-| Tints | `rose`, `lavender`, `sand` (+ `sand-ink`), `ocean`, `bluez` and their `-soft` | Icon chips and status tints |
-| Wallet | `wallet`, `wallet-2`, `wallet-ink`, `wallet-mut`, `wallet-stitch` | The stitched card (a deep shade of the accent) |
+| Accent | `sage` (+ `-soft`, `-line`, `-deep`) | The theme's accent: active tab, buttons, actions, money in |
+| Tints | `rose`, `lavender`, `sand` (+ `sand-ink`), `ocean`, `bluez` and their `-soft` | Icon chips and status tints; `rose` is money out (the brand's clay; berry in Terracotta) |
+| Wallet | `wallet`, `wallet-2`, `wallet-ink`, `wallet-mut`, `wallet-stitch` | The stitched card (set per brand theme, else a deep shade of the accent) |
 | Depth | `shadow-rgb`, `edge-hi`, `card-top`, `card-bottom` | Light from above |
 | Charts | `viz-in` (teal), `viz-out` (clay), `viz-out-1`, `viz-out-3`, `viz-ctx` | Charts only; same in every theme |
 
@@ -50,9 +60,11 @@ clay steps `#8A4A2C` / `#E2A685`. Dark: `#3D98BC`, `#C8744D`, `#A35A37` /
 
 | Role | Face and size |
 |---|---|
-| Page title | Crimson Pro 22px (26px on desktop), semibold |
-| Wallet figure | Crimson Pro 40px (30px for a slim wallet), embossed |
-| Pocket and tile figures | Crimson Pro 20–22px |
+| Page title, sheet and card headings | Manrope 22px (26px on desktop), bold; every `h1`–`h6` is Manrope |
+| Wallet figure | Inter 40px (30px for a slim wallet), semibold, tabular, embossed |
+| Pocket and tile figures | Inter 20–22px semibold, tabular |
+| Buttons | Inter semibold |
+| Logo | The wordmark artwork (`Wordmark`), never set as text |
 | Card label | Inter 10px bold, uppercase, `tracking-widest`, muted: `BUDGETS · NOVEMBER` |
 | Label action | Inter 10px semibold, uppercase, `tracking-wider`, sage: `EDIT`, `ALL INSIGHTS` |
 | Row title | Inter 13–14px semibold |
@@ -76,7 +88,8 @@ tooltips and the rail, `pressed` for switch tracks and wells.
 | `Navigation` | `Navigation.tsx` | Phones and tablets: the dock with its sprout and lotus. Desktops (≥1024px): a rail with the logo, the four tabs, Add an entry and Import |
 | Chart kit | `charts/kit.tsx` | `ChartCard` (label, legend, Numbers/Chart switch to a table), `Tooltip`, `Legend`, `niceTicks` in the shown currency |
 | Charts | `charts/*.tsx` | `MoneyInOut`, `PaceChart`, `SplitBar`, `RankedBars`, `UsualBars`, `WeekdayBars`, `CalendarHeat` |
-| Decorations | `SplashScreen.tsx` | `WallEEyes`, `WallEMascot`, `Sprout`, `LotusFlower`, `FloatingLeaf`, `RangoliCorner`, `Diya`, `PottedPlant`, `MandalaDots`, `Paisley` |
+| Brand | `ui/Brand.tsx` | `BrandIcon` (the app icon's tile), `Wordmark` (with a cream copy for dark themes), `Mascot` (welcome, think, encourage, celebrate, review), `TAGLINE` |
+| Decorations | `ui/Decor.tsx` | `Sprout`, `LotusFlower`, `FloatingLeaf`, `RangoliCorner`, `Diya`, `PottedPlant`, `MandalaDots`, `Paisley` |
 
 Every chart has a hover/tap tooltip, keyboard focus, a table of the same
 numbers, solid hairline gridlines, bars of 24px at most with 4px rounded

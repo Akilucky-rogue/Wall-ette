@@ -15,7 +15,7 @@ import {
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateBiometric, isNative } from '../utils/biometric';
 import { log } from '../utils/log';
 import { PRIVACY_URL, TERMS_URL } from '../utils/site';
-import { WallEEyes } from './SplashScreen';
+import { BrandIcon, TAGLINE, Wordmark } from './ui/Brand';
 import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
@@ -463,7 +463,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
           </button>
         )}
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight truncate">{PAGE_TITLE[page]}</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight truncate">{PAGE_TITLE[page]}</h2>
       </div>
 
       {page === 'hub' && (
@@ -471,28 +471,28 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
           {/* You */}
           <div className="bg-white rounded-[28px] p-5 shadow-raised border border-black/[0.02]">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-soft shrink-0">
-                <WallEEyes size="md" />
+              <div className="w-16 h-16 rounded-full bg-sage-light text-sage flex items-center justify-center shadow-soft shrink-0" aria-hidden="true">
+                <span className="font-display text-[26px] font-bold uppercase">{(user?.email ?? '?').charAt(0)}</span>
               </div>
               <div className="min-w-0">
-                <p className="font-serif text-[20px] font-semibold text-premium-charcoal truncate">{user?.email?.split('@')[0]}</p>
+                <p className="font-display text-[20px] font-bold text-premium-charcoal truncate">{user?.email?.split('@')[0]}</p>
                 <p className="text-[12px] text-muted-taupe truncate">{user?.email}</p>
               </div>
             </div>
             <dl className="mt-5 grid grid-cols-3 divide-x divide-premium-charcoal/[0.08] rounded-2xl bg-zen-bg/70 shadow-pressed py-3">
               <div className="text-center px-2 min-w-0">
                 <dt className="text-[11px] text-muted-taupe">Entries</dt>
-                <dd className="font-serif text-[17px] font-semibold text-premium-charcoal tabular-nums">{transactions.length.toLocaleString('en-IN')}</dd>
+                <dd className="text-[17px] font-semibold text-premium-charcoal tabular-nums">{transactions.length.toLocaleString('en-IN')}</dd>
               </div>
               <div className="text-center px-2 min-w-0">
                 <dt className="text-[11px] text-muted-taupe">This month</dt>
-                <dd className={`font-serif text-[17px] font-semibold tabular-nums truncate ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
+                <dd className={`text-[17px] font-semibold tabular-nums truncate ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
                   {monthlyNet >= 0 ? '+' : '−'}{money(Math.abs(monthlyNet))}
                 </dd>
               </div>
               <div className="text-center px-2 min-w-0">
                 <dt className="text-[11px] text-muted-taupe">Member since</dt>
-                <dd className="font-serif text-[17px] font-semibold text-premium-charcoal">{memberSince}</dd>
+                <dd className="text-[17px] font-semibold text-premium-charcoal">{memberSince}</dd>
               </div>
             </dl>
             <p className="mt-3 text-[11px] text-muted-taupe text-center">Last signed in {lastSignIn}</p>
@@ -689,11 +689,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       {page === 'about' && (
         <div className="px-6 pt-2 space-y-4">
           <div className="bg-white rounded-[28px] p-6 shadow-raised border border-black/[0.02] flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-soft">
-              <WallEEyes size="md" />
-            </div>
-            <p className="font-serif text-[20px] font-semibold text-premium-charcoal mt-3">Wall-ette</p>
-            <p className="text-[12px] text-muted-taupe tabular-nums">Version {__APP_VERSION__} ({__APP_BUILD__})</p>
+            <BrandIcon size={64} className="drop-shadow-sm" />
+            <h3 className="mt-4"><Wordmark height={26} /></h3>
+            <p className="mt-1.5 text-[13px] font-medium text-muted-taupe">{TAGLINE}</p>
+            <p className="mt-1 text-[12px] text-muted-taupe tabular-nums">Version {__APP_VERSION__} ({__APP_BUILD__})</p>
             {isNative() && (
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <button onClick={() => setNotesOpen(true)} className="px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft">
@@ -724,7 +723,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !mfaBusy && setMfaModal(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Two-Factor Auth</h3>
+              <h3 className="text-lg font-display font-bold text-premium-charcoal">Two-factor authentication</h3>
               <button onClick={() => setMfaModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={mfaBusy}>
                 <span className="material-symbols-outlined text-muted-taupe">close</span>
               </button>
@@ -738,8 +737,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                   Your account requires an authenticator code at every sign-in. Disabling removes this protection.
                 </p>
                 <button onClick={disableMfa} disabled={mfaBusy}
-                        className="w-full bg-rose text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
-                  {mfaBusy ? 'Removing…' : 'Disable Two-Factor Auth'}
+                        className="w-full bg-rose text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
+                  {mfaBusy ? 'Removing…' : 'Turn off two-factor authentication'}
                 </button>
               </>
             ) : mfaBusy && !enrollment ? (
@@ -768,7 +767,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                   placeholder="000000"
                 />
                 <button onClick={confirmMfaEnroll} disabled={mfaBusy || mfaCode.length < 6}
-                        className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
+                        className="w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
                   {mfaBusy ? 'Verifying…' : 'Activate'}
                 </button>
               </>
@@ -782,7 +781,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change password</h3>
+              <h3 className="text-lg font-display font-bold text-premium-charcoal">Change password</h3>
               <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
                 <span className="material-symbols-outlined text-muted-taupe">close</span>
               </button>
@@ -791,7 +790,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             {pwDone ? (
               <div className="p-5 bg-sage-light/40 border border-sage/20 rounded-2xl text-center">
                 <span className="material-symbols-outlined text-sage text-[36px] mb-1">check_circle</span>
-                <p className="text-[14px] font-serif font-semibold text-premium-charcoal">Password changed</p>
+                <p className="text-[14px] font-semibold text-premium-charcoal">Password changed</p>
                 <p className="text-[12px] text-muted-taupe mt-1">Use the new password from your next sign-in.</p>
               </div>
             ) : (
@@ -843,7 +842,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                 <button
                   onClick={changePassword}
                   disabled={pwBusy || !pwValid}
-                  className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   {pwBusy ? 'Updating…' : 'Update Password'}
                 </button>
@@ -860,7 +859,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       {delOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !delBusy && setDelOpen(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete account</h3>
+            <h3 className="text-lg font-display font-bold text-rose mb-2">Delete account</h3>
             <p className="text-[12px] text-muted-taupe leading-relaxed mb-4">
               This permanently erases your account and every transaction from the cloud. There is no undo.
               Consider exporting a backup first.
@@ -889,7 +888,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             <button
               onClick={handleDeleteAccount}
               disabled={delBusy || (delResolver ? delTotp.length < 6 : (delConfirm.toUpperCase() !== 'DELETE' || delPassword.length === 0))}
-              className="w-full bg-rose text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 mb-2"
+              className="w-full bg-rose text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 mb-2"
             >
               {delBusy ? 'Deleting…' : 'Permanently Delete Everything'}
             </button>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { AppScreen } from '../types';
 import { tick } from '../utils/haptics';
-import { LotusFlower, Sprout, WallEEyes } from './SplashScreen';
+import { BrandIcon, Wordmark } from './ui/Brand';
+import { LotusFlower, Sprout } from './ui/Decor';
 
 interface NavigationProps {
   currentScreen: AppScreen;
@@ -76,14 +77,12 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate, show
         aria-label="Main"
         className="hidden lg:flex fixed left-5 top-5 bottom-5 w-[220px] z-40 flex-col bg-white rounded-[32px] shadow-soft border border-black/[0.05] px-3 py-5"
       >
-        <div className="absolute top-4 right-5 opacity-50" aria-hidden="true">
+        <div className="absolute top-3 right-4 opacity-50" aria-hidden="true">
           <LotusFlower size="sm" color="var(--rose-2)" />
         </div>
-        <button onClick={() => go(AppScreen.DASHBOARD)} className="flex items-center gap-2.5 px-2.5 mb-7" aria-label="Wall-ette, Home">
-          <span className="w-9 h-9 rounded-full bg-sage flex items-center justify-center shadow-soft shrink-0">
-            <WallEEyes size="sm" />
-          </span>
-          <span className="font-serif text-[20px] font-semibold text-premium-charcoal tracking-tight">Wall-ette</span>
+        <button onClick={() => go(AppScreen.DASHBOARD)} className="flex items-center gap-2.5 px-2.5 mb-7" aria-label="Wall·ette, Home">
+          <BrandIcon size={34} />
+          <Wordmark height={20} />
         </button>
 
         <ul className="space-y-1">

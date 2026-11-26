@@ -155,12 +155,17 @@ Insights are computed entirely on-device in `services/insightsService.ts` — sa
 
 ## 🎨 Design System
 
-The app uses a custom Tailwind configuration defined in `index.html`:
+Wall·ette's brand kit (1.5.9): the leaf-headed mascot and wordmark
+(`components/ui/Brand.tsx`), the icon drawn by `scripts/brand-icons.mjs`,
+Manrope headings over Inter text and figures, and four themes from the brand
+palettes in `utils/theme.ts`. The default, Sage:
 
-*   **Bg**: `#FAF9F6` (Zen White)
-*   **Sage**: `#9BAE93` (Primary Accent - Positive/Growth)
-*   **Rose**: `#D4A5A5` (Secondary Accent - Expense/Alert)
-*   **Charcoal**: `#333333` (Text/Contrast)
+*   **Surface**: `#F9F3ED`
+*   **Accent**: `#49693E` (forest; money in, buttons) with sage `#97A96D`
+*   **Money out**: `#A35B48` (clay)
+*   **Ink**: `#282C20`
+
+See `docs/DESIGN_SYSTEM.md` for the rest.
 
 ---
 

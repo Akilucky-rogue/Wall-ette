@@ -90,11 +90,11 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-serif font-semibold tracking-tight leading-tight">Money moved</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Money moved</h2>
       </div>
 
       <div className="px-6 pt-6 pb-4">
-        <h1 className="text-premium-charcoal font-serif text-[28px] leading-tight mb-3">Moved, not spent</h1>
+        <h1 className="text-premium-charcoal font-display font-bold text-[28px] leading-tight mb-3">Moved, not spent</h1>
         <p className="text-muted-taupe text-[14px] leading-relaxed">
           Money sent to your own accounts, family or investments isn't spending, and money coming back from them isn't income.
           Sort a payee once and every payment to or from it is left out of both. Your balance still counts it.
@@ -128,7 +128,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
           <div className="space-y-3">
             {shownIncoming.map(s => (
               <div key={s.match} className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft">
-                <p className="text-premium-charcoal font-serif font-semibold text-[15px] truncate" title={s.name}>{s.name}</p>
+                <p className="text-premium-charcoal font-semibold text-[15px] truncate" title={s.name}>{s.name}</p>
                 <p className="text-muted-taupe text-[11px] mt-0.5">
                   {formatAmountCompact(s.in)} in · {s.count} {s.count === 1 ? 'payment' : 'payments'} · last {dayLabel(s.last)}
                 </p>
@@ -182,7 +182,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[20px]">{info.icon}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate" title={rule.match}>{rule.match}</p>
+                    <p className="text-premium-charcoal font-semibold text-[14px] truncate" title={rule.match}>{rule.match}</p>
                     <p className="text-muted-taupe text-[10px]">
                       {rule.kind === 'counts' && rule.category && <>Shown as {rule.category} · </>}
                       {stats ? `${stats.count} ${stats.count === 1 ? 'payment' : 'payments'} · ${formatAmountCompact(stats.total)}` : 'No payments match yet'}

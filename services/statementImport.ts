@@ -13,6 +13,7 @@
 import { Transaction, TransactionType } from '../types';
 import { addDays, byNewest } from '../utils/dates';
 import { narrationFields } from './narration';
+import { type AccountAnchor, type AccountAnchors, accountKey, totalOpening } from './accounts';
 
 /** A row as the statement parsers return it. */
 export interface StatementRow {
@@ -277,9 +278,29 @@ export function findDuplicates(
 /** What importing works on: the entries and the balance they start from. */
 export interface WalletLedger {
   transactions: readonly Transaction[];
+  /**
+   * The opening balance not tied to an account: from wallets before 1.5.9,
+   * when accounts weren't told apart, and from statements that don't show
+   * their account number.
+   */
   openingBalance: number;
-  /** The first day of the earliest statement imported, or null. */
+  /** The first day of the earliest such statement, or null. */
   openingBalanceAsOf: string | null;
+  /** Each account's own opening balance (from 1.5.9), by accountKey. */
+  accounts?: AccountAnchors;
+}
+
+/** The account a statement is from, and, when that's open, how it joins the wallet. */
+export interface StatementAccount {
+  bank: string;
+  last4: string;
+  /**
+   * For an account the wallet doesn't know yet, in a wallet that still has
+   * an opening balance from before accounts: whether that balance and the
+   * entries imported then are this account's ('same', the default) or
+   * another account's ('separate').
+   */
+  legacy?: 'same' | 'separate';
 }
 
 export interface MergeResult {
@@ -287,10 +308,129 @@ export interface MergeResult {
   transactions: Transaction[];
   /** The rows that went in (not ones the wallet already had). */
   added: Transaction[];
+  /**
+   * Entries the wallet already had from this statement, imported before
+   * 1.5.9 told accounts apart, now marked with its account.
+   */
+  retagged: Transaction[];
   /** Ids taken out (stale balance adjustments). */
   removed: string[];
-  /** The new opening balance, when this statement is now the earliest. */
+  /** The new opening balance not tied to an account, when it changed. */
   opening: { balance: number; asOf: string | null } | null;
+  /** The statement's account after the import, when it's new or its opening balance changed. */
+  account: { key: string; anchor: AccountAnchor } | null;
+}
+
+/** The wallet still has an opening balance from before accounts. */
+const hasUnassigned = (w: WalletLedger): boolean => w.openingBalance !== 0 || w.openingBalanceAsOf !== null;
+
+/** A statement being imported: every row read from it, and its first and last day. */
+export interface StatementRows {
+  rows: readonly Transaction[];
+  from: string;
+  to: string;
+}
+
+/**
+ * The account's own part of the wallet: its entries and its opening balance,
+ * as if it were the only account. The balance check and the gap between
+ * statements are worked out on this, so another account's entries never
+ * read as this one's missing money. Entries typed in (createdAt) are left
+ * out. Imported entries from before 1.5.9 (no account) are the account's
+ * when they're rows of this statement, or when the account takes over the
+ * opening balance from then, from the day that balance is from; but not,
+ * even then, ones inside the statement's own period that aren't its rows: a
+ * statement has every row of its period, so those are another account's.
+ * Without an account (a statement that doesn't show its number), it's the
+ * entries no account claims and the opening balance from before accounts.
+ */
+export function accountView(wallet: WalletLedger, account: StatementAccount | undefined, statement?: StatementRows): WalletLedger {
+  if (!account) {
+    // A statement that doesn't show its number: everything no account claims.
+    if (!wallet.transactions.some(t => t.account) && Object.keys(wallet.accounts ?? {}).length === 0) return wallet;
+    return {
+      transactions: wallet.transactions.filter(t => !t.account),
+      openingBalance: wallet.openingBalance,
+      openingBalanceAsOf: wallet.openingBalanceAsOf,
+    };
+  }
+  const key = accountKey(account.bank, account.last4);
+  const known = wallet.accounts?.[key];
+  const adopts = !known && hasUnassigned(wallet) && account.legacy !== 'separate';
+  const old = known ? !!known.legacy : adopts;
+  // The day its opening balance is from: entries from before 1.5.9 dated
+  // earlier aren't its own (that balance already counts them).
+  const asOf = (known ? known.asOf : adopts ? wallet.openingBalanceAsOf : null)?.slice(0, 10) ?? null;
+  const untagged = wallet.transactions.filter(t => !t.account && !t.createdAt);
+  const fromThen = (t: Transaction) => !asOf || t.date.slice(0, 10) >= asOf;
+  let mine: ReadonlySet<string> = new Set();
+  if (statement && untagged.length > 0) {
+    const from = statement.from.slice(0, 10);
+    const to = statement.to.slice(0, 10);
+    const ids = new Set(statement.rows.map(t => t.id));
+    const inPeriod = untagged.filter(t => !ids.has(t.id) && t.date.slice(0, 10) >= from && t.date.slice(0, 10) <= to);
+    const matched = findDuplicates(inPeriod, statement.rows);
+    mine = new Set([...untagged.filter(t => ids.has(t.id)).map(t => t.id), ...matched]);
+    if (old) {
+      // Inside the period, only the statement's rows.
+      const others = new Set(inPeriod.filter(t => !matched.has(t.id) && !t.id.startsWith('adjust-')).map(t => t.id));
+      mine = new Set(untagged.filter(t => mine.has(t.id) || (!others.has(t.id) && fromThen(t))).map(t => t.id));
+    }
+  } else if (old) {
+    mine = new Set(untagged.filter(fromThen).map(t => t.id));
+  }
+  return {
+    transactions: wallet.transactions.filter(t => t.account === key || mine.has(t.id)),
+    openingBalance: known ? known.opening : adopts ? wallet.openingBalance : 0,
+    openingBalanceAsOf: known ? known.asOf : adopts ? wallet.openingBalanceAsOf : null,
+  };
+}
+
+/**
+ * Whether the opening balance a wallet kept from before 1.5.9 (when
+ * accounts weren't told apart) is this statement's account's ('same') or
+ * another account's ('separate'), as far as the wallet shows, for a
+ * statement from an account the wallet doesn't know yet. In order:
+ *   1. the statement covers the day that balance is from: its own balance
+ *      that day says whose it is;
+ *   2. it closes, before that day, at that balance;
+ *   3. it opens where that balance and the entries before it leave off;
+ *   4. entries from then run alongside it that aren't its rows: another
+ *      account's, so the balance may be too;
+ * else 'same' (a wallet that has only ever had one account). Review shows
+ * the choice, so it can be changed. Null when there's nothing to decide: a
+ * known account, or no opening balance from before 1.5.9.
+ */
+export function suggestLegacy(args: {
+  wallet: WalletLedger;
+  account: Pick<StatementAccount, 'bank' | 'last4'>;
+  /** Every row read from the statement. */
+  rows: readonly Transaction[];
+  minDate: string;
+  maxDate: string;
+  opening?: number;
+  closing?: number;
+}): 'same' | 'separate' | null {
+  const { wallet, account, rows, minDate, maxDate, opening, closing } = args;
+  if (wallet.accounts?.[accountKey(account.bank, account.last4)] || !hasUnassigned(wallet)) return null;
+  const old = wallet.transactions.filter(t => !t.account && !t.createdAt);
+  const start = minDate.slice(0, 10);
+  const end = maxDate.slice(0, 10);
+  const asOf = wallet.openingBalanceAsOf?.slice(0, 10) ?? null;
+  const was = paise(wallet.openingBalance);
+  const opens = opening !== undefined && Number.isFinite(opening);
+  if (asOf && opens && start <= asOf && asOf <= end) {
+    const thatDay = paise(opening!) + netPaise(rows.filter(t => t.date.slice(0, 10) < asOf));
+    return thatDay === was ? 'same' : 'separate';
+  }
+  if (asOf && closing !== undefined && Number.isFinite(closing) && end < asOf && paise(closing) === was) return 'same';
+  if (opens && was + netPaise(old.filter(t => t.date.slice(0, 10) < start)) === paise(opening!)) return 'same';
+  const its = findDuplicates(old, rows);
+  const alongside = old.some(t => {
+    const day = t.date.slice(0, 10);
+    return !t.id.startsWith('adjust-') && !its.has(t.id) && day >= start && day <= end;
+  });
+  return alongside ? 'separate' : 'same';
 }
 
 /**
@@ -298,52 +438,118 @@ export interface MergeResult {
  * nothing is lost between taking out stale adjustments and adding rows.
  *   - rows with an id the wallet has (the same row from another statement)
  *     are left out, as are repeats within the import;
- *   - the balance anchors to the earliest statement ever imported: its
- *     opening balance applies when it starts before the current anchor (or,
- *     for wallets from before anchors, before every entry), so
- *     balance = opening + every entry, in whatever order statements arrive.
+ *   - a statement from a known account (options.account) anchors that
+ *     account's opening balance to its earliest statement; an account the
+ *     wallet doesn't know adds its own opening balance, or takes over the
+ *     opening balance from before 1.5.9 (account.legacy), even when every
+ *     row is one the wallet already has, so importing a statement again
+ *     sets an opening balance that was missing; new rows carry the account,
+ *     and so do the statement's rows the wallet had with none (imported
+ *     before 1.5.9), so each account's entries are its own from then on;
+ *   - with no account (the statement doesn't show its number), the balance
+ *     anchors to the earliest such statement, as before 1.5.9: its opening
+ *     balance applies when it starts before the current anchor (or, for
+ *     wallets from before anchors, before every entry no account claims);
+ * so balance = every opening + every entry, in whatever order statements arrive.
  */
 export function mergeImport(
   wallet: WalletLedger,
   incoming: readonly Transaction[],
-  options: { opening?: number; statementStart?: string; removeIds?: Iterable<string> } = {},
+  options: {
+    opening?: number;
+    statementStart?: string;
+    removeIds?: Iterable<string>;
+    account?: StatementAccount;
+    /** Every row read from the statement, ticked or not: the wallet's
+     *  entries among them that have no account yet are marked with this one. */
+    rowIds?: Iterable<string>;
+  } = {},
 ): MergeResult {
   const remove = new Set(options.removeIds ?? []);
-  const base = wallet.transactions.filter(t => !remove.has(t.id));
+  const key = options.account ? accountKey(options.account.bank, options.account.last4) : null;
+  const statementRows = new Set([...(options.rowIds ?? []), ...incoming.map(t => t.id)]);
+  const retagged: Transaction[] = [];
+  const base = wallet.transactions.filter(t => !remove.has(t.id)).map(t => {
+    if (!key || t.account || t.createdAt || !statementRows.has(t.id)) return t;
+    const own = { ...t, account: key };
+    retagged.push(own);
+    return own;
+  });
   const removed = wallet.transactions.filter(t => remove.has(t.id)).map(t => t.id);
   const ids = new Set(base.map(t => t.id));
   const added: Transaction[] = [];
   for (const t of incoming) {
     if (ids.has(t.id)) continue;
     ids.add(t.id);
-    added.push(t);
+    added.push(key && !t.account ? { ...t, account: key } : t);
   }
 
   let opening: MergeResult['opening'] = null;
+  let account: MergeResult['account'] = null;
   const { opening: statementOpening, statementStart } = options;
-  if (statementOpening !== undefined && Number.isFinite(statementOpening) && added.length > 0) {
+  const known = statementOpening !== undefined && Number.isFinite(statementOpening);
+  if (options.account && key) {
+    const { bank, last4 } = options.account;
+    let anchor: AccountAnchor | null = wallet.accounts?.[key] ? { ...wallet.accounts[key] } : null;
+    let changed = false;
+    if (!anchor && hasUnassigned(wallet) && options.account.legacy !== 'separate') {
+      // This account takes over the opening balance from before accounts.
+      anchor = { bank, last4, opening: wallet.openingBalance, asOf: wallet.openingBalanceAsOf, legacy: true };
+      opening = { balance: 0, asOf: null };
+      changed = true;
+    }
+    if (known) {
+      if (!anchor) {
+        anchor = { bank, last4, opening: statementOpening, asOf: statementStart ?? null };
+        changed = true;
+      } else {
+        const own = base.filter(t => t.account === key || (anchor!.legacy && !t.account && !t.createdAt));
+        const earliest = anchor.asOf
+          ? !!statementStart && statementStart < anchor.asOf
+          : !!statementStart && own.every(t => statementStart <= t.date.slice(0, 10));
+        if (earliest) {
+          anchor = { ...anchor, opening: statementOpening, asOf: statementStart ?? null };
+          changed = true;
+        }
+      }
+    }
+    if (changed && anchor) account = { key, anchor };
+  } else if (known && added.length > 0) {
+    // Entries of known accounts count from their own openings: only the
+    // rest decide whether this one is the earliest.
+    const rest = base.filter(t => !t.account);
     let applies = false;
-    if (base.length === 0) applies = true;
+    if (rest.length === 0) applies = true;
     else if (wallet.openingBalanceAsOf) applies = !!statementStart && statementStart < wallet.openingBalanceAsOf;
-    else if (statementStart) applies = base.every(t => statementStart <= t.date.slice(0, 10));
+    else if (statementStart) applies = rest.every(t => statementStart <= t.date.slice(0, 10));
     if (applies) opening = { balance: statementOpening, asOf: statementStart ?? null };
   }
 
   return {
-    transactions: added.length || removed.length ? [...added, ...base].sort(byNewest) : [...wallet.transactions],
+    transactions: added.length || removed.length || retagged.length ? [...added, ...base].sort(byNewest) : [...wallet.transactions],
     added,
+    retagged,
     removed,
     opening,
+    account,
   };
 }
+
+/** The wallet after a merge: its entries, and its opening balances with the merge's changes. */
+export const afterMerge = (wallet: WalletLedger, r: MergeResult): WalletLedger => ({
+  transactions: r.transactions,
+  openingBalance: r.opening ? r.opening.balance : wallet.openingBalance,
+  openingBalanceAsOf: r.opening ? r.opening.asOf : wallet.openingBalanceAsOf,
+  accounts: r.account ? { ...(wallet.accounts ?? {}), [r.account.key]: r.account.anchor } : wallet.accounts,
+});
 
 /** Money in minus money out, counted in paise so sums are exact. */
 export const netPaise = (list: readonly Pick<Transaction, 'amount' | 'type'>[]): number =>
   list.reduce((s, t) => s + (t.type === TransactionType.INCOME ? 1 : -1) * Math.round(t.amount * 100), 0);
 
-/** The wallet's balance: opening plus every entry (all of them, counted or not). */
+/** The wallet's balance: every opening balance plus every entry (all of them, counted or not). */
 export const ledgerBalance = (wallet: WalletLedger): number =>
-  (Math.round(wallet.openingBalance * 100) + netPaise(wallet.transactions)) / 100;
+  (Math.round(totalOpening(wallet.openingBalance, wallet.accounts) * 100) + netPaise(wallet.transactions)) / 100;
 
 const ADJUST_ID = /^adjust-(\d{4}-\d{2}-\d{2})-(\d{4}-\d{2}-\d{2})-/;
 
@@ -435,9 +641,9 @@ export function statementCheck(args: {
 }
 
 export interface ImportTally {
-  /** The wallet's balance at the statement's last day, after the import. */
+  /** The account's balance at the statement's last day, after the import. */
   projected: number;
-  /** The wallet's balance after the import, counting later entries too. */
+  /** The wallet's balance after the import (every account), counting later entries too. */
   projectedFinal: number;
   hasNewer: boolean;
   endDate: string;
@@ -451,16 +657,20 @@ export interface ImportTally {
   stale: string[];
   /** The statement's own check (needs `rows`, and both balances printed). */
   statement: StatementCheck | null;
+  /** The account's opening balance after the import, when the import sets or moves it. */
+  accountOpening: { key: string; anchor: AccountAnchor; isNew: boolean } | null;
 }
 
 /**
- * The balance check on Import's review: the wallet as the import will leave
- * it (worked out with mergeImport itself, so the check and the import can't
- * disagree) against the statement's closing balance, both at the statement's
- * last day. Also finds a gap between this statement and the wallet's entries,
- * whichever side it's on, and the adjustment that would bridge it. Given the
- * statement's rows, it checks the statement on its own too, which is the
- * check that counts when the wallet holds more than this one account.
+ * The balance check on Import's review: the statement's account as the
+ * import will leave it (worked out with mergeImport itself, so the check and
+ * the import can't disagree) against the statement's closing balance, both
+ * at the statement's last day. With the account known (from 1.5.9), that's
+ * the account's own entries and opening balance, so a wallet with several
+ * accounts checks each one; without it, the whole wallet, as before. Also
+ * finds a gap between this statement and the account's entries, whichever
+ * side it's on, and the adjustment that would bridge it. Given the
+ * statement's rows, it checks the statement on its own too.
  */
 export function importTally(args: {
   wallet: WalletLedger;
@@ -475,35 +685,48 @@ export function importTally(args: {
    *  wallet already has: for the statement's own check. */
   rows?: readonly Transaction[];
   duplicates?: ReadonlySet<string>;
+  /** The statement's account, when it shows its number. */
+  account?: StatementAccount;
 }): ImportTally | null {
-  const { wallet, selected, minDate, maxDate, opening, closing, bridge } = args;
+  const { wallet, selected, minDate, maxDate, opening, closing, bridge, account } = args;
   if (closing === undefined || !Number.isFinite(closing)) return null;
-  const days = wallet.transactions.map(t => t.date.slice(0, 10));
+  const rows = args.rows ?? selected;
+  const rowIds = new Set(rows.map(t => t.id));
+  const statement: StatementRows = { rows, from: minDate, to: maxDate };
+  const view = accountView(wallet, account, statement);
+  const days = view.transactions.map(t => t.date.slice(0, 10));
   const latest = days.length ? days.reduce((a, b) => (b > a ? b : a)) : null;
   const earliest = days.length ? days.reduce((a, b) => (b < a ? b : a)) : null;
-  const balance = ledgerBalance(wallet);
+  const balance = ledgerBalance(view);
   const paise = (n: number) => Math.round(n * 100);
 
   let gap: CoverageGap | null = null;
   if (opening !== undefined && latest && minDate > latest) {
     const amount = (paise(opening) - paise(balance)) / 100;
     if (paise(amount) !== 0) gap = { amount, from: latest, to: minDate, at: addDays(latest, 1), direction: 'after' };
-  } else if (earliest && maxDate < earliest && wallet.openingBalanceAsOf) {
-    const amount = (paise(wallet.openingBalance) - paise(closing)) / 100;
-    if (paise(amount) !== 0) gap = { amount, from: maxDate, to: wallet.openingBalanceAsOf.slice(0, 10), at: addDays(maxDate, 1), direction: 'before' };
+  } else if (earliest && maxDate < earliest && view.openingBalanceAsOf) {
+    const amount = (paise(view.openingBalance) - paise(closing)) / 100;
+    if (paise(amount) !== 0) gap = { amount, from: maxDate, to: view.openingBalanceAsOf.slice(0, 10), at: addDays(maxDate, 1), direction: 'before' };
   }
 
-  const stale = staleAdjustments(wallet.transactions, minDate, maxDate);
+  const stale = staleAdjustments(view.transactions, minDate, maxDate);
   const incoming = bridge && gap ? [bridgeAdjustment(gap), ...selected] : [...selected];
-  const after = mergeImport(wallet, incoming, { opening, statementStart: minDate, removeIds: stale });
-  const afterLedger: WalletLedger = {
-    transactions: after.transactions,
-    openingBalance: after.opening ? after.opening.balance : wallet.openingBalance,
-    openingBalanceAsOf: after.opening ? after.opening.asOf : wallet.openingBalanceAsOf,
-  };
-  const projectedFinal = ledgerBalance(afterLedger);
-  const later = after.transactions.filter(t => t.date.slice(0, 10) > maxDate);
-  const projected = (paise(projectedFinal) - netPaise(later)) / 100;
+  // The whole wallet: what its balance will be.
+  const all = mergeImport(wallet, incoming, { opening, statementStart: minDate, removeIds: stale, account, rowIds });
+  const wholeAfter = afterMerge(wallet, all);
+  const projectedFinal = ledgerBalance(wholeAfter);
+  // The account on its own: what the check compares with the bank.
+  let mineAfter: WalletLedger;
+  if (account) {
+    const key = accountKey(account.bank, account.last4);
+    const anchor = all.account?.anchor ?? wallet.accounts?.[key];
+    const own = accountView({ ...wholeAfter, openingBalance: wallet.openingBalance, openingBalanceAsOf: wallet.openingBalanceAsOf }, account, statement);
+    mineAfter = { transactions: own.transactions, openingBalance: anchor ? anchor.opening : own.openingBalance, openingBalanceAsOf: null };
+  } else {
+    mineAfter = afterMerge(view, mergeImport(view, incoming, { opening, statementStart: minDate, removeIds: stale }));
+  }
+  const later = mineAfter.transactions.filter(t => t.date.slice(0, 10) > maxDate);
+  const projected = (paise(ledgerBalance(mineAfter)) - netPaise(later)) / 100;
   const diff = (paise(projected) - paise(closing)) / 100;
   return {
     projected,
@@ -526,6 +749,7 @@ export function importTally(args: {
           closing,
         })
       : null,
+    accountOpening: all.account ? { ...all.account, isNew: !wallet.accounts?.[all.account.key] } : null,
   };
 }
 

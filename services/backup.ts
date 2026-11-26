@@ -2,10 +2,13 @@
  * Data Studio's full backup: the file it writes, and reading one back
  * (Data Studio → Restore from a backup).
  *
- * Version 2 (from 1.5.8) holds every entry and the settings that rebuild the
- * wallet: the opening balance and the day it's anchored to, budgets, the
- * savings goal, the daily limit and the Money moved rules. Version 1 files
- * (1.5.7 and earlier) hold the entries and the opening balance.
+ * Version 3 (from 1.5.9) adds each bank account's own opening balance, and
+ * the account each imported entry came from; an older Wall-ette refuses it
+ * rather than restore a balance short by those openings. Version 2 (1.5.8)
+ * holds every entry and the settings that rebuild the wallet: the opening
+ * balance and the day it's anchored to, budgets, the savings goal, the daily
+ * limit and the Money moved rules. Version 1 files (1.5.7 and earlier) hold
+ * the entries and the opening balance.
  *
  * A restore only adds. Entries the wallet already has (same id) are skipped,
  * so restoring a file twice changes nothing, and nothing in the wallet is
@@ -15,20 +18,24 @@
  * only the fields an entry has are kept, ids must be usable as Firestore
  * document ids, and anything malformed is counted and left out.
  *
- * Types and the TransactionType enum only, so scripts/check-restore.mjs can
- * test it in Node.
+ * Types, the TransactionType enum and services/accounts.ts only, so
+ * scripts/check-restore.mjs can test it in Node.
  */
 import { TransactionType, type PayeeKind, type PayeeRule, type Transaction } from '../types';
+import { type AccountAnchor, type AccountAnchors, asAccountAnchors } from './accounts';
 
 export const BACKUP_APP = 'Wall-ette';
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 /** A 20,000-entry backup is about 5 MB; anything this big isn't one of ours. */
 export const MAX_BACKUP_CHARS = 50 * 1024 * 1024;
 
 export interface BackupSettings {
+  /** The opening balance not tied to an account (wallets from before 1.5.9). */
   openingBalance?: number;
   /** The day the opening balance is anchored to ('YYYY-MM-DD'), or null. */
   openingBalanceAsOf?: string | null;
+  /** Each bank account's own opening balance, by account key (from 1.5.9). */
+  accounts?: Record<string, AccountAnchor>;
   /** Monthly budget per category, in rupees. */
   budgets?: Record<string, number>;
   savingsGoal?: number;
@@ -40,7 +47,7 @@ export interface WalletBackup {
   app: string;
   version: number;
   exportedAt: string;
-  /** Also inside settings; kept here, where version 1 put it. */
+  /** The opening balance not tied to an account; also inside settings, kept here where version 1 put it. */
   openingBalance: number;
   transactionCount: number;
   transactions: Transaction[];
@@ -51,6 +58,7 @@ export interface WalletForBackup {
   transactions: readonly Transaction[];
   openingBalance: number;
   openingBalanceAsOf: string | null;
+  accounts?: AccountAnchors;
   budgets: Record<string, number>;
   savingsGoal: number;
   dailyLimit: number;
@@ -68,6 +76,9 @@ export function buildBackup(wallet: WalletForBackup, now: Date = new Date()): Wa
     settings: {
       openingBalance: wallet.openingBalance,
       openingBalanceAsOf: wallet.openingBalanceAsOf,
+      ...(wallet.accounts && Object.keys(wallet.accounts).length > 0
+        ? { accounts: Object.fromEntries(Object.entries(wallet.accounts).map(([k, a]) => [k, { ...a }])) }
+        : {}),
       budgets: { ...wallet.budgets },
       savingsGoal: wallet.savingsGoal,
       dailyLimit: wallet.dailyLimit,
@@ -125,6 +136,7 @@ export function isEntryId(s: unknown): s is string {
 const TYPES = new Set<string>(Object.values(TransactionType));
 const PAYEE_KINDS = new Set<PayeeKind>(['mine', 'family', 'investment', 'ignore', 'counts', 'salary']);
 const CURRENCY = /^[A-Z]{3}$/;
+const ACCOUNT_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*:\d{4}$/;
 /** Far above any real entry; guards against nonsense, not against big spenders. */
 const MAX_AMOUNT = 1e12;
 
@@ -153,6 +165,8 @@ export function asEntry(raw: unknown): Transaction | null {
   if (merchant !== undefined) entry.merchant = merchant;
   const createdAt = text(raw.createdAt, 40);
   if (createdAt !== undefined) entry.createdAt = createdAt;
+  // The account it was imported from: an account key ("hdfc-bank:1234").
+  if (typeof raw.account === 'string' && ACCOUNT_KEY.test(raw.account)) entry.account = raw.account;
 
   const { typedAmount, typedCurrency } = raw;
   if (typedAmount !== undefined || typedCurrency !== undefined) {
@@ -173,6 +187,8 @@ function readSettings(raw: unknown, version: number, legacyOpening: unknown): Ba
     s.openingBalance = raw.openingBalance;
     s.openingBalanceAsOf = isEntryDate(raw.openingBalanceAsOf) ? raw.openingBalanceAsOf.slice(0, 10) : null;
   }
+  const accounts = asAccountAnchors(raw.accounts);
+  if (Object.keys(accounts).length > 0) s.accounts = accounts;
   if (isObject(raw.budgets)) {
     const budgets: Record<string, number> = {};
     for (const [category, amount] of Object.entries(raw.budgets)) {
@@ -202,7 +218,7 @@ function readSettings(raw: unknown, version: number, legacyOpening: unknown): Ba
 
 export function hasSettings(s: BackupSettings): boolean {
   return (s.openingBalance !== undefined && (s.openingBalance !== 0 || !!s.openingBalanceAsOf))
-    || !!s.budgets || !!s.savingsGoal || !!s.dailyLimit || !!s.payeeRules;
+    || !!s.accounts || !!s.budgets || !!s.savingsGoal || !!s.dailyLimit || !!s.payeeRules;
 }
 
 /** Reads a backup file's text. `limit` is for tests. */

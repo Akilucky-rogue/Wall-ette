@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { parseStatementPdf, StatementLockedError } from '../services/idfcParser';
 import IDFCBankParser from '../services/IDFCBankParser';
-import { bridgeAdjustment, findDuplicates, fromExcel, importTally, staleAdjustments, tallyTone as tallyToneOf, toTransactions, unreadableRows, type StatementRow } from '../services/statementImport';
+import { accountView, bridgeAdjustment, findDuplicates, fromExcel, importTally, mergeImport, staleAdjustments, suggestLegacy, tallyTone as tallyToneOf, toTransactions, unreadableRows, type StatementAccount, type StatementRow, type WalletLedger } from '../services/statementImport';
+import { accountKey, accountLabel } from '../services/accounts';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
@@ -40,10 +41,10 @@ const ReceiptCard: React.FC<{ receipt: ImportReceipt; money: (n: number) => stri
     <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
       {heading && <p className="font-serif text-[20px] font-semibold text-premium-charcoal mb-0.5">{heading}</p>}
       <p className="text-[12px] text-muted-taupe">
-        {r.bank ?? 'Statement'} {r.format} · {showDay(r.from)} to {showDay(r.to)}
+        {r.bank ?? 'Statement'}{r.last4 ? ` ••${r.last4}` : ''} {r.format} · {showDay(r.from)} to {showDay(r.to)}
       </p>
       <ul className="mt-3 space-y-1 text-[13px] text-premium-charcoal leading-snug">
-        {receiptLines(r).map(line => <li key={line}>{line}</li>)}
+        {receiptLines(r, money).map(line => <li key={line}>{line}</li>)}
       </ul>
       <p className="mt-3 flex items-start gap-2 text-[12px] text-premium-charcoal leading-snug">
         <span className={`material-symbols-outlined text-[18px] shrink-0 ${check.cls}`} aria-hidden="true">{check.icon}</span>
@@ -73,7 +74,7 @@ interface EditingTransaction {
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
       importTransactions, transactions: existingTransactions,
-      getBalance, openingBalance, openingBalanceAsOf, formatAmount,
+      unassignedOpening, openingBalanceAsOf, accounts, formatAmount,
       flowOf, importReceipts, saveImportReceipt,
   } = useWallet();
 
@@ -97,6 +98,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const [error, setError] = useState<string | null>(null);
   const [parsedOpeningBalance, setParsedOpeningBalance] = useState<number | undefined>(undefined);
   const [parsedClosingBalance, setParsedClosingBalance] = useState<number | undefined>(undefined);
+  // The account the statement is from (its bank and the last four digits of
+  // its number), when it shows the number. Each account keeps its own
+  // opening balance, so a wallet with several tallies each one.
+  const [statementAccount, setStatementAccount] = useState<{ bank: string; last4: string } | null>(null);
+  // Whether the opening balance the wallet kept from before 1.5.9 is this
+  // account's; null goes by the suggestion.
+  const [legacyChoice, setLegacyChoice] = useState<'same' | 'separate' | null>(null);
   // Rows with money on them the statement reader couldn't place (no day or
   // direction). Not imported; the review says how many.
   const [unreadable, setUnreadable] = useState(0);
@@ -162,10 +170,32 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // and checks the statement on its own: opening + rows = closing, with every
   // row in the wallet once. A wallet that also holds other accounts or cash
   // can't equal one account's closing, so that check is what proves its import.
+  const wallet = useMemo<WalletLedger>(
+    () => ({ transactions: existingTransactions, openingBalance: unassignedOpening, openingBalanceAsOf, accounts }),
+    [existingTransactions, unassignedOpening, openingBalanceAsOf, accounts],
+  );
+  // For an account the wallet doesn't know yet, in a wallet that kept an
+  // opening balance from before 1.5.9: whether that balance is this
+  // account's (services/statementImport.ts suggestLegacy). Review asks.
+  const legacySuggestion = useMemo(() => {
+    if (!statementAccount || !reviewSummary) return null;
+    return suggestLegacy({
+      wallet, account: statementAccount, rows: extractedData,
+      minDate: reviewSummary.minDate, maxDate: reviewSummary.maxDate,
+      opening: parsedOpeningBalance, closing: parsedClosingBalance,
+    });
+  }, [wallet, statementAccount, reviewSummary, extractedData, parsedOpeningBalance, parsedClosingBalance]);
+  const legacy = legacySuggestion ? (legacyChoice ?? legacySuggestion) : null;
+  const account = useMemo<StatementAccount | undefined>(
+    () => (statementAccount ? { ...statementAccount, ...(legacy ? { legacy } : {}) } : undefined),
+    [statementAccount, legacy],
+  );
+  const rowIds = useMemo(() => new Set(extractedData.map(t => t.id)), [extractedData]);
+
   const tally = useMemo(() => {
     if (!reviewSummary) return null;
     return importTally({
-      wallet: { transactions: existingTransactions, openingBalance, openingBalanceAsOf },
+      wallet,
       selected: extractedData.filter(t => selectedIds.has(t.id)),
       rows: extractedData,
       duplicates: duplicateIds,
@@ -174,9 +204,45 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       opening: parsedOpeningBalance,
       closing: parsedClosingBalance,
       bridge: bridgeGap,
+      account,
     });
   }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds, duplicateIds,
-      existingTransactions, openingBalanceAsOf, openingBalance, bridgeGap]);
+      wallet, bridgeGap, account]);
+  // What the import does to the account itself: its opening balance (set,
+  // moved to an earlier statement, or kept) and the entries from before
+  // 1.5.9 it marks as the account's. Worked out with the import's own merge.
+  const accountPlan = useMemo(() => {
+    if (!account || !reviewSummary) return null;
+    const key = accountKey(account.bank, account.last4);
+    const r = mergeImport(wallet, [], { opening: parsedOpeningBalance, statementStart: reviewSummary.minDate, account, rowIds });
+    return { known: wallet.accounts?.[key] ?? null, next: r.account?.anchor ?? null, marks: r.retagged.length };
+  }, [account, reviewSummary, wallet, parsedOpeningBalance, rowIds]);
+  // Importing a statement again, with every row already in the wallet,
+  // still sets the account's opening balance or marks its entries.
+  const nothingToAdd = selectedIds.size === 0;
+  const canUpdate = !!accountPlan && (!!accountPlan.next || accountPlan.marks > 0);
+  const accountNote = (): string => {
+    if (!account || !accountPlan) return '';
+    const { known, next } = accountPlan;
+    const when = (asOf: string | null) => (asOf ? ` on ${showDay(asOf)}` : '');
+    const noOpening = "This statement doesn't show the balance it started with, so your balance counts only its entries.";
+    // The answer to whose the opening balance from before 1.5.9 is.
+    if (legacySuggestion && legacy === 'same') {
+      const earlier = next && next.opening !== unassignedOpening
+        ? ` This statement starts earlier, so the account opens at ${formatAmount(next.opening)}${when(next.asOf)} instead.`
+        : '';
+      return `Then that balance, and the entries you imported before, are this account's.${earlier} The balance check below shows whether that adds up.`;
+    }
+    if (legacySuggestion) {
+      return next
+        ? `Then this account gets its own opening balance, ${formatAmount(next.opening)}${when(next.asOf)}, and that one stays with your other entries.`
+        : `Then that one stays with your other entries. ${noOpening}`;
+    }
+    if (next && !known) return `New in your wallet. Its opening balance, ${formatAmount(next.opening)}${when(next.asOf)}, is added to your balance.`;
+    if (next) return `This statement starts before any other from this account in your wallet, so the account's opening balance becomes ${formatAmount(next.opening)}${when(next.asOf)}.`;
+    if (known) return `Already in your wallet, with an opening balance of ${formatAmount(known.opening)}${when(known.asOf)}.`;
+    return `New in your wallet. ${noOpening}`;
+  };
 
   // Card tone (services/statementImport.ts tallyTone): 'ok' when the wallet
   // will match the bank; 'note' when the statement checks out row for row but
@@ -194,6 +260,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
     const st = tally.statement;
     if (tallyTone === 'ok') {
       if (tallyBridged) return '✓ Bridged: with the adjustment entry, your balance will match the bank.';
+      if (account) {
+        return `✓ ${accountLabel(account)} tallies with the bank${tally.hasNewer ? ` as of ${showDay(tally.endDate)}` : ''}. Your wallet's balance after import: ${formatAmount(tally.projectedFinal)}.`;
+      }
       if (tally.hasNewer) return `✓ Tallies with the bank as of ${showDay(tally.endDate)}. Final balance after import: ${formatAmount(tally.projectedFinal)}.`;
       return '✓ Tallies with the statement. Your balance will be accurate after import.';
     }
@@ -209,14 +278,31 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       return `${n === 1 ? '1 unticked row' : `${n} unticked rows`} (${amount(st.leftOut.net)}) won't be imported, so your wallet will miss ${n === 1 ? 'it' : 'them'}.`;
     }
     const checked = statementChecks ? "✓ Every row adds up to the bank's closing balance, to the paisa. " : '';
+    if (account && tally.gap) {
+      // Checked on this account's own entries: other accounts and entries
+      // typed in don't count, so a gap is this account's.
+      const g = tally.gap;
+      const label = accountLabel(account);
+      if (g.direction === 'after') {
+        return `${checked}${label} stands at ${formatAmount(parsedOpeningBalance! - g.amount)} in your wallet on ${showDay(g.from)}, but the bank opened this statement at ${formatAmount(parsedOpeningBalance!)}. ${amount(g.amount)} of this account's activity between ${showDay(g.from)} and ${showDay(g.to)} hasn't been imported: import that period's statement (any order works).`;
+      }
+      return `${checked}This statement ends ${showDay(g.from)} at ${formatAmount(tally.closing)}, and ${label}'s entries in your wallet resume ${showDay(g.to)} from ${formatAmount(tally.closing + g.amount)}. ${amount(g.amount)} in between hasn't been imported: import that statement (any order works).`;
+    }
     const others = "That's expected if your wallet also tracks other accounts or cash.";
     if (tally.gap && tally.gap.direction === 'after') {
-      return `${checked}Your wallet stands at ${formatAmount(getBalance())}, but this account opened the period at ${formatAmount(parsedOpeningBalance!)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} of activity between ${showDay(tally.gap.from)} and ${showDay(tally.gap.to)} hasn't been imported: import that period's statement (any order works).`;
+      return `${checked}Your wallet stands at ${formatAmount(parsedOpeningBalance! - tally.gap.amount)}, but this account opened the period at ${formatAmount(parsedOpeningBalance!)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} of activity between ${showDay(tally.gap.from)} and ${showDay(tally.gap.to)} hasn't been imported: import that period's statement (any order works).`;
     }
     if (tally.gap) {
-      return `${checked}This statement ends ${showDay(tally.gap.from)} at ${formatAmount(tally.closing)}, and your records resume ${showDay(tally.gap.to)} from ${formatAmount(openingBalance)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} in between hasn't been imported: import that statement (any order works).`;
+      return `${checked}This statement ends ${showDay(tally.gap.from)} at ${formatAmount(tally.closing)}, and your records resume ${showDay(tally.gap.to)} from ${formatAmount(tally.closing + tally.gap.amount)}. ${others} If it tracks only this account, ${amount(tally.gap.amount)} in between hasn't been imported: import that statement (any order works).`;
     }
     const side = tally.diff > 0 ? 'higher' : 'lower';
+    if (account) {
+      const label = accountLabel(account);
+      const why = legacy === 'same'
+        ? " It counts the entries imported before 1.5.9 as this account's: if some are another account's, choose \"Another account\" above."
+        : ' Check the rows left unticked, or import the statements on either side of this one.';
+      return `${checked}On ${showDay(tally.endDate)}, ${label} will read ${amount(tally.diff)} ${side} in your wallet than the bank's closing balance.${why}`;
+    }
     if (statementChecks) {
       // No gap, so the difference can't be a missing stretch of this account:
       // it's money in the wallet from outside this statement.
@@ -224,6 +310,15 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
     }
     return `Your wallet will be ${amount(tally.diff)} ${side} than the statement's closing on ${showDay(tally.endDate)}. ${others} If it tracks only this account, check unticked rows or try Flip types.`;
   };
+
+  // A wallet from before 1.5.9 with statements from more than one bank:
+  // importing each again gives every account its own opening balance.
+  const reimportHint = useMemo(
+    () => Object.keys(accounts).length === 0
+      && new Set(importReceipts.map(r => r.bank ?? '')).size > 1
+      && existingTransactions.some(t => t.id.startsWith('import-') && !t.account),
+    [accounts, importReceipts, existingTransactions],
+  );
 
   // Helper to update loading messages
   const updateProgress = (msg: string) => setLoadingMessage(msg);
@@ -309,7 +404,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             : `Found ${result.transactions.length} transactions`);
 
         const bank = result.header.bankName;
-        setSource({ bank: bank && bank !== 'Generic (auto-detected)' ? bank : null, format: 'PDF' });
+        const known = bank && bank !== 'Generic (auto-detected)' ? bank : null;
+        setSource({ bank: known, format: 'PDF' });
+        setStatementAccount(known && result.header.accountLast4 ? { bank: known, last4: result.header.accountLast4 } : null);
         await stageForReview(result.transactions,
             bank === 'Generic (auto-detected)'
                 ? 'Generic PDF parser (verify amounts)'
@@ -352,8 +449,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
             result.summary.closingKnown ? result.summary.closingBalance : undefined
         );
         setSource({ bank: result.bank || null, format: 'Excel' });
+        setStatementAccount(result.bank && result.account ? { bank: result.bank, last4: result.account } : null);
         await stageForReview(fromExcel(result.transactions),
-            `${result.bank} Excel${result.validation.isValid ? ' · totals match the bank' : ' (verify amounts)'}`);
+            `${result.bank} Excel${!result.validation.isValid ? ' (verify amounts)' : result.balancesFrom === 'rows' ? ' · every row matches its balance' : ' · totals match the bank'}`);
     } catch (err: any) {
         log.warn('Excel import failed:', err?.message);
         setError('Failed to parse Excel file: ' + (err.message || 'Unknown error'));
@@ -373,6 +471,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
         setLocked(null);
         setPdfPassword('');
         setExtractedData([]);
+        setStatementAccount(null);
+        setLegacyChoice(null);
         updateProgress('Reading file...');
 
         const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
@@ -433,20 +533,30 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   const confirmImport = () => {
       const toImport = extractedData.filter(t => selectedIds.has(t.id));
-      if (toImport.length === 0 || !reviewSummary) return;
+      if (!reviewSummary || (toImport.length === 0 && !canUpdate)) return;
 
       // One adjustment entry that stands in for a missing statement window,
       // so the running balance matches the bank to the paisa.
       if (bridgeGap && tally?.gap) toImport.unshift(bridgeAdjustment(tally.gap));
 
       // Adjustments that stood in for a period this statement covers come out
-      // in the same step, so its real rows don't count on top of them.
-      const stale = staleAdjustments(existingTransactions, reviewSummary.minDate, reviewSummary.maxDate);
+      // in the same step, so its real rows don't count on top of them (with
+      // the account known, only the account's own).
+      const stale = tally
+        ? tally.stale
+        : staleAdjustments(accountView(wallet, account, { rows: extractedData, from: reviewSummary.minDate, to: reviewSummary.maxDate }).transactions, reviewSummary.minDate, reviewSummary.maxDate);
 
       log.debug(`Importing ${toImport.length} of ${extractedData.length} reviewed transactions, replacing ${stale.length} adjustment(s)`);
-      // Opening balance + statement start let the context anchor the balance
-      // to the earliest statement, so multi-statement imports always tally.
-      const result = importTransactions(toImport, parsedOpeningBalance, reviewSummary.minDate, stale);
+      // Opening balance + statement start let the context anchor each
+      // account's balance to its earliest statement, so statements tally in
+      // any order; every row read lets it mark the account's earlier entries.
+      const result = importTransactions(toImport, {
+          opening: parsedOpeningBalance,
+          statementStart: reviewSummary.minDate,
+          removeIds: stale,
+          account,
+          rowIds: extractedData.map(t => t.id),
+      });
 
       // The receipt: what this import did, kept with the account's settings.
       const toReview = toImport
@@ -456,6 +566,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
           id: `receipt-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`,
           at: new Date().toISOString(),
           bank: source.bank,
+          ...(statementAccount ? { last4: statementAccount.last4 } : {}),
           format: source.format,
           from: reviewSummary.minDate.slice(0, 10),
           to: reviewSummary.maxDate.slice(0, 10),
@@ -469,6 +580,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
           check: tally ? tallyToneOf(tally, bridgeGap) : null,
           ...(tally ? { closing: tally.closing, difference: tally.diff } : {}),
           ...(toReview > 0 ? { toReview: Math.round(toReview * 100) / 100 } : {}),
+          ...(result.openingSet && accountPlan?.next ? { opening: accountPlan.next.opening } : {}),
+          ...(result.retagged > 0 ? { marked: result.retagged } : {}),
       };
       saveImportReceipt(done);
       setReceipt(done);
@@ -485,6 +598,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       setSelectedIds(new Set());
       setParsedOpeningBalance(undefined);
       setParsedClosingBalance(undefined);
+      setStatementAccount(null);
+      setLegacyChoice(null);
       setBridgeGap(false);
       setStage('IDLE');
   }
@@ -532,8 +647,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                 </div>
 
                 <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Choose a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank or Saraswat Bank: the PDF or Excel file your bank gives you. Other banks' PDFs often work too. It's read on this device, without AI, and never uploaded.
+                Choose a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank, Saraswat Bank or Equitas: the PDF or Excel file your bank gives you. Other banks' PDFs often work too. It's read on this device, without AI, and never uploaded.
                 </p>
+
+                {reimportHint && (
+                    <div className="mb-6 p-4 rounded-2xl bg-white/70 border border-sage/20 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-sage text-[20px] mt-0.5" aria-hidden="true">account_balance</span>
+                        <p className="text-[12px] text-premium-charcoal leading-relaxed">
+                            <b>Statements from more than one bank?</b> Wall·ette now keeps each account's own opening balance. Import each account's statement again so your balance counts every one. Rows already in your wallet aren't added twice.
+                        </p>
+                    </div>
+                )}
                 
                 <div
                     onClick={handleDropAreaClick}
@@ -623,7 +747,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'DONE' && receipt && (
             <div className="space-y-6 animate-slide-up">
-                <ReceiptCard receipt={receipt} money={formatAmount} heading={receipt.added > 0 ? 'Imported' : 'Nothing new to add'} />
+                <ReceiptCard receipt={receipt} money={formatAmount} heading={receipt.added > 0 ? 'Imported' : receipt.opening !== undefined ? 'Opening balance set' : receipt.marked ? 'Entries updated' : 'Nothing new to add'} />
 
                 {/* The payments this statement leaves to review */}
                 {toReviewAfter.length > 0 && (
@@ -736,6 +860,45 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
 
+                {/* The statement's account, and what the import does to it */}
+                {statementAccount && (
+                    <div className="mb-4 p-4 rounded-2xl bg-white/70 border border-sage/20 animate-slide-up">
+                        <p className="text-[13px] font-semibold text-premium-charcoal flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sage text-[18px]" aria-hidden="true">account_balance</span>
+                            {accountLabel(statementAccount)}
+                        </p>
+                        {!legacySuggestion && <p className="text-[12px] text-muted-taupe mt-1 leading-relaxed">{accountNote()}</p>}
+                        {legacySuggestion && (
+                            <fieldset className="mt-3">
+                                <legend className="text-[12px] text-premium-charcoal leading-relaxed mt-1">
+                                    Your wallet has an opening balance of {formatAmount(unassignedOpening)}{openingBalanceAsOf ? ` from ${showDay(openingBalanceAsOf)}` : ''}, saved before Wall·ette told accounts apart. Is it this account's?
+                                </legend>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                    {(['same', 'separate'] as const).map(v => (
+                                        <label
+                                            key={v}
+                                            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold cursor-pointer border transition-colors focus-within:ring-2 focus-within:ring-sage ${
+                                                legacy === v ? 'bg-sage text-white border-sage' : 'bg-white text-premium-charcoal border-sage/20'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="legacy-opening"
+                                                value={v}
+                                                checked={legacy === v}
+                                                onChange={() => setLegacyChoice(v)}
+                                                className="sr-only"
+                                            />
+                                            {v === 'same' ? 'This account' : 'Another account'}
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-[12px] text-muted-taupe mt-2 leading-relaxed">{accountNote()}</p>
+                            </fieldset>
+                        )}
+                    </div>
+                )}
+
                 {/* Balance tally — statement closing vs wallet after import */}
                 {tally && (
                     <div className={`mb-4 p-4 rounded-2xl border animate-slide-up ${
@@ -759,7 +922,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             <span className="material-symbols-outlined text-muted-taupe/40 text-[18px]">arrow_forward</span>
                             <div className="text-right">
                                 <p className="text-[10px] text-muted-taupe uppercase tracking-wider">
-                                    {tally.hasNewer ? `Wallet on ${showDay(tally.endDate)}` : 'Wallet after import'}
+                                    {account
+                                        ? (tally.hasNewer ? `This account on ${showDay(tally.endDate)}` : 'This account after import')
+                                        : (tally.hasNewer ? `Wallet on ${showDay(tally.endDate)}` : 'Wallet after import')}
                                 </p>
                                 <p className={`text-[15px] font-serif font-bold ${
                                     tallyTone === 'ok' ? 'text-sage' : tallyTone === 'note' ? 'text-premium-charcoal' : 'caution-ink'
@@ -782,7 +947,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     className="mt-0.5 w-4 h-4 accent-[var(--sage)] shrink-0"
                                 />
                                 <span className="text-[10px] leading-relaxed text-premium-charcoal">
-                                    <b>Tracking only this account, and can't get that statement?</b> Add one {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} so your balance matches the bank. Leave this off if your wallet also holds other accounts or cash.
+                                    {account
+                                        ? <><b>Can't get that statement?</b> Add one {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} so this account's balance matches the bank.</>
+                                        : <><b>Tracking only this account, and can't get that statement?</b> Add one {tally.gap.amount >= 0 ? 'income' : 'expense'} adjustment of {formatAmount(Math.abs(tally.gap.amount))} so your balance matches the bank. Leave this off if your wallet also holds other accounts or cash.</>}
                                 </span>
                             </label>
                         )}
@@ -1068,11 +1235,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     
                     <button 
                         onClick={confirmImport}
-                        disabled={selectedIds.size === 0}
+                        disabled={nothingToAdd && !canUpdate}
                         className="w-full bg-sage text-white font-serif font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span className="material-symbols-outlined text-[20px]">check</span>
-                        Import {selectedIds.size} Transactions
+                        {!nothingToAdd
+                            ? `Import ${selectedIds.size} Transactions`
+                            : accountPlan?.next
+                                ? "Set this account's opening balance"
+                                : canUpdate
+                                    ? `Mark ${accountPlan!.marks} ${accountPlan!.marks === 1 ? 'entry' : 'entries'} as this account's`
+                                    : 'Import 0 Transactions'}
                     </button>
                 </div>
             </div>

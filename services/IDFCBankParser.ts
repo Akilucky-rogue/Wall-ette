@@ -12,6 +12,7 @@
 import * as XLSX from 'xlsx';
 import { log } from '../utils/log';
 import { categorizeNarration, cleanNarration } from './categorize';
+import { accountLast4 } from './accounts';
 
 interface Transaction {
   id: string;
@@ -46,8 +47,12 @@ interface StatementSummary {
 interface ParseResult {
   transactions: Transaction[];
   summary: StatementSummary;
-  /** "IDFC FIRST Bank" or "HDFC Bank". */
+  /** "IDFC FIRST Bank", "HDFC Bank" or "Equitas Small Finance Bank". */
   bank: string;
+  /** The account's last four digits, when the statement shows its number. */
+  account: string | null;
+  /** Where the opening and closing balances came from: printed, or the rows' running balance. */
+  balancesFrom: 'statement' | 'rows';
   validation: {
     isValid: boolean;
     errors: string[];
@@ -105,6 +110,19 @@ export class IDFCBankParser {
         if (txn) transactions.push(txn);
       }
 
+      // No balances printed (Equitas): the rows' own running balance gives
+      // them, exactly, when every row follows from the one before.
+      let balancesFrom: 'statement' | 'rows' = 'statement';
+      if (!summary.openingKnown || !summary.closingKnown) {
+        const derived = this.balancesFromRows(transactions);
+        if (derived) {
+          balancesFrom = 'rows';
+          if (!summary.openingKnown) { summary.openingBalance = derived.opening; summary.openingKnown = true; }
+          if (!summary.closingKnown) { summary.closingBalance = derived.closing; summary.closingKnown = true; }
+        }
+      }
+      const account = this.accountLast4(data.slice(0, columns.header));
+
       // Validation
       const validation = this.validateTransactions(transactions, summary);
 
@@ -117,6 +135,8 @@ export class IDFCBankParser {
         transactions,
         summary,
         bank,
+        account,
+        balancesFrom,
         validation
       };
     } catch (error: any) {
@@ -159,7 +179,39 @@ export class IDFCBankParser {
   private static detectBank(rows: any[][]): string {
     const text = rows.map(r => (r || []).join(' ')).join(' ');
     if (/HDFC\s*BANK|IFSC[^A-Z]{0,20}HDFC0/i.test(text)) return 'HDFC Bank';
+    // Equitas's Excel table has the same columns Wall-ette reads for IDFC FIRST.
+    if (/EQUITAS|IFSC[^A-Z]{0,20}ESFB0/i.test(text)) return 'Equitas Small Finance Bank';
     return 'IDFC FIRST Bank';
+  }
+
+  /**
+   * The account's last four digits, from the rows above the table: "Account
+   * No : 501000…1234" (HDFC), "Account No" with the number in the cells
+   * beside it (Equitas), the number beside "Account" (IDFC FIRST). Only the
+   * last four are kept: enough to tell a wallet's accounts apart, never the
+   * number itself.
+   */
+  static accountLast4(rows: any[][]): string | null {
+    return accountLast4(rows.map(r => (r || []).map(c => (c ?? '').toString()).join(' ')).join(' \n '));
+  }
+
+  /**
+   * Opening and closing balances from the rows' own running balance, for a
+   * statement that doesn't print them (Equitas's Excel). Only when every row
+   * has a balance and each one follows from the last to the paisa, in file
+   * order (oldest first) or reverse (newest first); else null.
+   */
+  static balancesFromRows(rows: readonly Pick<Transaction, 'amount' | 'type' | 'balance'>[]): { opening: number; closing: number } | null {
+    if (rows.length === 0 || rows.some(r => r.balance === undefined || !Number.isFinite(r.balance))) return null;
+    const paise = (n: number) => Math.round(n * 100);
+    const signed = (r: Pick<Transaction, 'amount' | 'type'>) => (r.type === 'income' ? 1 : -1) * paise(r.amount);
+    const chains = (list: readonly Pick<Transaction, 'amount' | 'type' | 'balance'>[]) =>
+      list.every((r, i) => i === 0 || paise(list[i - 1].balance!) + signed(r) === paise(r.balance!));
+    const ordered = chains(rows) ? rows : chains([...rows].reverse()) ? [...rows].reverse() : null;
+    if (!ordered) return null;
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    return { opening: (paise(first.balance!) - signed(first)) / 100, closing: paise(last.balance!) / 100 };
   }
 
   // NOTE (audit Phase 5.2): the unused parsePDF / extractSummaryFromText /
@@ -332,10 +384,9 @@ export class IDFCBankParser {
     if (description.includes('NEFT') || description.includes('RTGS')) tags.push('transfer');
     if (description.includes('ATM')) tags.push('cash');
 
-    // Extract UPI ID if present
-    const upiMatch = description.match(/UPI[\/\-]([A-Z0-9]+)/i);
-    if (upiMatch) notes = `UPI ID: ${upiMatch[1]}`;
-
+    // No note of its own: the row keeps the bank's narration in full as its
+    // note (fromExcel), as PDF rows do. (Up to 1.5.8 this saved "UPI ID: DR",
+    // the debit marker read as an ID; Vault's details skip those.)
     return { notes, tags };
   }
 

@@ -109,6 +109,13 @@ eq('payee: none in boilerplate', [
   payeeName('UPI/CREDIT ADJUSTMENT/615230407557/26-12-25'),
   payeeName('Dad'),
 ], [null, null, null, null, null]);
+// Equitas (made-up rows): fields between spaced dashes, card rows between backslashes.
+eq('payee: Equitas IMPS', payeeName('IMP P2A 612345678901 - RAVI KUMAR - HDFC0001234 - HEAD OFFICE'), 'RAVI KUMAR');
+eq('payee: Equitas IMPS in', payeeName('IMP P2P 612345678902 - TEST ASSOCIATES LLP - ICIC0001234 - FORT'), 'TEST ASSOCIATES LLP');
+eq('payee: Equitas salary credit', payeeName('SALARY 0525 TRANSFER CR - NORTHWIND LABS PVT LTD'), 'NORTHWIND LABS PVT LTD');
+eq('payee: Equitas card purchase', payeeName('PURCHASE \\4XXXXXXXXXXX1234\\ACME STORE\\MUMBAI\\ IN'), 'ACME STORE');
+eq('payee: a name typed with a dash is not a statement payee', [payeeName('Dad - rent'), payeeName('Groceries - week 2')], [null, null]);
+eq('category: Equitas IMPS out is a transfer', categorizeNarration('imp p2a 612345678901 - ravi kumar - hdfc0001234 - head office', 'expense'), 'Transfer Out');
 eq('matchText drops filler', [matchText('Mr. RAVI/KUMAR'), matchText('TEST AND SONS PVT LTD')], ['ravi kumar', 'test sons']);
 
 // ── Defaults: investments and adjustments move; everything else counts ─────

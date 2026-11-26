@@ -6,9 +6,9 @@
 // leaves a receipt: the statement's period, the rows read, what was added,
 // what was skipped and why, and how the balance check read. The last
 // MAX_RECEIPTS are kept with the account's settings (and on this device),
-// and the Import screen lists them. A receipt holds counts and the check's
-// balances only: no payees, narrations or file names (a file name can carry
-// an account number).
+// and the Import screen lists them. A receipt holds counts, the check's
+// balances and the account's last four digits only: no payees, narrations or
+// file names (a file name can carry an account number).
 //
 // No React or Firebase imports, so the check scripts run it in Node.
 
@@ -20,6 +20,8 @@ export interface ImportReceipt {
   at: string;
   /** The bank the reader recognised, or null for the general reader. */
   bank: string | null;
+  /** The account number's last four digits, when the statement shows them (from 1.5.9). */
+  last4?: string;
   format: 'PDF' | 'Excel';
   /** The statement's first and last day, YYYY-MM-DD. */
   from: string;
@@ -51,6 +53,10 @@ export interface ImportReceipt {
   difference?: number;
   /** Money out this import left "To review", in rupees. */
   toReview?: number;
+  /** The account's opening balance this import set or moved, in rupees (from 1.5.9). */
+  opening?: number;
+  /** Entries already in the wallet that this import marked with the account (from 1.5.9). */
+  marked?: number;
 }
 
 export const MAX_RECEIPTS = 20;
@@ -82,6 +88,9 @@ export function asImportReceipts(raw: unknown): ImportReceipt[] {
     if (money(x.closing)) receipt.closing = x.closing;
     if (money(x.difference)) receipt.difference = x.difference;
     if (money(x.toReview) && x.toReview > 0) receipt.toReview = x.toReview;
+    if (typeof x.last4 === 'string' && /^\d{4}$/.test(x.last4)) receipt.last4 = x.last4;
+    if (money(x.opening)) receipt.opening = x.opening;
+    if (count(x.marked) && x.marked > 0) receipt.marked = x.marked;
     out.push(receipt);
   }
   return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, MAX_RECEIPTS);
@@ -91,8 +100,11 @@ export function asImportReceipts(raw: unknown): ImportReceipt[] {
 export const withReceipt = (list: readonly ImportReceipt[], receipt: ImportReceipt): ImportReceipt[] =>
   [receipt, ...list.filter(r => r.id !== receipt.id)].slice(0, MAX_RECEIPTS);
 
-/** "Added 412 of 431 rows", then what happened to the rest, as short clauses. */
-export function receiptLines(r: ImportReceipt): string[] {
+/**
+ * "Added 412 of 431 rows", then what happened to the rest, as short clauses.
+ * `money` formats rupees, for the opening balance line.
+ */
+export function receiptLines(r: ImportReceipt, money?: (inr: number) => string): string[] {
   const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
   const lines = [`Added ${r.added.toLocaleString('en-IN')} of ${plural(r.rows, 'row')}`];
   if (r.duplicates > 0) lines.push(`${plural(r.duplicates, 'row')} already in your wallet, skipped`);
@@ -100,5 +112,10 @@ export function receiptLines(r: ImportReceipt): string[] {
   if (r.unreadable > 0) lines.push(`${plural(r.unreadable, 'row')} couldn't be read`);
   if (r.replaced > 0) lines.push(`${plural(r.replaced, 'balance adjustment')} replaced by this statement`);
   if (r.bridged) lines.push('A balance adjustment bridges a gap with no statement');
+  if (r.opening !== undefined) {
+    const amount = money ? money(r.opening) : `₹${r.opening.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    lines.push(`This account's opening balance is now ${amount}`);
+  }
+  if (r.marked) lines.push(`${plural(r.marked, 'entry', 'entries')} from earlier imports now belong to this account`);
   return lines;
 }

@@ -170,7 +170,8 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
 
   // ── EXPENSE: Transfers (classify last — very broad) ──────────────────────
   // UPIAR/UPIAB: Union Bank's UPI debits and credits.
-  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bift\b|\bupi(ar|ab)?\b|\btrf\b|\btfr\b/))
+  // "IMP P2A": Equitas's IMPS transfers.
+  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bimp p2[ap]\b|\bift\b|\bupi(ar|ab)?\b|\btrf\b|\btfr\b/))
     return 'Transfer Out';
 
   return 'Other';

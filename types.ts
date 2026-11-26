@@ -15,6 +15,12 @@ export interface Transaction {
   /** When the entry was added in New Entry (ISO timestamp). Imported rows have none. */
   createdAt?: string;
   /**
+   * The bank account an imported row came from (services/accounts.ts
+   * accountKey: bank and last four digits). From 1.5.9; rows imported
+   * earlier, and entries typed in, have none.
+   */
+  account?: string;
+  /**
    * For an entry typed in another currency: the amount as typed and its code.
    * `amount` is the same in rupees, to the paisa; these let the entry read
    * back exactly as typed (¥1,500, not ¥1,500.01) while it's shown in that

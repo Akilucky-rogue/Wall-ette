@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BackupSettings, RestorePlan } from '../services/backup';
+import { accountLabel } from '../services/accounts';
 
 interface RestoreBackupSheetProps {
   plan: RestorePlan;
@@ -23,8 +24,16 @@ const listText = (parts: string[]) =>
 
 export function settingsText(s: BackupSettings, money: (inr: number) => string): string {
   const parts: string[] = [];
-  if (s.openingBalance !== undefined) {
+  // The opening balance from before 1.5.9 told accounts apart; zero with
+  // accounts saved means there's none left to restore.
+  if (s.openingBalance !== undefined && !(s.accounts && s.openingBalance === 0 && !s.openingBalanceAsOf)) {
     parts.push(`opening balance ${money(s.openingBalance)}${s.openingBalanceAsOf ? ` from ${dayText(s.openingBalanceAsOf)}` : ''}`);
+  }
+  if (s.accounts) {
+    const list = Object.values(s.accounts);
+    parts.push(list.length === 1
+      ? `${accountLabel(list[0])}'s opening balance ${money(list[0].opening)}`
+      : `opening balances for ${list.length} accounts`);
   }
   if (s.budgets) parts.push(count(Object.keys(s.budgets).length, 'budget', 'budgets'));
   if (s.savingsGoal) parts.push(`savings goal ${money(s.savingsGoal)}`);

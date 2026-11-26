@@ -73,7 +73,7 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 |---|---|
 | Does your app collect or share user data? | Collects: yes. Shares: **no** |
 | Email address | Collected · App functionality (account management) · Not shared |
-| Financial info → "Other financial info" | Collected (user-entered/imported transactions) · App functionality · Not shared |
+| Financial info → "Other financial info" | Collected (user-entered/imported transactions; from 1.5.9 also each bank account's opening balance, bank name and the last four digits of its number, to tell accounts apart) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
 | App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Self → Crash reports (Self → Your data from 1.5.6) turns it off |

@@ -31,7 +31,22 @@ export function narrationFields(narration: string): string[] {
  * Bank references are read with narrationFields as it is, so the ids of
  * entries already imported never change.
  */
-export const payeeFields = (narration: string): string[] => narrationFields(narration.replace(/\bA\/C\b/gi, 'AC'));
+export const payeeFields = (narration: string): string[] => {
+  const text = narration.replace(/\bA\/C\b/gi, 'AC');
+  if (!/[/:]/.test(text) && !RAIL_DASH.test(text)) {
+    // Card rows with fields between backslashes (Equitas: "PURCHASE \card\MERCHANT\CITY\ US").
+    if (/^\s*(PURCHASE|POS)\b/i.test(text) && text.includes('\\')) return clean(text.split('\\'));
+    // Fields between spaced dashes after a rail or a reference (Equitas:
+    // "IMP P2A <ref> - NAME - IFSC - HEAD OFFICE", "… TRANSFER CR - COMPANY").
+    const [head] = text.split(/\s+-\s+/);
+    if (/\s-\s/.test(text) && /\d{4,}|^\s*(IMPS?|IMP P2[AP]|NEFT|RTGS|UPI|TRF|TRANSFER|CUSTOMER|ATM|POS)\b|\bTRANSFER (CR|DR)\b/i.test(head)) {
+      return clean(text.split(/\s+-\s+/));
+    }
+  }
+  return narrationFields(text);
+};
+
+const clean = (fields: string[]): string[] => fields.map(f => f.replace(/\s+/g, ' ').trim()).filter(Boolean);
 
 // The note the IDFC Excel reader saves on a UPI row: the field after "UPI/",
 // which is usually DR or CR ("UPI ID: DR"). It isn't the bank's text.

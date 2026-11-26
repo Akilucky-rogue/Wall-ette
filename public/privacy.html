@@ -19,7 +19,7 @@
 <body>
 <div class="page">
   <h1>Wall<span class="dot">·</span>ette — Privacy Policy</h1>
-  <p class="sub">Effective date: 25 November 2026 · Applies to the Wall-ette Android app and wall-ette.com</p>
+  <p class="sub">Effective date: 27 November 2026 · Applies to the Wall-ette Android app and wall-ette.com</p>
 
   <p>Wall-ette is a personal finance tracker operated by an individual developer ("we", "us").
   This policy explains what data the app handles and how. The short version: your financial
@@ -32,10 +32,13 @@
       authenticate your account (via Google Firebase Authentication).</li>
     <li><b>Financial data you provide:</b> transactions you enter manually and transactions
       extracted from bank statements you choose to import (amounts, dates, merchant names,
-      categories, notes, account opening balance).</li>
+      categories, notes, and each account's opening balance). To tell your bank accounts
+      apart, the app also keeps each account's bank name and the <b>last four digits</b> of its
+      account number, never the full number.</li>
     <li><b>App settings:</b> preferred currency, daily spend limit, which payees count as spending,
-      a record of each statement import (its period, how many rows were added or skipped, and the
-      balance check), and similar preferences.</li>
+      a record of each statement import (its bank, the last four digits of its account number,
+      its period, how many rows were added or skipped, and the balance check), and similar
+      preferences.</li>
     <li><b>Security log:</b> timestamps and method (password/biometric) of app unlock attempts,
       stored in your own account space so you can review access to your wallet.</li>
     <li id="crash-reports"><b>Crash reports (Android app):</b> when the app crashes or hits an
@@ -52,7 +55,8 @@
   <h2>How bank statement imports work</h2>
   <p>Statement files (PDF/Excel) are parsed <b>entirely on your device</b>. The file itself is
   never uploaded to any server. Only the resulting transaction records (date, amount, merchant,
-  category) are saved to your private database space so they sync across your devices.</p>
+  category, and the account they came from: its bank and the last four digits of its number)
+  are saved to your private database space so they sync across your devices.</p>
 
   <h2>Where data is stored</h2>
   <ul>

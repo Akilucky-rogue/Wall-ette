@@ -13,6 +13,9 @@
  *     days, half-typed currencies, repeated ids
  *   - only an entry's own fields come back (nothing else from the file), and
  *     __reserved__ or prototype names never become budget categories
+ *   - each account's opening balance (1.5.9, version 3) and the account an
+ *     entry came from come back as saved, and malformed ones are left out;
+ *     a version 2 file (1.5.8) still reads
  *   - 20,000 entries read and plan in well under two seconds
  *
  * Usage (after `npm ci`):
@@ -94,7 +97,7 @@ console.log('Round trip');
   const file = JSON.stringify(B.buildBackup(w, new Date('2026-11-25T06:30:00Z')), null, 2);
   const r = B.readBackup(file);
   ok('reads its own backup', r.ok);
-  eq('version', r.backup.version, 2);
+  eq('version', r.backup.version, 3);
   eq('saved when', r.backup.exportedAt, '2026-11-25T06:30:00.000Z');
   const canon = list => list.map(t => Object.fromEntries(Object.entries(t).sort(([a], [b]) => a.localeCompare(b))));
   eq('every entry, every field, in order', canon(r.backup.entries), canon(w.transactions));
@@ -147,7 +150,7 @@ console.log('Refused files');
   eq('another app', B.readBackup(JSON.stringify({ app: 'Other', version: 1, transactions: [] })), { ok: false, problem: 'not-backup' });
   eq('no entries list', B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 2 })), { ok: false, problem: 'not-backup' });
   eq('version as text', B.readBackup(JSON.stringify({ app: 'Wall-ette', version: '2', transactions: [] })), { ok: false, problem: 'not-backup' });
-  eq('a newer version', B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 3, transactions: [] })), { ok: false, problem: 'newer-version' });
+  eq('a newer version', B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 4, transactions: [] })), { ok: false, problem: 'newer-version' });
   eq('far too big', B.readBackup(good, 100), { ok: false, problem: 'too-big' });
   eq('nothing in it', B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 2, transactions: [], settings: {} })), { ok: false, problem: 'empty' });
   const settingsOnly = B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 2, transactions: [], settings: { savingsGoal: 9000 } }));
@@ -217,6 +220,49 @@ console.log('Settings');
     { id: 'rule-5', match: 'acme', kind: 'counts' },
     { id: 'rule-6', match: 'zerodha', kind: 'investment' },
   ]);
+}
+
+// ── Accounts (1.5.9) ─────────────────────────────────────────────────────────
+console.log('Accounts');
+{
+  const w = wallet(300);
+  w.openingBalance = 0;
+  w.openingBalanceAsOf = null;
+  w.accounts = {
+    'hdfc-bank:1234': { bank: 'HDFC Bank', last4: '1234', opening: 52000.4, asOf: '2025-04-01' },
+    'equitas-small-finance-bank:5678': { bank: 'Equitas Small Finance Bank', last4: '5678', opening: 10000.55, asOf: '2025-05-02', legacy: true },
+  };
+  w.transactions.forEach((t, i) => { if (t.id.startsWith('import-')) t.account = i % 2 ? 'hdfc-bank:1234' : 'equitas-small-finance-bank:5678'; });
+  const r = B.readBackup(JSON.stringify(B.buildBackup(w)));
+  ok('reads', r.ok);
+  eq('every account, as saved', r.backup.settings.accounts, w.accounts);
+  eq('entries keep their account', r.backup.entries.filter(t => t.account).length, w.transactions.filter(t => t.account).length);
+  eq('… and only imported ones have one', r.backup.entries.some(t => t.account && !t.id.startsWith('import-')), false);
+
+  const rows = [
+    { id: 'import-a', amount: 10, type: 'EXPENSE', category: 'Other', date: '2025-06-01', account: 'hdfc-bank:1234' },
+    { id: 'import-b', amount: 10, type: 'EXPENSE', category: 'Other', date: '2025-06-01', account: 'HDFC:1234' },
+    { id: 'import-c', amount: 10, type: 'EXPENSE', category: 'Other', date: '2025-06-01', account: '../x:1234' },
+    { id: 'import-d', amount: 10, type: 'EXPENSE', category: 'Other', date: '2025-06-01', account: 'hdfc-bank:12345' },
+    { id: 'import-e', amount: 10, type: 'EXPENSE', category: 'Other', date: '2025-06-01', account: 42 },
+  ];
+  const settings = { accounts: {
+    'hdfc-bank:1234': { bank: 'HDFC Bank', last4: '1234', opening: 100, asOf: '2025-04-01' },
+    'sbi:9999': { bank: 'HDFC Bank', last4: '9999', opening: 5, asOf: null },
+    'hdfc-bank:12ab': { bank: 'HDFC Bank', last4: '12ab', opening: 5, asOf: null },
+    'kotak:1111': { bank: 'Kotak', last4: '1111', opening: '5', asOf: null },
+    '__proto__': { bank: 'X', last4: '0000', opening: 1, asOf: null },
+  } };
+  const m = B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 3, transactions: rows, settings }));
+  eq('an account on an entry is kept only as an account key', m.backup.entries.map(t => t.account ?? null), ['hdfc-bank:1234', null, null, null, null]);
+  eq('only well-formed accounts, under their own key', Object.keys(m.backup.settings.accounts), ['hdfc-bank:1234']);
+  ok('no account can reach the prototype', !('polluted' in {}) && Object.getPrototypeOf(m.backup.settings.accounts) === Object.prototype);
+
+  const only = B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 3, transactions: [], settings: { openingBalance: 0, openingBalanceAsOf: null, accounts: settings.accounts } }));
+  ok('a backup with only account openings is something to restore', only.ok && B.planRestore(only.backup, new Set()).hasSettings);
+
+  const v2 = B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 2, transactions: rows.slice(0, 1), settings: { openingBalance: 2500, openingBalanceAsOf: '2025-04-01' } }));
+  ok('a version 2 backup (1.5.8) still reads', v2.ok && v2.backup.settings.openingBalance === 2500 && v2.backup.settings.accounts === undefined);
 }
 
 // ── Size ─────────────────────────────────────────────────────────────────────

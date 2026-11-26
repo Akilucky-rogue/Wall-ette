@@ -1,18 +1,41 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, CATEGORIES, canonicalCategory } from '../types';
 import { auth, db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference, deleteField } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { FALLBACK_RATES, getCurrencyFormatter, getCompactCurrencyFormatter, getWholeCurrencyFormatter, isCurrencyCode } from '../utils/currencyUtils';
 import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
-import { mergeImport } from '../services/statementImport';
+import { mergeImport, type StatementAccount } from '../services/statementImport';
+import { type AccountAnchor, asAccountAnchors, totalOpening } from '../services/accounts';
 import { reversalPairs } from '../services/reversals';
 import { categoryToStore, shownCategory, withShownCategories } from '../services/review';
 import { asImportReceipts, withReceipt, type ImportReceipt } from '../services/importReceipt';
 import type { BackupSettings } from '../services/backup';
+
+export interface ImportOptions {
+  /** The statement's opening balance, when it shows one (or its rows give it). */
+  opening?: number;
+  /** The statement's first day. */
+  statementStart?: string;
+  /** Balance adjustments the statement replaces. */
+  removeIds?: string[];
+  /** The account it's from, when it shows its number. */
+  account?: StatementAccount;
+  /** Every row read from it, ticked or not. */
+  rowIds?: string[];
+}
+
+export interface ImportOutcome {
+  added: number;
+  removed: number;
+  /** Entries already in the wallet now marked with the statement's account. */
+  retagged: number;
+  /** An opening balance was set or moved. */
+  openingSet: boolean;
+}
 
 // Firestore refuses fields set to undefined; leave them out.
 const forCloud = <T extends object,>(t: T): T =>
@@ -104,9 +127,18 @@ interface WalletContextType {
   savingsGoal: number;
   isOnline: boolean;
   isCloudSyncing: boolean;
+  /**
+   * The wallet's opening balance: every account's (what each held before its
+   * earliest statement here) plus the one from before 1.5.9. Balance is this
+   * plus every entry.
+   */
   openingBalance: number;
-  /** ISO date the opening balance is anchored to (start of the earliest imported statement). */
+  /** The opening balance not tied to an account (wallets from before 1.5.9). */
+  unassignedOpening: number;
+  /** ISO date that one is anchored to (start of the earliest statement it came from). */
   openingBalanceAsOf: string | null;
+  /** Each bank account's own opening balance, by accountKey (services/accounts.ts). */
+  accounts: Record<string, AccountAnchor>;
   setCurrency: (code: CurrencyCode) => void;
   setDailyLimit: (limit: number) => void;
   setMfaEnabled: (enabled: boolean) => void;
@@ -122,10 +154,13 @@ interface WalletContextType {
   clearAllTransactions: (waitForCloud?: boolean) => Promise<void>;
   /**
    * Adds a statement's rows (skipping ids the wallet has), takes out the
-   * stale balance adjustments named in `removeIds`, and moves the opening
-   * balance when this is now the earliest statement. One step, one list.
+   * stale balance adjustments named in `removeIds`, and sets or moves the
+   * opening balance of the statement's account (or, with none, the
+   * wallet's) when this is its earliest statement. One step, one list
+   * (services/statementImport.ts mergeImport): the balance stays every
+   * opening plus every entry.
    */
-  importTransactions: (newTransactions: Transaction[], openingBalance?: number, statementStart?: string, removeIds?: string[]) => { added: number; removed: number };
+  importTransactions: (newTransactions: Transaction[], options?: ImportOptions) => ImportOutcome;
   /**
    * Data Studio → Restore: puts back a backup's settings. The opening balance,
    * and each budget, goal and limit the file holds, replace the ones here;
@@ -217,6 +252,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [lastLoginTime, setLastLoginTime] = useState<Date | null>(null);
   const [openingBalance, setOpeningBalanceState] = useState<number>(0);
   const [openingBalanceAsOf, setOpeningBalanceAsOfState] = useState<string | null>(null);
+  const [accounts, setAccountsState] = useState<Record<string, AccountAnchor>>({});
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   // Backend ready state to handle cases where DB doesn't exist
@@ -498,6 +534,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                if (localOpeningBalance !== null) {
                    setOpeningBalanceState(localOpeningBalance || 0);
                }
+               setAccountsState(asAccountAnchors(loadFromLocal('accounts')));
           }
           return;
       }
@@ -539,6 +576,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                       setOpeningBalanceAsOfState(data.openingBalanceAsOf || null);
                       saveToLocal('openingBalanceAsOf', data.openingBalanceAsOf || null);
                   }
+                  {
+                      const anchors = asAccountAnchors(data.accounts);
+                      setAccountsState(anchors);
+                      saveToLocal('accounts', anchors);
+                  }
                   if (data.budgets) {
                       const budgetsByName = withListBudgetNames(data.budgets);
                       setBudgetsState(budgetsByName);
@@ -568,6 +610,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               if (localOpeningBalance !== null) {
                   setOpeningBalanceState(localOpeningBalance || 0);
               }
+              setAccountsState(asAccountAnchors(loadFromLocal('accounts')));
           });
       } catch (e) {
            log.warn('Settings sync exception, falling back to localStorage');
@@ -581,6 +624,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
            if (localOpeningBalance !== null) {
                setOpeningBalanceState(localOpeningBalance || 0);
            }
+           setAccountsState(asAccountAnchors(loadFromLocal('accounts')));
       }
 
       return () => unsubscribe();
@@ -655,6 +699,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       saveSetting('openingBalance', { openingBalance: balance, openingBalanceAsOf: asOf });
   }, [saveToLocal, saveSetting]);
 
+  // One account's opening balance, saved with the others. The ref keeps
+  // several in one turn (a restore) from overwriting each other.
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
+  const setAccountAnchor = useCallback((key: string, anchor: AccountAnchor) => {
+      const next = { ...accountsRef.current, [key]: anchor };
+      accountsRef.current = next;
+      setAccountsState(next);
+      saveToLocal('accounts', next);
+      saveSetting('accounts', { accounts: next });
+  }, [saveToLocal, saveSetting]);
+
+  // Every account's opening plus the one from before accounts.
+  const walletOpening = useMemo(() => totalOpening(openingBalance, accounts), [openingBalance, accounts]);
+
   // ── Spending, income and money moved (audit H3) ───────────────────────────
   // One classifier per rule set. counted leaves money moved out, so totals,
   // charts and insights see only real spending and income.
@@ -704,9 +763,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       monthlyExpense,
       todayIncome,
       todayExpense,
-      balance: openingBalance + net,
+      balance: walletOpening + net,
     };
-  }, [transactions, counted, openingBalance]);
+  }, [transactions, counted, walletOpening]);
 
   const getBalance = useCallback(() => aggregates.balance, [aggregates]);
   const getMonthlyIncome = useCallback(() => aggregates.monthlyIncome, [aggregates]);
@@ -804,6 +863,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setOpeningBalanceAsOfState(null);
     saveToLocal('openingBalance', 0);
     saveToLocal('openingBalanceAsOf', null);
+    setAccountsState({});
+    accountsRef.current = {};
+    saveToLocal('accounts', {});
 
     if (!user) {
         clearingRef.current = false;
@@ -812,7 +874,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const uid = user.uid;
     const settingsRef = doc(db, `users/${uid}/settings/preferences`);
-    const resetOpening = { openingBalance: 0, openingBalanceAsOf: null };
+    const resetOpening = { openingBalance: 0, openingBalanceAsOf: null, accounts: deleteField() };
 
     if (waitForCloud) {
         // Account deletion: every delete must reach the server before the
@@ -857,20 +919,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     void Promise.all(work).finally(() => { clearingRef.current = false; });
   }, [transactions, user, saveToLocal, deleteInBatches]);
 
-  const importTransactions = useCallback((newTransactions: Transaction[], importedOpeningBalance?: number, statementStart?: string, removeIds: string[] = []) => {
+  const importTransactions = useCallback((newTransactions: Transaction[], options: ImportOptions = {}): ImportOutcome => {
     const result = mergeImport(
-      { transactions: listRef.current, openingBalance, openingBalanceAsOf },
+      { transactions: listRef.current, openingBalance, openingBalanceAsOf, accounts },
       newTransactions,
-      { opening: importedOpeningBalance, statementStart, removeIds },
+      options,
     );
-    if (result.added.length === 0 && result.removed.length === 0) {
-        log.warn('No new unique transactions to import');
-        return { added: 0, removed: 0 };
-    }
-
-    // Balance = opening + every entry, anchored to the earliest statement
-    // ever imported, so statements tally in any order.
+    // Balance = every opening + every entry: each account's opening anchors
+    // to its earliest statement, so statements tally in any order. Importing
+    // a statement again can set an account's opening with nothing to add.
     if (result.opening) setOpeningBalance(result.opening.balance, result.opening.asOf);
+    if (result.account) setAccountAnchor(result.account.key, result.account.anchor);
+    const openingSet = !!(result.opening || result.account);
+    const outcome = { added: result.added.length, removed: result.removed.length, retagged: result.retagged.length, openingSet };
+    if (result.added.length === 0 && result.removed.length === 0 && result.retagged.length === 0) {
+        if (!openingSet) log.warn('No new unique transactions to import');
+        return outcome;
+    }
 
     listRef.current = result.transactions;
     setTransactions(result.transactions);
@@ -879,20 +944,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (user) {
         // Every batch is handed to Firestore at once. Awaiting each in turn
         // meant an import made offline, with the app closed before it
-        // reconnected, kept only its first 500 rows (audit M4).
+        // reconnected, kept only its first 500 rows (audit M4). Entries
+        // marked with their account go back whole, like new ones.
         const uid = user.uid;
         if (result.removed.length > 0) deleteInBatches(uid, result.removed);
-        for (const chunk of chunkArray(result.added, 500)) {
+        for (const chunk of chunkArray([...result.added, ...result.retagged], 500)) {
             void sendToCloud(`import:${chunk[0].id}`, chunk.length, () => {
                 const batch = writeBatch(db);
                 chunk.forEach(tx => batch.set(doc(db, `users/${uid}/transactions/${tx.id}`), forCloud(tx)));
                 return batch.commit();
             });
         }
-        log.debug(`Importing ${result.added.length} transactions, removing ${result.removed.length}`);
+        log.debug(`Importing ${result.added.length} transactions, marking ${result.retagged.length}, removing ${result.removed.length}`);
     }
-    return { added: result.added.length, removed: result.removed.length };
-  }, [openingBalance, openingBalanceAsOf, setOpeningBalance, persistTransactions, user, deleteInBatches]);
+    return outcome;
+  }, [openingBalance, openingBalanceAsOf, accounts, setOpeningBalance, setAccountAnchor, persistTransactions, user, deleteInBatches]);
 
   // Receipts save on this device at once and to the cloud through Firestore's queue.
   const saveImportReceipt = useCallback((receipt: ImportReceipt) => {
@@ -932,6 +998,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const restoreSettings = useCallback((s: BackupSettings) => {
     if (s.openingBalance !== undefined) setOpeningBalance(s.openingBalance, s.openingBalanceAsOf ?? null);
+    if (s.accounts) for (const [key, anchor] of Object.entries(s.accounts)) setAccountAnchor(key, anchor);
     if (s.budgets && Object.keys(s.budgets).length > 0) {
       const next = withListBudgetNames({ ...budgets, ...s.budgets });
       setBudgetsState(next);
@@ -956,7 +1023,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       if (extra.length > 0) persistPayeeRules([...payeeRules, ...extra]);
     }
-  }, [budgets, payeeRules, setOpeningBalance, setSavingsGoal, setDailyLimit, saveToLocal, saveSetting, persistPayeeRules]);
+  }, [budgets, payeeRules, setOpeningBalance, setAccountAnchor, setSavingsGoal, setDailyLimit, saveToLocal, saveSetting, persistPayeeRules]);
 
   // Memoized provider value (audit Phase 2.1) — consumers no longer re-render
   // from identity churn alone.
@@ -990,8 +1057,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       restoreSettings,
       savePayeeRule,
       deletePayeeRule,
-      openingBalance,
+      openingBalance: walletOpening,
+      unassignedOpening: openingBalance,
       openingBalanceAsOf,
+      accounts,
       getBalance,
       getMonthlyIncome,
       getMonthlyExpense,
@@ -1012,7 +1081,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       lastLoginTime
   }), [
       shown, transactions, importReceipts, saveImportReceipt, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
-      isBackendReady, openingBalance, openingBalanceAsOf, budgets, savingsGoal,
+      isBackendReady, openingBalance, walletOpening, openingBalanceAsOf, accounts, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       deleteTransactions, clearAllTransactions, importTransactions, restoreSettings, savePayeeRule, deletePayeeRule, getBalance,

@@ -8,6 +8,7 @@
 import { log } from '../utils/log';
 import { categorizeNarration, cleanNarration } from './categorize';
 import { detectBank, parseBankStatement, type BankRow } from './bankPdfLayouts';
+import { headerLast4 } from './accounts';
 
 type TransactionNature = 
     | 'CONSUMPTION'
@@ -50,6 +51,8 @@ interface RawTransaction {
 interface StatementHeader {
     bankName?: string;
     accountNumber?: string;
+    /** The account number's last four digits (services/accounts.ts), when printed. */
+    accountLast4?: string | null;
     statementPeriod?: { from: string; to: string };
     openingBalance: number;
     closingBalance: number;
@@ -926,6 +929,7 @@ export async function parseStatementPdf(base64Data: string, password?: string): 
             return {
                 header: {
                     bankName: statement.bankName,
+                    accountLast4: headerLast4(text),
                     openingBalance: statement.opening,
                     closingBalance: statement.closing,
                     openingKnown: true,
@@ -941,6 +945,7 @@ export async function parseStatementPdf(base64Data: string, password?: string): 
 
         // Extract header info from flat text (period, account no, …)
         const header = extractHeader(text);
+        header.accountLast4 = headerLast4(text);
 
         // 1) Column-aware IDFC table parser (coordinates — handles wrapped
         //    descriptions and x-position Debit/Credit columns exactly).

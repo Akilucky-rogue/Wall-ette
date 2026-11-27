@@ -215,5 +215,8 @@ As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
 8. Asked on 28 Nov: the website's features in 1.6.0, switched off.
    Essential and Plus, Spread, the plan screens and locks, Essential's
    limits and the reminders are built; the server is ready to deploy.
-9. After the 14-day closed test, with testers' purchases tried: switch on
-   `plansLive` with the production release.
+9. Deployed on 28 Nov: the plan server (us-central1) and the 1.6.0 rules.
+10. After the 14-day closed test and production access: the payments
+   profile (its verification needs the public Play Store link), the
+   subscriptions, licence testers' purchases on the internal track, then
+   `plansLive` on with the release that announces paid plans.

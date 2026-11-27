@@ -101,7 +101,9 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 
 1.6.0 carries Google Play billing (`@capgo/native-purchases`, which adds `com.android.vending.BILLING`), the plan screens and the server, all dormant while `config/app.plansLive` is false: everything stays open and no plan screen shows. A tester listed with `node scripts/plans-admin.mjs tester <email>` sees plans before everyone else. Steps, in order (Play Console and Firebase steps are the account owner's):
 
-**Data safety (with the 1.6.0 upload, since testers can buy):**
+**When (agreed 28 Nov 2026):** the payments profile's verification asks for the app's Play Store link, which a closed test doesn't give, so it waits for production access after the 14-day closed test. 1.6.0 goes to the closed test with plans dormant. After production access: payments profile → subscriptions → service account → real-time notifications → licence testers and `plans-admin tester` → test purchases on the internal track → `plansLive` on with the release that announces paid plans.
+
+**Data safety (when the subscriptions are created, before anyone can buy):**
 
 | Question | Answer |
 |---|---|

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppScreen, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { byNewest, localDay, parseDay } from '../utils/dates';
@@ -10,6 +10,8 @@ import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
 import NotificationCenter from './NotificationCenter';
 import LeftToSpendCard from './LeftToSpendCard';
+import WalletArriving from './WalletArriving';
+import { markTiming } from '../utils/timing';
 import { BrandIcon, Mascot, Wordmark } from './ui/Brand';
 import styles from './Dashboard.module.css';
 
@@ -20,7 +22,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
     getDailyIncome, getDailyExpense, transactions, counted, flowOf, formatAmount, formatWhole, formatEntry,
-    formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance, budgets,
+    formatAmountCompact, isCloudSyncing, isOnline, refresh, openingBalance, budgets, walletLoaded,
   } = useWallet();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -109,8 +111,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     : isCloudSyncing ? 'Saved to your account'
     : isOnline ? "Can't reach your account · Retry"
     : 'Offline · saved on this device';
+  // Still on its way from the cloud (signed in on this device for the first
+  // time, or after signing out): say so, rather than show an empty wallet.
+  const arriving = !walletLoaded && transactions.length === 0;
+  useEffect(() => { if (walletLoaded) markTiming('wallet:shown', 'signin:done'); }, [walletLoaded]);
   // A wallet with nothing in it yet opens on what to do first.
-  const isNewWallet = transactions.length === 0 && openingBalance === 0;
+  const isNewWallet = !arriving && transactions.length === 0 && openingBalance === 0;
   const openRestore = () => { openAt('restore'); onNavigate(AppScreen.EXPORT); };
   const monthLong = selectedDate.toLocaleString('en-GB', { month: 'long' });
 
@@ -295,7 +301,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {/* The wallet: the balance for the period picked, with what came in and
           went out in its two pockets (styles.css .wallet) */}
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:px-8 lg:items-start">
-      {isNewWallet ? startPanel : (
+      {arriving ? (
+        <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-label="Your wallet">
+          <div className="bg-white rounded-[30px] px-6 py-8 shadow-raised border border-black/[0.02]">
+            <WalletArriving isOnline={isOnline} />
+          </div>
+        </section>
+      ) : isNewWallet ? startPanel : (
       <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-label="Balance">
         <div className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden">
           <p className="relative text-[12px] font-medium tracking-wide" style={{ color: 'var(--wallet-mut)' }}>{balanceLabel}</p>
@@ -399,13 +411,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {/* Wider screens: cards flow into two columns, three on desktops;
           phones/APK keep the single column (CSS columns are inert below md). */}
       <div className="md:columns-2 md:gap-x-0 lg:columns-3 lg:px-2">
-      {transactions.length === 0 && !isNewWallet && <div className="break-inside-avoid">{startPanel}</div>}
+      {transactions.length === 0 && !isNewWallet && !arriving && <div className="break-inside-avoid">{startPanel}</div>}
 
       {/* What's left until pay day, once something has come in */}
       <LeftToSpendCard onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />
 
       {/* Budgets this month (set in Flow → Goals) */}
-      {budgetRows.length > 0 ? (
+      {arriving ? null : budgetRows.length > 0 ? (
         <div className="px-6 pt-2 break-inside-avoid">
           <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02]">
             <div className="flex items-center justify-between mb-3">

@@ -17,6 +17,7 @@ import { breadcrumb } from './services/crashReports';
 import { onPhoneNoteTap } from './services/phoneNotifier';
 import { openAt } from './utils/screenSection';
 import { closeNewestPanel } from './utils/backStack';
+import { markTiming } from './utils/timing';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -271,6 +272,7 @@ function AppContent() {
 
   // Handle auth success - trigger splash before showing app
   const handleAuthSuccess = (type: AuthType) => {
+    markTiming('signin:done');
     // The user JUST authenticated with their password — don't bounce them
     // into the session lock on top of it.
     setIsLocked(false);
@@ -303,7 +305,13 @@ function AppContent() {
 
   // Show splash screen on initial load or after auth
   if (showSplash) {
-    return <SplashScreen variant={splashVariant} onComplete={handleSplashComplete} />;
+    const splash = <SplashScreen variant={splashVariant} onComplete={handleSplashComplete} />;
+    // After signing in, the wallet starts on its way under the welcome
+    // splash: the same WalletProvider stays mounted into the app below, so a
+    // device signing in for the first time has its entries two seconds sooner.
+    return user && (splashVariant === 'login' || splashVariant === 'register')
+      ? <WalletProvider>{splash}</WalletProvider>
+      : splash;
   }
 
   if (loading || signingOut) {

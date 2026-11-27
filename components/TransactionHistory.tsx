@@ -9,6 +9,7 @@ import { Mascot } from './ui/Brand';
 import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import DuplicateEntries from './DuplicateEntries';
+import WalletArriving from './WalletArriving';
 import { removed } from '../utils/haptics';
 import { useBackHandler } from '../utils/backStack';
 
@@ -29,7 +30,7 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline } = useWallet();
   // A saved amount as the edit box and the amount filter see it: as typed
   // when typed in the currency shown, else converted, to the decimals that
   // currency can hold.
@@ -674,7 +675,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         )}
         {groupedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-                {transactions.length === 0 ? (
+                {transactions.length === 0 && !walletLoaded ? (
+                  <WalletArriving isOnline={isOnline} />
+                ) : transactions.length === 0 ? (
                   <>
                     <Mascot pose="welcome" height={120} />
                     <p className="mt-4 font-display text-lg font-bold text-premium-charcoal">No entries yet</p>

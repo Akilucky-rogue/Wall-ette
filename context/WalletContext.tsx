@@ -8,6 +8,7 @@ import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
 import { FlowInfo, flowClassifier, matchText, MIN_MATCH } from '../services/spend';
 import { sendToCloud, setCloudOwner } from '../services/cloudSaves';
 import { log } from '../utils/log';
+import { markTiming } from '../utils/timing';
 import { mergeImport, type StatementAccount } from '../services/statementImport';
 import { type AccountAnchor, asAccountAnchors, totalOpening } from '../services/accounts';
 import { reversalPairs } from '../services/reversals';
@@ -127,6 +128,13 @@ interface WalletContextType {
   savingsGoal: number;
   isOnline: boolean;
   isCloudSyncing: boolean;
+  /**
+   * False while the wallet is still on its way: signed in on a phone for the
+   * first time, or after signing out (which clears this device's copy), the
+   * entries come from the cloud, which takes a few seconds for thousands of
+   * them. Screens show that it's arriving rather than an empty wallet.
+   */
+  walletLoaded: boolean;
   /**
    * The wallet's opening balance: every account's (what each held before its
    * earliest statement here) plus the one from before 1.5.9. Balance is this
@@ -259,6 +267,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isBackendReady, setIsBackendReady] = useState(true);
   // Bumped by refresh() — re-runs the listener effects for a fresh server pull.
   const [refreshNonce, setRefreshNonce] = useState(0);
+  // Whether this user's entries have arrived (see WalletContextType).
+  const [walletLoaded, setWalletLoaded] = useState(false);
   // While a Clear All is running, snapshot echoes of the soon-to-be-deleted
   // docs must not repopulate state (issue: cleared data "flickering back").
   const clearingRef = useRef(false);
@@ -451,12 +461,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     if (!user) {
         setTransactions([]);
+        setWalletLoaded(false);
         return;
     }
 
     if (!isBackendReady) {
         const localData = loadFromLocal('transactions');
         if (localData) setTransactions(asLoaded(localData));
+        setWalletLoaded(true);
         return;
     }
 
@@ -465,7 +477,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
         // Sorted by date descending in the database
         const q = query(collection(db, `users/${user.uid}/transactions`), orderBy('date', 'desc'));
+        // How long the entries take to arrive, in a performance trace.
+        markTiming('wallet:listen', 'signin:done');
+        let arrived = false;
         unsubscribe = onSnapshot(q, (snapshot) => {
+            // The wallet has arrived with its first entries from this
+            // device, or with the cloud's answer (an empty wallet is
+            // empty only once the cloud says so). Offline, an empty copy
+            // is all there is.
+            if (!arrived && (snapshot.size > 0 || !snapshot.metadata.fromCache || !navigator.onLine)) {
+                arrived = true;
+                markTiming('wallet:arrived', 'wallet:listen');
+                setWalletLoaded(true);
+            }
             // Ignore echoes while Clear All is deleting in batches — otherwise
             // half-deleted snapshots repopulate the UI mid-clear.
             if (clearingRef.current) return;
@@ -482,6 +506,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (timestamped.length > 0) saveLocalDays(timestamped);
         }, (error) => {
             log.warn('Firestore access failed, switching to local-only mode:', error.message);
+            setWalletLoaded(true);
             setIsBackendReady(false);
             // Keep whatever is already in memory (freshest); only fall back to
             // the mirror when we have nothing.
@@ -493,6 +518,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
     } catch (e) {
         log.warn('Firestore setup error:', e);
+        setWalletLoaded(true);
         setIsBackendReady(false);
         const localData = loadFromLocal('transactions');
         if (localData) setTransactions(asLoaded(localData));
@@ -1040,6 +1066,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       mfaEnabled,
       isOnline,
       isCloudSyncing: isOnline && isBackendReady,
+      walletLoaded,
       budgets,
       savingsGoal,
       setCurrency,
@@ -1081,7 +1108,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       lastLoginTime
   }), [
       shown, transactions, importReceipts, saveImportReceipt, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
-      isBackendReady, openingBalance, walletOpening, openingBalanceAsOf, accounts, budgets, savingsGoal,
+      isBackendReady, walletLoaded, openingBalance, walletOpening, openingBalanceAsOf, accounts, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
       setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
       deleteTransactions, clearAllTransactions, importTransactions, restoreSettings, savePayeeRule, deletePayeeRule, getBalance,

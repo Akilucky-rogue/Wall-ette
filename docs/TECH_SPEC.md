@@ -361,6 +361,15 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   Insights, with "Ask Wall-ette" marked coming soon), Category Split (interactive SVG donut with merchant drill-down), Income
   Insights (Flow), Left to spend, Rewind (lifetime timeline) with exportable "Wall·ette
   Wrapped" canvas cards. Fee Hunter was removed in 1.5.6.
+- **A wallet on its way** (1.5.9) — signing in on a device for the first time, or after
+  signing out (which clears this device's copy, `services/session.ts`), the entries come from
+  the cloud: a few seconds for thousands of them. `walletLoaded` (WalletContext) is false until
+  the first snapshot with entries in it, or the server's answer; until then Home and Vault show
+  "Getting your wallet" (`components/WalletArriving.tsx`), never "Start your wallet" or an
+  empty Vault. After signing in, `WalletProvider` mounts under the welcome splash and stays
+  mounted into the app, so the entries start arriving two seconds sooner. User Timing marks
+  (`utils/timing.ts`: `signin:done`, `wallet:listen`, `wallet:arrived`, `wallet:shown`) time
+  it in a performance trace.
 - **Vault's list** (1.5.9) — draws 100 entries, then 100 more per "Show 100 more"; a new
   search, filter or order starts again from 100. The count, the totals and the CSV export cover
   every match. A wallet of thousands drawn at once was slow to open and to scroll.

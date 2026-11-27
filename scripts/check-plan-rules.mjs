@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Firestore rules for the paid plans (firestore.rules, PLANS): a member reads
- * their own plan, its grants and their invite record, and nobody else's;
- * nothing about a plan can be written from the app; codes, purchase tokens,
- * student checks and mail are server only.
+ * their own plan, its grants, their invite record and whether they're a plan
+ * tester, and nobody else's; nothing about a plan can be written from the
+ * app; codes, purchase tokens, student checks and mail are server only.
  *
  * Needs the Firestore emulator:
  *   npx firebase emulators:exec --only firestore --project demo-wallette "node scripts/check-plan-rules.mjs"
@@ -53,6 +53,7 @@ await seed('referrals/u1', { code: 'W7KQ2M9P' });
 await seed('codes/W7KQ2M9P', { kind: 'referral', owner: 'u1' });
 await seed('playTokens/abc', { uid: 'u1' });
 await seed('studentChecks/u1', { tries: 0 });
+await seed('planTesters/u1', { addedAt: '2026-11-28T00:00:00Z' });
 
 const client = (uid, name) => {
   const app = initializeApp({ projectId, apiKey: 'demo' }, name);
@@ -82,6 +83,11 @@ try {
   await refused('reading your student check', F.getDoc(doc('studentChecks/u1')));
   await refused('sending mail', F.addDoc(F.collection(me.db, 'mail'), { to: 'anyone@example.com' }));
   await refused('switching paid plans on', F.updateDoc(doc('config/app'), { plansLive: true }));
+  await allowed('a tester reads that they are one', F.getDoc(doc('planTesters/u1')));
+  await refused('reading whether someone else is a tester', F.getDoc(doc('planTesters/u2')));
+  await refused('listing the testers', F.getDocs(F.collection(me.db, 'planTesters')));
+  await refused('making yourself a tester', F.setDoc(doc('planTesters/u3'), { addedAt: 'now' }));
+  await refused('changing your tester record', F.setDoc(doc('planTesters/u1'), { addedAt: 'now' }));
 } finally {
   await deleteApp(me.app);
 }

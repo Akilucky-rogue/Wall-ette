@@ -21,7 +21,8 @@
  *   first paid month is done.
  * - forgetPlan: deleting the account (users/{uid}) removes all of it.
  *
- * Nothing here runs for members until config/app.plansLive is true.
+ * Nothing here runs for members until config/app.plansLive is true, except
+ * for plan testers listed in planTesters/{uid} (scripts/plans-admin.mjs).
  * Play is reached as the functions' service account, which needs access in
  * Play Console (Users and permissions).
  */
@@ -76,8 +77,14 @@ function signedIn(request: { auth?: { uid: string } }): string {
 async function plansLive(): Promise<boolean> {
   return (await db.doc('config/app').get()).get('plansLive') === true;
 }
-async function requireLive(): Promise<void> {
-  if (!(await plansLive())) throw new HttpsError('failed-precondition', 'Paid plans open soon. Everything stays free until then.');
+/** planTesters/{uid} (scripts/plans-admin.mjs tester): on for this member before everyone. */
+async function isTester(uid: string): Promise<boolean> {
+  return (await db.doc(`planTesters/${uid}`).get()).exists;
+}
+async function requireLive(uid: string): Promise<void> {
+  if (!(await plansLive()) && !(await isTester(uid))) {
+    throw new HttpsError('failed-precondition', 'Paid plans open soon. Everything stays free until then.');
+  }
 }
 
 /** Reads every grant in a transaction and writes their summary with `changed` applied. */
@@ -207,7 +214,7 @@ export const playNotifications = onMessagePublished('play-billing', async event 
 /** The member's own invite code, made the first time they ask. */
 export const myInviteCode = onCall(async request => {
   const uid = signedIn(request);
-  await requireLive();
+  await requireLive(uid);
   const ref = db.doc(`referrals/${uid}`);
   const existing = (await ref.get()).get('code') as string | undefined;
   if (existing) return { code: existing };
@@ -229,7 +236,7 @@ export const myInviteCode = onCall(async request => {
 
 export const redeemCode = onCall(async request => {
   const uid = signedIn(request);
-  await requireLive();
+  await requireLive(uid);
   const { code: raw, adult } = (request.data ?? {}) as { code?: unknown; adult?: unknown };
   const code = typeof raw === 'string' ? normalizeCode(raw) : '';
   if (code.length < 6 || code.length > 16) return { ok: false, message: REFUSALS['not-found'] };
@@ -272,7 +279,7 @@ const STUDENT_CODE_TRIES = 5;
 
 export const studentEmailStart = onCall(async request => {
   const uid = signedIn(request);
-  await requireLive();
+  await requireLive(uid);
   const { email, courseEnd, adult } = (request.data ?? {}) as { email?: unknown; courseEnd?: unknown; adult?: unknown };
   const settings = (await db.doc('config/students').get()).data() ?? {};
   if (settings.emailChecks !== true) {
@@ -298,8 +305,11 @@ export const studentEmailStart = onCall(async request => {
     expiresAt: new Date(at.getTime() + STUDENT_CODE_MINUTES * 60_000).toISOString(),
     tries: 0, sentAt: at.toISOString(), day: at.toISOString().slice(0, 10), sentToday: sentToday + 1,
   });
-  // The Trigger Email extension sends what lands in `mail`.
+  // The Trigger Email extension sends what lands in `mail`; tidyStudentChecks
+  // removes it a day later, forgetPlan with the account.
   await db.collection('mail').add({
+    uid,
+    createdAt: at.toISOString(),
     to: address,
     message: {
       subject: 'Your Wall·ette student code',
@@ -311,7 +321,7 @@ export const studentEmailStart = onCall(async request => {
 
 export const studentEmailConfirm = onCall(async request => {
   const uid = signedIn(request);
-  await requireLive();
+  await requireLive(uid);
   const { code } = (request.data ?? {}) as { code?: unknown };
   if (typeof code !== 'string' || !/^\d{6}$/.test(code.trim())) throw new HttpsError('invalid-argument', 'Enter the 6-digit code from the email.');
   const ref = db.doc(`studentChecks/${uid}`);
@@ -346,7 +356,7 @@ export const studentEmailConfirm = onCall(async request => {
 /** Asks for student access to be checked by a person (scripts/plans-admin.mjs approves). */
 export const studentReview = onCall(async request => {
   const uid = signedIn(request);
-  await requireLive();
+  await requireLive(uid);
   const { institution, course, courseEnd, adult } = (request.data ?? {}) as Record<string, unknown>;
   const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim().length >= 2 && v.trim().length <= max ? v.trim() : null);
   const inst = text(institution, 120);
@@ -400,10 +410,13 @@ async function rewardMember(uid: string): Promise<void> {
 
 /** Daily: both people get a month once the friend's first paid month is done. */
 export const referralRewards = onSchedule({ schedule: 'every day 06:30', timeZone: 'Asia/Kolkata' }, async () => {
-  if (!(await plansLive())) return;
+  // Before plans are on for everyone, only invites between plan testers count.
+  const testers = (await plansLive()) ? null : new Set((await db.collection('planTesters').get()).docs.map(d => d.id));
+  if (testers && testers.size === 0) return;
   const waiting = await db.collection('referrals').where('joinedWith.state', '==', 'waiting').limit(200).get();
   for (const doc of waiting.docs) {
     const friend = doc.id;
+    if (testers && !(testers.has(friend) && testers.has((doc.get('joinedWith.by') as string | undefined) ?? ''))) continue;
     const by = doc.get('joinedWith.by') as string | undefined;
     const joined = Date.parse((doc.get('joinedWith.at') as string | undefined) ?? '');
     const grants = (await grantsCol(friend).get()).docs.map(d => d.data() as Grant);
@@ -423,22 +436,41 @@ export const referralRewards = onSchedule({ schedule: 'every day 06:30', timeZon
   }
 });
 
+/**
+ * Daily: a student code nobody used, and the email that carried it, are
+ * removed a day after they're sent, so an institution address isn't kept
+ * for longer than the check needs.
+ */
+export const tidyStudentChecks = onSchedule({ schedule: 'every day 04:30', timeZone: 'Asia/Kolkata' }, async () => {
+  const cutoff = new Date(now().getTime() - DAY_MS).toISOString();
+  const [mail, checks] = await Promise.all([
+    db.collection('mail').where('createdAt', '<', cutoff).limit(400).get(),
+    db.collection('studentChecks').where('expiresAt', '<', cutoff).limit(400).get(),
+  ]);
+  if (mail.empty && checks.empty) return;
+  const batch = db.batch();
+  for (const d of [...mail.docs, ...checks.docs]) batch.delete(d.ref);
+  await batch.commit();
+  logger.info('tidied student checks', { mail: mail.size, checks: checks.size });
+});
+
 // ── Deleting the account ─────────────────────────────────────────────────────
 
 export const forgetPlan = onDocumentDeleted('users/{uid}', async event => {
   const uid = event.params.uid;
-  const [tokens, grants, ownCodes, studentEmails, usedCodes] = await Promise.all([
+  const [tokens, grants, ownCodes, studentEmails, usedCodes, mail] = await Promise.all([
     db.collection('playTokens').where('uid', '==', uid).get(),
     grantsCol(uid).get(),
     db.collection('codes').where('owner', '==', uid).get(),
     db.collection('studentEmails').where('uid', '==', uid).get(),
     db.collection('codes').where('usedBy', '==', uid).get(),
+    db.collection('mail').where('uid', '==', uid).get(),
   ]);
   const batch = db.batch();
-  for (const d of [...tokens.docs, ...grants.docs, ...ownCodes.docs, ...studentEmails.docs]) batch.delete(d.ref);
+  for (const d of [...tokens.docs, ...grants.docs, ...ownCodes.docs, ...studentEmails.docs, ...mail.docs]) batch.delete(d.ref);
   // A used gift or student code stays used, without saying by whom.
   for (const d of usedCodes.docs) batch.update(d.ref, { usedBy: 'deleted-account' });
-  for (const path of [`entitlements/${uid}`, `referrals/${uid}`, `studentChecks/${uid}`, `studentRequests/${uid}`]) batch.delete(db.doc(path));
+  for (const path of [`entitlements/${uid}`, `referrals/${uid}`, `studentChecks/${uid}`, `studentRequests/${uid}`, `planTesters/${uid}`]) batch.delete(db.doc(path));
   await batch.commit();
 });
 

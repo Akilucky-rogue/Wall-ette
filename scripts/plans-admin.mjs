@@ -3,7 +3,8 @@
  * The owner's tool for the parts of Spread that a person confirms
  * (wall-ette.com/spread): gift codes once a gift order is paid, institution
  * code batches, approving a student review, an early-member grant at
- * launch, and looking at a member's plan.
+ * launch, plan testers who see paid plans before config/app.plansLive is
+ * on, and looking at a member's plan.
  *
  * Runs with a service account that can write Firestore:
  *   npm --prefix functions run build
@@ -13,6 +14,7 @@
  *   institution-codes --institution "<name>" --course-end YYYY-MM-DD --count N --batch <id>
  *   approve-student   <uid> --course-end YYYY-MM-DD
  *   early             --plan plus|essential --until YYYY-MM-DD (--joined-before YYYY-MM-DD | --uids a,b,c) [--dry-run]
+ *   tester            <email or uid> [--remove]
  *   show              <uid>
  *
  * Codes are printed once; the person delivers them. Nothing here charges anyone.
@@ -133,6 +135,19 @@ switch (command) {
     }
     break;
   }
+  case 'tester': {
+    if (!positional) fail('tester <email or uid> [--remove]');
+    const uid = positional.includes('@') ? (await getAuth().getUserByEmail(positional)).uid : positional;
+    const ref = db.doc(`planTesters/${uid}`);
+    if (flag('remove')) {
+      await ref.delete();
+      console.log(`${uid} no longer sees paid plans before launch.`);
+    } else {
+      await ref.set({ addedAt: now.toISOString() });
+      console.log(`${uid} sees paid plans now (sign out and in, or restart the app).`);
+    }
+    break;
+  }
   case 'show': {
     const uid = positional;
     if (!uid) fail('show <uid>');
@@ -141,5 +156,5 @@ switch (command) {
     break;
   }
   default:
-    fail('Commands: gift-codes, institution-codes, approve-student, early, show (see the top of this file).');
+    fail('Commands: gift-codes, institution-codes, approve-student, early, tester, show (see the top of this file).');
 }

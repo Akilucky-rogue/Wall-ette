@@ -90,7 +90,11 @@ service cloud.firestore {
     // so a plan can't be switched on by hand. codes, playTokens,
     // studentChecks, studentEmails, studentRequests and mail fall to the
     // deny-by-default rule below: server only. config/app.plansLive
-    // switches paid plans on (docs/PLAN_1.6.0.md).
+    // switches paid plans on (docs/PLAN_1.6.0.md); planTesters/{uid} switches
+    // them on for one tester before that (scripts/plans-admin.mjs tester).
+    match /planTesters/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+    }
     match /entitlements/{userId} {
       allow get: if request.auth != null && request.auth.uid == userId;
       match /grants/{source} {

@@ -18,6 +18,9 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(versionName),
     __APP_BUILD__: JSON.stringify(versionCode),
+    // The test build's web code (scripts/build-qa.mjs sets WALLETTE_QA=1):
+    // never for a release, which `npm run android` rebuilds without it.
+    __QA_BUILD__: JSON.stringify(process.env.WALLETTE_QA === '1'),
   },
   server: {
     host: '0.0.0.0',

@@ -14,7 +14,7 @@
     "android:build": "npm run android && npm run postandroid && cd android && .\\gradlew assembleDebug",
     "android:release": "npm run android && npm run postandroid && cd android && .\\gradlew assembleRelease",
     "android:bundle": "npm run android && npm run postandroid && cd android && .\\gradlew bundleRelease -Pplay",
-    "android:qa": "npm run android && npm run postandroid && node scripts/qa-google-services.mjs && cd android && .\\gradlew assembleQa",
+    "android:qa": "node scripts/build-qa.mjs",
     "postandroid": "powershell -ExecutionPolicy Bypass -File patch-capacitor-gradle.ps1",
     "deploy": "npm run build:hosting && npx firebase-tools deploy --only hosting --project wall-e-7a113",
     "build:web": "vite build --base=/app/ --outDir dist-web",

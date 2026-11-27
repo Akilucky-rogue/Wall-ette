@@ -119,5 +119,16 @@ def buildsQa = gradle.startParameter.taskNames.any { it.toLowerCase().contains('
 if (buildsQa && !file('src/qa/google-services.json').exists()) {
     throw new GradleException("android/app/src/qa/google-services.json is missing. Make it from the app's own with: node scripts/qa-google-services.mjs")
 }
+// The test build's web code opens without the app lock, and
+// scripts/build-qa.mjs leaves a QA_BUILD file next to it. A release never
+// packs that code, from the command line or from Android Studio.
+def qaWebCode = file('src/main/assets/public/QA_BUILD')
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    doFirst {
+        if (qaWebCode.exists()) {
+            throw new GradleException("The web code in android/app/src/main/assets/public is the test build's (no app lock). Run npm run android first: it builds the web code again for a release.")
+        }
+    }
+}
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'

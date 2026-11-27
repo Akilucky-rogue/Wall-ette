@@ -95,7 +95,9 @@ function AppContent() {
   // Native cold start opens LOCKED: a signed-in session resumes behind the
   // biometric/password gate instead of straight onto the dashboard. This is
   // what makes "biometric login" real — open app → fingerprint → in.
-  const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform());
+  // The test build (__QA_BUILD__) opens unlocked and never locks: it holds a
+  // made-up account and is driven from a computer while it's tried out.
+  const [isLocked, setIsLocked] = useState(() => Capacitor.isNativePlatform() && !__QA_BUILD__);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   // The screen before this one, for the entrance motion.
   const shownScreenRef = useRef<AppScreen>(AppScreen.DASHBOARD);
@@ -147,7 +149,7 @@ function AppContent() {
       listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
         // Android's notification access screen, opened from Payments from
         // your apps, backgrounds the app the same way the file picker does.
-        if (!isActive && currentScreenRef.current !== AppScreen.IMPORT && currentScreenRef.current !== AppScreen.PAYMENT_APPS) {
+        if (!isActive && !__QA_BUILD__ && currentScreenRef.current !== AppScreen.IMPORT && currentScreenRef.current !== AppScreen.PAYMENT_APPS) {
           setIsLocked(true);
         }
       });

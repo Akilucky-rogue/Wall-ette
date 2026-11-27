@@ -19,18 +19,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    versionCode: 17,
-    version: '1.5.9',
+    // 1.5.9 (versionCode 17) never went to Play: its changes ship here.
+    versionCode: 18,
+    version: '1.6.0',
     items: [
-      "A new look: Wall·ette's own icon, logo and mascot, and clearer type.",
+      "A new look: Wall·ette's own icon, logo and mascot, clearer type and a Teal theme.",
       'Sign in with Google.',
-      'Brand colours in Sage and Terracotta, and a new Teal theme.',
-      'Money in and money out are easier to read in every theme.',
-      'Each bank account keeps its own opening balance, so statements from two banks add up.',
-      'Import statements from Equitas Small Finance Bank.',
-      'No stray "UPI ID" note on Excel imports.',
-      'Back closes an open panel first.',
-      'Less waiting at start-up on a slow connection, and in Vault.',
+      'Payments from Google Pay, PhonePe, Paytm and bank apps are added for you. Turn it on in Self → Your data.',
+      'Share a payment message to Wall·ette to add it.',
+      'Each bank account keeps its own balance, and Equitas statements import.',
+      'Importing goes step by step: format, statement, balance check, categories.',
+      'Faster start-up and Vault, even with years of entries.',
     ],
   },
   {

@@ -397,6 +397,32 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   number, are "Other entries". Together they make the balance on Home. Tapping one opens
   Vault filtered to it (`utils/vaultAccount.ts`); Vault's filters offer every account once
   entries are in more than one place. Checked by `check-accounts`.
+- **Payments from your apps** (1.6.0, Android, off until turned on in Self → Your data →
+  Payments from your apps, after a disclosure) — `PaymentAlertListener` (a
+  `NotificationListenerService`) keeps notifications from the apps in `PACKAGES` (Google Pay,
+  PhonePe, Paytm, BHIM, the banks' apps; the same list as `services/paymentAlerts.ts`
+  `PAYMENT_APPS` and the manifest's `<queries>`) that show an amount, never OTPs, in
+  `PaymentAlertStore` (app-private SharedPreferences, at most 300) until the app reads them;
+  every other notification is dropped unread, and the manifest asks Android 12+ for alerting
+  and silent notifications only. `PaymentAlertsPlugin` ("PaymentAlerts") gives the app their
+  status, the access screen, the notices and shared text; `services/paymentAlertsBridge.ts`
+  wraps it (nothing on the web). `components/PaymentIntake.tsx` runs while the app is open and
+  unlocked, on start and on each kept notice: `services/paymentAlerts.ts` reads each one
+  (payment-app phrases, or the bank-alert reader from `feature/sms-capture`) and
+  `services/captured.ts` `planIntake` adds sure ones (Undo for 8 s), keeps the rest for "Add
+  this?" (`services/paymentInbox.ts`, `wallette_toCheck_<uid>`, on the phone only) and skips
+  what's in the wallet already: the same notification, a repost within 10 minutes, another
+  app's notice of the same payment within 15 minutes. Entries carry `via` (the app) and a
+  statement-style narration (rail/reference/payee). On import, `capturedRows` pairs statement
+  rows with them (reference, else amount, a day either side and the payee's words) and the
+  rows take their place with their category and note (`carryOver`), out of the wallet in the
+  same step (`removeIds`, `importTally`'s `replaces`). Share to Wall-ette: an `ACTION_SEND`
+  text/plain filter on `MainActivity`; shared text always waits for a tap. Sign-out turns the
+  reader off. Checked by `check-payment-alerts` and `check-captured`.
+- **Importing in five steps** (1.6.0, `components/ImportStatement.tsx`) — Format (PDF or
+  Excel; picking one opens the file picker for it), Statement, Balance check, Categories,
+  Summary, with a step bar. The balance check's status and the categories' status are shown
+  apart, and both are labelled on the receipt.
 - **Vault's list** (1.5.9) — draws 100 entries, then 100 more per "Show 100 more"; a new
   search, filter or order starts again from 100. The count, the totals and the CSV export cover
   every match. A wallet of thousands drawn at once was slow to open and to scroll.
@@ -447,8 +473,9 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
 | Windowing | Edge to edge on every version: `MainActivity` calls `EdgeToEdge.enable` with transparent bars (Android 15+ is edge to edge anyway). Capacitor's `SystemBars` passes the bar insets to CSS on WebView 140+; `index.html` turns them into `--sat`/`--sab`, pads the body and paints strips under both bars. Older WebViews get the insets as padding and the cream window background shows behind the bars. Fixed top/bottom UI must add `var(--sat)`/`var(--sab)`. The 3-button nav bar scrim is off. No `statusBarColor`/`navigationBarColor` in `styles.xml` and no StatusBar plugin (Android 15 deprecated those calls); Play may still list androidx's own `EdgeToEdge`, which uses them below Android 15 |
 | Code shrinking | Release builds run R8 (`proguard-android-optimize.txt`): shrinking, optimisation and obfuscation of the Java/Kotlin side, for Play's DEX optimisation check. Capacitor's consumer rules keep the plugin classes the bridge finds by name; `proguard-rules.pro` keeps `@JavascriptInterface` methods and line numbers. The Crashlytics Gradle plugin uploads the mapping file on each release build (needs network), and the bundle carries it for Play. Debug builds aren't minified |
 | Backups & screen | `allowBackup="false"`, plus `res/xml/data_extraction_rules.xml` (Android 12+) and `backup_rules.xml` (11 and earlier) excluding every domain, so neither Google backups nor phone-to-phone transfers copy the WebView's data (mirror, Firestore cache, sign-in). `MainActivity` sets `FLAG_SECURE` in release builds: no screenshots, recordings or recent-apps preview. Debug builds leave capture on for store screenshots (audit M11) |
+| Test build | `npm run android:qa` builds the `qa` build type: id `com.wallette.app.test`, named "Wall-ette Test", so it installs next to the Play app on a phone or emulator. Like a debug build otherwise; Google sign-in isn't set up for it. Its `src/qa/google-services.json` (gitignored) is made from the app's own by `scripts/qa-google-services.mjs`. Debug-like builds also read a notification posted with `adb shell cmd notification post -t <title> wallette-test:<package> <text>` as that package's, to try the reader without a payment app |
 | Phone notifications | `@capacitor/local-notifications` (from 1.5.6): one channel, "Bills and budgets" (importance default, private on the lock screen), the status-bar icon `res/drawable/ic_stat_wallette.xml`. Inexact alarms only (`isExactNotification: false`); the manifest removes the plugin's `SCHEDULE_EXACT_ALARM`, so Android never shows the "Alarms & reminders" screen. `POST_NOTIFICATIONS` is asked for when the switch in Self → Alerts and limits is turned on |
-| Versioning | versionCode 14 · versionName 1.5.6, set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
+| Versioning | versionCode 18 · versionName 1.6.0 (1.5.9, versionCode 17, never went to Play), set only in `android/app/build.gradle`; `vite.config.ts` reads both into `__APP_VERSION__`/`__APP_BUILD__` for the web code (and stops the build if they're missing) |
 | Updates | Google Play in-app updates (`services/appUpdates.ts`; rules in `services/appUpdatePolicy.ts`), checked each time the main screen appears. Flexible by default: Google's prompt, download in the background, then an "Update ready · Restart" banner; "No thanks" quiets that version for 3 days. Required below `config/app.androidMinVersionCode` or at in-app update priority 4+: Google's full-screen update, and a blocking screen if the user backs out — only when Play offers an update, so it fails open. From 1.5.7 each check records what Play answered (`finding`: latest, available, downloading, ready, not-from-play, unavailable): the bell lists an update Play has even after "No thanks" ("Update available" → Google's dialog, else its full-screen update, else the store page), and Self → About has **Check for updates**, which asks again, skips the 3-day quiet and says the answer. Play only answers for a copy it installed: a build from Android Studio or an APK gets Install Error −10 (`ERROR_APP_NOT_OWNED`) and About says so. "What's new" (`services/releaseNotes.ts`) shows once after an update, never on a new install. Checklist: `docs/PLAY_SUBMISSION.md` §9; tests: `scripts/check-app-updates.mjs` |
 
 **iOS (parked):** `npm run ios` + `patch-ios.ps1` prepare the Xcode project; a manual-trigger

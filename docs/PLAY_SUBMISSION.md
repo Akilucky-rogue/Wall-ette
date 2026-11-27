@@ -74,20 +74,28 @@ The app, the privacy policy and the terms point to **wall-ette.com**. The contac
 | Does your app collect or share user data? | Collects: yes. Shares: **no** |
 | Email address | Collected · App functionality (account management) · Not shared |
 | Name (from 1.5.9) | Collected, **optional** (only for people who sign in with Google: Google sends their name and profile-picture address with the sign-in; kept in Firebase Authentication's sign-in record) · App functionality (account management) · Not shared |
-| Financial info → "Other financial info" | Collected (user-entered/imported transactions; from 1.5.9 also each bank account's opening balance, bank name and the last four digits of its number, to tell accounts apart) · App functionality · Not shared |
+| Financial info → "Other financial info" | Collected (user-entered/imported transactions; from 1.5.9 also each bank account's opening balance, bank name and the last four digits of its number, to tell accounts apart; from 1.6.0 also payments read from payment and bank apps' notifications, once added: amount, day, payee, reference and the app) · App functionality · Not shared |
 | App activity → "App interactions" | Collected (unlock attempts: time and method, for the in-app security log) · App functionality; Fraud prevention, security, and compliance · Not shared |
 | App info and performance (from 1.5.3) | Google's in-app updates library sends device metadata, the app version and the list of installed modules to Google Play to find updates; Google says it's encrypted and not shared ([In-app updates → Data safety](https://developer.android.com/guide/playcore/in-app-updates)). `play-services-base`, which it pulls in, collects nothing. Google leaves the answer to you; the cautious one is Collected → "Other app performance data" · App functionality · Not shared |
 | App info and performance → "Crash logs" (from 1.5.5) | Collected (Firebase Crashlytics: the stack trace, app state, masked error message and recent screen names when the app crashes or reports an error) · Analytics (Play's purpose for diagnosing and fixing crashes) · Not shared (Google processes it for us) · Optional: Self → Crash reports (Self → Your data from 1.5.6) turns it off |
 | App info and performance → "Diagnostics" (from 1.5.5) | Collected (device details at the time of a crash, such as model, Android version, free memory and storage) · Analytics · Not shared · Optional |
 | Device or other IDs (from 1.5.5) | Collected (the Crashlytics installation ID, which counts how many installs a crash affects; no user ID is set) · Analytics · Not shared · Optional |
 | Account creation | **Username and password**, and from 1.5.9 **OAuth** (Sign in with Google). Two-factor sign-in is still Coming Soon; the fingerprint unlock is on the device, not a way to sign in |
-| Personal info | **Email address**, and from 1.5.9 **Name** for Google sign-ins (above). No phone number is asked for, and statement files are read on the phone, so Files and docs isn't collected either |
+| Personal info | **Email address**, and from 1.5.9 **Name** for Google sign-ins (above). No phone number is asked for, and statement files are processed on the device, so Files and docs isn't collected either |
 | Data encrypted in transit? | **Yes** (Firebase TLS) |
 | Can users request deletion? | **Yes** — in the app (Self → Account and security → Delete account and all data from 1.5.6), or by email to akshatbvora@gmail.com; URL in section 4 |
 | Data processed ephemerally? | No |
 | Ads / advertising ID | **None** |
 
 From 1.5.6 the app can show phone notifications (bill reminders, budget and daily-limit alerts), switched on in Self → Alerts and limits. They are made on the device from data the app already holds, so nothing new is collected and these answers don't change. The manifest gains `POST_NOTIFICATIONS` (asked for on Android 13+ when switched on), `RECEIVE_BOOT_COMPLETED` and `WAKE_LOCK` (reminders survive a restart) and `VIBRATE` (taps); `SCHEDULE_EXACT_ALARM`, which the notifications plugin declares, is removed, so there is no exact-alarm declaration to make.
+
+## 5b. Payments from your apps (from 1.6.0)
+
+- **Notification access** (`BIND_NOTIFICATION_LISTENER_SERVICE`, granted by the person in Android's settings) has no Play declaration form. The in-app disclosure (Self → Your data → Payments from your apps, shown before Android's access screen) says what is read and why, as the User Data policy asks; the privacy policy has a section on it (wall-ette.com/privacy#payments-from-apps).
+- **Data safety:** notification text is processed on the device and never leaves it, so it isn't "collected". Payments it adds go to the wallet like typed entries: Financial info → Other financial info, already declared (row above). No answers change otherwise.
+- **SMS:** not read, by any route. The reader skips every app not on its list, messaging apps included (Play forbids deriving SMS data by other means). Share to Wall-ette only takes text the person shares.
+- **Sideloading:** in India, Play Protect blocks apps that ask for notification access when installed from a browser, messaging app or file manager; Play installs (and adb, for testing) are unaffected.
+- **Release notes / listing:** say it's optional and off until turned on.
 
 ## 5a. Sign in with Google (from 1.5.9) — set up before building the 1.5.9 bundle
 

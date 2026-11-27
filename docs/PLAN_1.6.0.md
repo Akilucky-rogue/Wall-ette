@@ -171,12 +171,23 @@ As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
 
 ## Order of work
 
-1. This plan and the two Claude docs.
-2. Entries stored by month, with the move of existing wallets.
-3. Accounts.
-4. Payments from notifications and Share to Wall-ette.
-5. Review fixes.
-6. The 1.6.0 release: one What's new entry, privacy policy, Data safety
+1. This plan and the two Claude docs. **Done.**
+2. Entries stored by month, with the move of existing wallets. **Done** (29b6326).
+3. Accounts. **Done** (e443dce).
+4. Payments from notifications and Share to Wall-ette. **Built** (2426632):
+   checked on made-up notifications in each app's style and in the UI
+   harness; to try on the test emulator and on the owner's phone (a test
+   build, "Wall-ette Test", installs beside the Play app). The payment
+   apps' real wording is still to confirm; IDFC FIRST's alerts follow real
+   ones.
+5. Review fixes. Some done (84f0b9d); the rest need a read-only look at
+   the owner's wallet.
+6. Asked on 27 Nov and done: the import in five steps (format, statement,
+   balance check, categories, summary) with the two statuses apart
+   (4f1d211); on the website, every plan rule in one place, unambiguous
+   billing changes, and a privacy policy that names providers and says who
+   can see your data (1ee886b).
+7. The 1.6.0 release (versionCode 18; one What's new entry): Data safety
    check, bundle; the Firestore rules deploy, web deploy and push on the
    owner's go.
-7. After the 14-day closed test: Essential and Plus, Spread, production.
+8. After the 14-day closed test: Essential and Plus, Spread, production.

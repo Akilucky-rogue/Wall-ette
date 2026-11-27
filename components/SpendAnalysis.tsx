@@ -497,7 +497,7 @@ const Insights: React.FC<{ r: PulseResult; open: (screen: AppScreen, section?: S
           </Card>
         ))}
         <p className="text-[11px] text-muted-taupe leading-relaxed px-1">
-          Worked out on this device from your entries; money moved between your own accounts, to family or to investments isn't counted as spending.
+          Processed on this device from your entries; money moved between your own accounts, to family or to investments isn't counted as spending.
         </p>
       </div>
       <AskSoon className="lg:col-span-5" full />

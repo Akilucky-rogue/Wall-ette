@@ -177,7 +177,7 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
 
           <p className="text-[11px] text-muted-taupe leading-relaxed px-1">
             Money between your own accounts isn't counted. Bills are the payments that repeat in your history.
-            Worked out on your phone.
+            Processed on this device.
           </p>
         </div>
       )}

@@ -51,11 +51,14 @@ const ReceiptCard: React.FC<{ receipt: ImportReceipt; money: (n: number) => stri
       </ul>
       <p className="mt-3 flex items-start gap-2 text-[12px] text-premium-charcoal leading-snug">
         <span className={`material-symbols-outlined text-[18px] shrink-0 ${check.cls}`} aria-hidden="true">{check.icon}</span>
-        <span>{check.text}</span>
+        <span><b>Balance check:</b> {check.text}</span>
       </p>
-      {r.toReview !== undefined && (
-        <p className="mt-2 text-[12px] text-muted-taupe">{money(r.toReview)} of payments left to review.</p>
-      )}
+      <p className="mt-2 flex items-start gap-2 text-[12px] text-premium-charcoal leading-snug">
+        <span className={`material-symbols-outlined text-[18px] shrink-0 ${r.toReview !== undefined ? 'text-ocean' : 'text-sage'}`} aria-hidden="true">
+          {r.toReview !== undefined ? 'info' : 'check_circle'}
+        </span>
+        <span><b>Categories:</b> {r.toReview !== undefined ? `${money(r.toReview)} of payments left to name.` : 'every payment has a category.'}</span>
+      </p>
       {showWhen && (
         <p className="mt-2 text-[11px] text-muted-taupe">
           Imported {when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
@@ -64,6 +67,32 @@ const ReceiptCard: React.FC<{ receipt: ImportReceipt; money: (n: number) => stri
     </div>
   );
 };
+
+/** The five steps of an import, in order. */
+const IMPORT_STEPS = ['Format', 'Statement', 'Balance', 'Categories', 'Summary'] as const;
+
+/** Where the import is: the step done so far filled, its name in bold. */
+const ImportSteps: React.FC<{ current: number }> = ({ current }) => (
+  <ol className="flex items-start gap-1.5 mb-6" aria-label={`Step ${current + 1} of ${IMPORT_STEPS.length}: ${IMPORT_STEPS[current]}`}>
+    {IMPORT_STEPS.map((label, i) => (
+      <li key={label} className="flex-1 min-w-0" aria-current={i === current ? 'step' : undefined}>
+        <div className={`h-1 rounded-full ${i <= current ? 'bg-sage' : 'bg-sage/15'}`} />
+        <p className={`mt-1.5 text-[10px] leading-tight truncate ${i === current ? 'text-premium-charcoal font-semibold' : 'text-muted-taupe'}`}>{label}</p>
+      </li>
+    ))}
+  </ol>
+);
+
+/** A status on its own line: the balance check's, or the categories'. */
+const StatusLine: React.FC<{ label: string; tone: 'ok' | 'info' | 'warn' | 'muted'; text: string; action?: React.ReactNode }> = ({ label, tone, text, action }) => (
+  <div className="flex items-start gap-2.5 rounded-2xl bg-white/70 border border-black/[0.04] px-4 py-3">
+    <span className={`material-symbols-outlined text-[18px] mt-0.5 shrink-0 ${tone === 'ok' ? 'text-sage' : tone === 'info' ? 'text-ocean' : tone === 'warn' ? 'caution-mark' : 'text-muted-taupe'}`} aria-hidden="true">
+      {tone === 'ok' ? 'check_circle' : tone === 'info' ? 'info' : tone === 'warn' ? 'error' : 'help'}
+    </span>
+    <p className="flex-1 min-w-0 text-[12px] text-premium-charcoal leading-snug"><b>{label}:</b> {text}</p>
+    {action}
+  </div>
+);
 
 interface EditingTransaction {
     id: string;
@@ -84,6 +113,11 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Stages: IDLE (choose a file), PROCESSING (reading it), REVIEW (the rows),
   // DONE (the receipt, and the payments to review)
   const [stage, setStage] = useState<'IDLE' | 'PROCESSING' | 'REVIEW' | 'DONE'>('IDLE');
+  // The five steps the person sees (ImportSteps): the format, then the
+  // statement (IDLE), the balance check and the categories (REVIEW, each with
+  // its own status), then the summary (DONE).
+  const [format, setFormat] = useState<'PDF' | 'Excel' | null>(null);
+  const [reviewStep, setReviewStep] = useState<'balance' | 'categories'>('balance');
   // The bank the reader recognised and the file's format, for the receipt.
   const [source, setSource] = useState<{ bank: string | null; format: 'PDF' | 'Excel' }>({ bank: null, format: 'PDF' });
   const [receipt, setReceipt] = useState<ImportReceipt | null>(null);
@@ -265,6 +299,21 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   // The card's words: what's wrong with the import itself first, then how
   // the wallet's total relates to this one account.
+  // The two statuses of a review, kept apart: does the statement add up
+  // (the balance check), and what's still to name (the categories).
+  const balanceStatus: { tone: 'ok' | 'info' | 'warn' | 'muted'; text: string } =
+    tallyTone === 'ok' ? { tone: 'ok', text: "matches the bank's closing balance." }
+    : tallyTone === 'note' ? { tone: 'info', text: 'the statement adds up row for row. Your wallet also holds other accounts, so its balance differs.' }
+    : tallyTone === 'off' ? { tone: 'warn', text: "doesn't match the bank's closing balance yet." }
+    : { tone: 'muted', text: "this statement shows no closing balance to check against." };
+  const toNameCount = useMemo(
+    () => extractedData.filter(t => selectedIds.has(t.id) && t.type === TransactionType.EXPENSE && shownCategory(t, flowOf(t)) === TO_REVIEW).length,
+    [extractedData, selectedIds, flowOf],
+  );
+  const categoryStatus: { tone: 'ok' | 'info'; text: string } = toNameCount > 0
+    ? { tone: 'info', text: `${toNameCount} ${toNameCount === 1 ? 'payment is a transfer' : 'payments are transfers'} Wall-ette can't name yet. You can say what they were after importing.` }
+    : { tone: 'ok', text: 'every row has a category.' };
+
   const tallyMessage = (): string => {
     if (!tally) return '';
     const amount = (n: number) => formatAmount(Math.abs(n));
@@ -386,6 +435,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       // Select all EXCEPT duplicates by default
       setSelectedIds(new Set(mappedTransactions.filter(t => !foundDuplicates.has(t.id)).map(t => t.id)));
       setShowDuplicateInfo(foundDuplicates.size > 0);
+      setReviewStep('balance');
       setStage('REVIEW');
   };
 
@@ -532,6 +582,17 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
     }
   };
 
+  // Step 1: the format picked opens the file picker for it straight away.
+  const chooseFormat = (f: 'PDF' | 'Excel') => {
+    setFormat(f);
+    setError(null);
+    const input = fileInputRef.current;
+    if (input) {
+      input.accept = f === 'Excel' ? '.xlsx,.xls' : '.pdf';
+      input.click();
+    }
+  };
+
   const toggleSelection = (id: string) => {
       const newSet = new Set(selectedIds);
       if (newSet.has(id)) newSet.delete(id);
@@ -668,9 +729,47 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </button>
                 </div>
 
-                <p className="text-muted-taupe text-[13px] font-medium leading-relaxed mb-8 text-center px-4">
-                Choose a statement from IDFC FIRST, HDFC, SBI, Kotak, Union Bank, Saraswat Bank or Equitas: the PDF or Excel file your bank gives you. Other banks' PDFs often work too. It's read on this device, without AI, and never uploaded.
-                </p>
+                <ImportSteps current={format ? 1 : 0} />
+
+                {!format ? (
+                    <>
+                        <h3 className="text-premium-charcoal text-lg font-display font-bold mb-1">Choose a supported format</h3>
+                        <p className="text-muted-taupe text-[13px] leading-relaxed mb-5">
+                            The statement your bank gives you, from IDFC FIRST, HDFC, SBI, Kotak, Union Bank, Saraswat Bank or Equitas. Processed on this device, without AI; the file is never uploaded.
+                        </p>
+                        <div className="space-y-3 mb-2">
+                            {([
+                                ['PDF', 'picture_as_pdf', 'PDF statement', "The one your bank emails or lets you download. Password-locked PDFs are fine. Other banks' PDFs often work too."],
+                                ['Excel', 'table_view', 'Excel statement', 'An .xlsx or .xls file from your net banking.'],
+                            ] as const).map(([f, icon, title, sub]) => (
+                                <button
+                                    key={f}
+                                    onClick={() => chooseFormat(f)}
+                                    className="w-full flex items-center gap-4 bg-white rounded-3xl px-5 py-4 text-left shadow-soft border border-black/[0.02] active:scale-[0.99] transition-transform"
+                                >
+                                    <span className="w-11 h-11 rounded-2xl bg-sage-light text-sage flex items-center justify-center shrink-0">
+                                        <span className="material-symbols-outlined text-[22px]" aria-hidden="true">{icon}</span>
+                                    </span>
+                                    <span className="flex-1 min-w-0">
+                                        <span className="block text-[15px] font-semibold text-premium-charcoal">{title}</span>
+                                        <span className="block text-[12px] text-muted-taupe leading-snug mt-0.5">{sub}</span>
+                                    </span>
+                                    <span className="material-symbols-outlined text-[20px] text-muted-taupe" aria-hidden="true">chevron_right</span>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                <>
+                <div className="flex items-start justify-between gap-3 mb-6">
+                    <div>
+                        <h3 className="text-premium-charcoal text-lg font-display font-bold mb-1">Choose statement</h3>
+                        <p className="text-muted-taupe text-[13px] leading-relaxed">
+                            {format === 'PDF' ? 'A PDF statement from your bank.' : 'An Excel statement (.xlsx or .xls) from your bank.'} Processed on this device, without AI; the file is never uploaded.
+                        </p>
+                    </div>
+                    <button onClick={() => setFormat(null)} className="shrink-0 text-[13px] font-semibold text-sage pt-1">Change format</button>
+                </div>
 
                 {reimportHint && (
                     <div className="mb-6 p-4 rounded-2xl bg-white/70 border border-sage/20 flex items-start gap-3">
@@ -692,20 +791,11 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <Mascot pose="review" height={116} />
                     <div className="text-center px-6">
                         <p className="text-premium-charcoal font-display text-lg font-bold inline-flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sage text-[20px]" aria-hidden="true">upload</span>
+                            <span className="material-symbols-outlined text-sage text-[20px]" aria-hidden="true">folder_open</span>
                             Choose statement
                         </p>
-                        <p className="text-muted-taupe text-xs mt-1">Excel (.xlsx/.xls) or PDF</p>
+                        <p className="text-muted-taupe text-xs mt-1">{format === 'PDF' ? 'PDF' : 'Excel (.xlsx or .xls)'}</p>
                     </div>
-                    <input
-                        ref={fileInputRef}
-                        accept=".pdf,.xlsx,.xls"
-                        className="hidden"
-                        type="file"
-                        onChange={handleFileSelect}
-                        title="Choose a bank statement file"
-                        aria-label="Choose a bank statement file"
-                    />
                 </div>
 
                 {locked && (
@@ -741,6 +831,19 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </form>
                 )}
 
+                </>
+                )}
+
+                <input
+                    ref={fileInputRef}
+                    accept={format === 'Excel' ? '.xlsx,.xls' : format === 'PDF' ? '.pdf' : '.pdf,.xlsx,.xls'}
+                    className="hidden"
+                    type="file"
+                    onChange={handleFileSelect}
+                    title="Choose a bank statement file"
+                    aria-label="Choose a bank statement file"
+                />
+
                 {error && (
                     <div className="mt-6 p-4 bg-rose-light/30 border border-rose/20 rounded-2xl flex gap-3 items-center animate-slide-up">
                         <span className="material-symbols-outlined text-rose">error</span>
@@ -762,6 +865,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'DONE' && receipt && (
             <div className="space-y-6 animate-slide-up">
+                <ImportSteps current={4} />
                 <ReceiptCard receipt={receipt} money={formatAmount} heading={receipt.added > 0 ? 'Imported' : receipt.opening !== undefined ? 'Opening balance set' : receipt.marked ? 'Entries updated' : 'Nothing new to add'} />
 
                 {/* The payments this statement leaves to review */}
@@ -794,17 +898,29 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'PROCESSING' && (
             <div className="flex flex-col items-center justify-center flex-1 h-[60vh] animate-slide-up">
+                <div className="w-full self-stretch"><ImportSteps current={1} /></div>
                 <div className="mb-7">
                     <Mascot pose="review" height={148} className="animate-pulse motion-reduce:animate-none" />
                 </div>
                 <h3 className="text-xl font-display font-bold text-premium-charcoal mb-2">{loadingMessage}</h3>
-                <p className="text-muted-taupe text-xs">The file is read on this device and never uploaded</p>
+                <p className="text-muted-taupe text-xs">Processed on this device. The file is never uploaded.</p>
                 <div className="mt-5 h-6 w-6 rounded-full border-[3px] border-sage/20 border-t-sage animate-spin" aria-hidden="true" />
             </div>
         )}
 
         {stage === 'REVIEW' && (
             <div className="flex flex-col h-full animate-slide-up">
+                <ImportSteps current={reviewStep === 'balance' ? 2 : 3} />
+                {reviewStep === 'balance' ? (
+                <>
+                <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h3 className="text-premium-charcoal text-lg font-display font-bold">Review the balance check</h3>
+                        <p className="text-muted-taupe text-[13px] leading-relaxed mt-1">Whether the statement adds up, and what importing it does to your balance. Categories come next.</p>
+                    </div>
+                    <button onClick={handleDiscard} className="shrink-0 text-rose text-[13px] font-semibold pt-1">Discard</button>
+                </div>
+                <div className="mb-4"><StatusLine label="Balance check" tone={balanceStatus.tone} text={balanceStatus.text} /></div>
                 {/* Rows for payments read from your apps: the row takes the entry's place */}
                 {replaces.length > 0 && (
                     <div className="mb-4 p-4 rounded-2xl bg-ocean-light/60 border border-ocean/20 animate-slide-up" role="status">
@@ -971,17 +1087,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     </div>
                 )}
 
-                <div className="flex justify-between items-end mb-6 px-2">
-                    <div>
-                        <h3 className="text-premium-charcoal text-lg font-display font-bold">Review transactions</h3>
-                        <p className="text-muted-taupe text-xs mt-1">
-                            {selectedIds.size} of {extractedData.length} selected
-                            {duplicateIds.size > 0 && (
-                                <span className="text-blue-500 ml-1">({duplicateIds.size} duplicates)</span>
-                            )}
-                        </p>
+                {/* What the statement holds */}
+                <div className="mb-4 p-4 rounded-2xl bg-white/70 border border-black/[0.04]">
                         {reviewSummary && (
-                            <div className="text-[10px] text-muted-taupe mt-2 space-y-0.5">
+                            <div className="text-[12px] text-muted-taupe space-y-1">
                                 <p>💰 Income: {formatAmount(reviewSummary.incomeSum)}</p>
                                 <p>💸 Expense: {formatAmount(reviewSummary.expenseSum)}</p>
                                 <p>📅 Covers: {showDay(reviewSummary.minDate)} to {showDay(reviewSummary.maxDate)}</p>
@@ -996,15 +1105,24 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 )}
                             </div>
                         )}
-                    </div>
-                    <button 
-                        onClick={handleDiscard}
-                        className="text-rose text-xs font-bold uppercase tracking-widest border-b border-rose/30 pb-1"
-                    >
-                        Discard
-                    </button>
                 </div>
-
+                </>
+                ) : (
+                <>
+                <div className="mb-4 space-y-2">
+                    <StatusLine label="Categories" tone={categoryStatus.tone} text={categoryStatus.text} />
+                    <StatusLine label="Balance check" tone={balanceStatus.tone} text={balanceStatus.text}
+                        action={<button onClick={() => setReviewStep('balance')} className="shrink-0 text-[12px] font-semibold text-sage">Review</button>} />
+                </div>
+                <div className="flex justify-between items-end mb-6 px-2">
+                    <div>
+                        <h3 className="text-premium-charcoal text-lg font-display font-bold">Review categories</h3>
+                        <p className="text-muted-taupe text-xs mt-1">
+                            {selectedIds.size} of {extractedData.length} rows ticked to import. Tap a row to change its category.
+                        </p>
+                    </div>
+                    <button onClick={handleDiscard} className="text-rose text-[13px] font-semibold pb-1">Discard</button>
+                </div>
                 <div className="flex items-center justify-between mb-4 px-2">
                      <div className="flex items-center gap-4">
                          <button 
@@ -1090,6 +1208,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         </div>
                     )})}
                 </div>
+
+                </>
+                )}
 
                 {/* Edit Modal */}
                 {editingTx && (
@@ -1192,7 +1313,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                 onClick={saveEdit}
                                 className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
                             >
-                                <span className="material-symbols-outlined text-[20px]">check</span>
+                                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">check</span>
                                 Save changes
                             </button>
                         </div>
@@ -1204,7 +1325,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     show through between the page numbers. */}
                 <div className="fixed bottom-0 left-0 right-0 lg:left-[240px] px-6 pt-10 pb-[calc(1.5rem_+_var(--sab))] bg-gradient-to-t from-zen-bg via-zen-bg via-75% to-transparent z-50 max-w-[430px] md:max-w-2xl mx-auto">
                     {/* Pagination controls */}
-                    {totalPages > 1 && (
+                    {reviewStep === 'categories' && totalPages > 1 && (
                         <div className="flex items-center justify-center gap-3 mb-4">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -1248,12 +1369,21 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         </div>
                     )}
                     
+                    {reviewStep === 'balance' ? (
+                    <button
+                        onClick={() => { setReviewStep('categories'); window.scrollTo(0, 0); }}
+                        className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90"
+                    >
+                        Continue to categories
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_forward</span>
+                    </button>
+                    ) : (
                     <button 
                         onClick={confirmImport}
                         disabled={nothingToAdd && !canUpdate}
                         className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <span className="material-symbols-outlined text-[20px]">check</span>
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">check</span>
                         {!nothingToAdd
                             ? `Import ${selectedIds.size} Transactions`
                             : accountPlan?.next
@@ -1262,6 +1392,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                                     ? `Mark ${accountPlan!.marks} ${accountPlan!.marks === 1 ? 'entry' : 'entries'} as this account's`
                                     : 'Import 0 Transactions'}
                     </button>
+                    )}
                 </div>
             </div>
         )}

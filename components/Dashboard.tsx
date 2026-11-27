@@ -262,7 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <Mascot pose="welcome" height={88} className="-mt-2 -mr-1" />
         </div>
         <p className="text-[13px] text-muted-taupe leading-relaxed mt-2 max-w-[52ch]">
-          Import a bank statement to bring in months of entries at once, or add one by hand. Statements are read on this device and checked against the bank's balance before anything is saved.
+          Import a bank statement to bring in months of entries at once, or add one by hand. Statements are processed on this device and checked against the bank's balance before anything is saved.
         </p>
         <div className="flex flex-col sm:flex-row gap-2.5 mt-5">
           <button

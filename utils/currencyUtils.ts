@@ -73,7 +73,9 @@ function formatter(code: CurrencyCode, style: 'full' | 'whole' | 'compact'): Int
     const locale = localeFor(code);
     const options: Intl.NumberFormatOptions = { style: 'currency', currency: code };
     if (style === 'whole') { options.minimumFractionDigits = 0; options.maximumFractionDigits = 0; }
-    if (style === 'compact') { options.notation = 'compact'; options.maximumFractionDigits = 1; }
+    // Without the minimum, a currency's own two decimals pull it up to one:
+    // ₹299.0, ₹0.0, ₹2.0K.
+    if (style === 'compact') { options.notation = 'compact'; options.minimumFractionDigits = 0; options.maximumFractionDigits = 1; }
     try {
       f = new Intl.NumberFormat(locale, options);
     } catch {
@@ -88,8 +90,32 @@ function formatter(code: CurrencyCode, style: 'full' | 'whole' | 'compact'): Int
 export const getCurrencyFormatter = (code: CurrencyCode): Intl.NumberFormat => formatter(code, 'full');
 /** ₹1,23,457: no decimals, for figures read at a glance. */
 export const getWholeCurrencyFormatter = (code: CurrencyCode): Intl.NumberFormat => formatter(code, 'whole');
+/**
+ * Rupees in Indian units, ₹299, ₹2.5K, ₹1.2L, ₹3.4Cr, written out here
+ * rather than by Intl's compact notation: the locale data in older Android
+ * WebViews writes Indian thousands as "T" (₹2.5T, read as trillions), newer
+ * data as "K". Rounds like Intl: one decimal at most, and 99,960 is ₹1L.
+ */
+let indianCompact: { format(n: number): string } | null = null;
+function indianCompactFormatter(): { format(n: number): string } {
+  if (indianCompact) return indianCompact;
+  const plain = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 1 });
+  indianCompact = {
+    format(n: number): string {
+      if (!Number.isFinite(n)) return plain.format(n);
+      const a = Math.abs(n);
+      // Each unit starts where the one below would round up to a hundred of it.
+      const [size, unit] = a >= 0.9995e7 ? [1e7, 'Cr'] : a >= 0.9995e5 ? [1e5, 'L'] : a >= 999.95 ? [1e3, 'K'] : [1, ''];
+      const shown = Math.round((a / size) * 10) / 10;
+      return (n < 0 && shown > 0 ? '-' : '') + plain.format(shown) + unit;
+    },
+  };
+  return indianCompact;
+}
+
 /** ₹85.7K, ₹1.2L, $4.5K: chart axes and tight spaces. */
-export const getCompactCurrencyFormatter = (code: CurrencyCode): Intl.NumberFormat => formatter(code, 'compact');
+export const getCompactCurrencyFormatter = (code: CurrencyCode): { format(n: number): string } =>
+  (code === 'INR' ? indianCompactFormatter() : formatter(code, 'compact'));
 
 /** The currencies the picker offers: those with a rate, popular first, then by name. */
 export function currencyChoices(rates: Record<string, number>): CurrencyCode[] {

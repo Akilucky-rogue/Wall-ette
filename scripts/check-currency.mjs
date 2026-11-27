@@ -43,6 +43,21 @@ const nb = s => s.replace(/ | /g, ' ');
 eq('INR: Indian grouping', nb(C.getCurrencyFormatter('INR').format(123456.78)), '₹1,23,456.78');
 eq('INR: whole', nb(C.getWholeCurrencyFormatter('INR').format(123456.78)), '₹1,23,457');
 eq('INR: compact lakh', nb(C.getCompactCurrencyFormatter('INR').format(185707)), '₹1.9L');
+eq('INR: compact under a thousand has no decimal', nb(C.getCompactCurrencyFormatter('INR').format(299)), '₹299');
+eq('INR: compact zero', nb(C.getCompactCurrencyFormatter('INR').format(0)), '₹0');
+eq('INR: compact round thousands', nb(C.getCompactCurrencyFormatter('INR').format(2000)), '₹2K');
+{
+  // Indian units written out, the same in every WebView (older locale data says ₹2.5T).
+  const f = C.getCompactCurrencyFormatter('INR');
+  eq('INR: compact thousands are K', f.format(2529), '₹2.5K');
+  eq('INR: compact keeps one decimal', [f.format(85707), f.format(299.5), f.format(999.94)], ['₹85.7K', '₹299.5', '₹999.9']);
+  eq('INR: compact crore', f.format(12345678), '₹1.2Cr');
+  eq('INR: compact rounds up into the next unit like Intl', [f.format(999.96), f.format(99960), f.format(9996000)], ['₹1K', '₹1L', '₹1Cr']);
+  eq('INR: compact stays in its unit just below', [f.format(99940), f.format(9994000)], ['₹99.9K', '₹99.9L']);
+  eq('INR: compact negatives', [f.format(-2529), f.format(-0.04)], ['-₹2.5K', '₹0']);
+  eq('INR: compact matches the screens\' minus handling', nb(f.format(-185707)), '-₹1.9L');
+}
+eq('USD: compact keeps one decimal when there is one', nb(C.getCompactCurrencyFormatter('USD').format(4500)), '$4.5K');
 eq('USD: English grouping', nb(C.getCurrencyFormatter('USD').format(1234.5)), '$1,234.50');
 eq('EUR: symbol first in English', nb(C.getCurrencyFormatter('EUR').format(1234.5)), '€1,234.50');
 eq('JPY: no decimals', nb(C.getCurrencyFormatter('JPY').format(1234.5)), '¥1,235');

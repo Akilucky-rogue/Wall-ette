@@ -16,7 +16,7 @@ type LegalDocument = {
 };
 
 const operator =
-  "Wall·ette is built and run by Akshat Vora, an independent developer in Mumbai (“we”, “us”), and backed by SERNET. SERNET is not a party to these policies and has no access to your account or your financial records.";
+  "Wall·ette is built and run by Akshat Vora, an independent developer in Mumbai (“we”, “us”), and backed by SERNET. SERNET is not a party to these policies and has no access to your account or your financial records. Being backed by SERNET doesn’t mean your data goes to SERNET or to any of its other services: nothing is shared with them, and using Wall·ette doesn’t sign you up for anything they offer.";
 
 const scope =
   "Wall·ette is a money-tracking and budgeting tool. It helps you organise your recorded transactions and manage your own budgets. It is not a bank, a SEBI-registered investment adviser or a research analyst. It does not provide financial, tax, legal or investment advice, hold deposits or guarantee financial outcomes.";
@@ -25,7 +25,7 @@ const freeNow =
   "Wall·ette is free to use today. Paid plans, Essential and Plus, are planned; until they start, nothing is charged and no card is asked for. Before any plan starts we will tell you its price and terms, and nothing will be charged without your agreement.";
 
 const pricing =
-  "When paid plans start: Essential will cost ₹49 per month or ₹449 per year, and Plus ₹99 per month or ₹899 per year. New members will get their first 30 days at ₹0, with card or UPI/bank payment details required to start; the first charge comes on day 31 at the full price of the chosen plan and billing period, and cancelling before then costs nothing. Plans will renew automatically until cancelled. Essential can move up to Plus at any time; Plus can move down to Essential after the first year. Switching between monthly and yearly billing mid-term applies at once, with the price difference charged. After moving down, nothing is deleted: extra accounts and older history become read-only. Records are kept when a subscription ends and are deleted only when you delete them or ask us to; export and deletion stay available on every plan. In the Android app, purchases will go through Google Play, whose payment and refund terms apply as well.";
+  "When paid plans start: Essential will cost ₹49 per month or ₹449 per year, and Plus ₹99 per month or ₹899 per year. New members will get their first 30 days at ₹0, with card or UPI/bank payment details required to start; the first charge comes on day 31 at the full price of the chosen plan and billing period, and cancelling before then costs nothing. Plans will renew automatically until cancelled. Essential can move up to Plus at any time, straight away, paying the price difference for the rest of the current period; Plus can move down to Essential after the first year, from the next renewal. Moving from monthly to yearly billing starts straight away, at the yearly price less the unused part of the month; moving from yearly to monthly starts when the paid year ends. Cancelling stops the next renewal and keeps access until the paid period ends. After moving down, nothing is deleted: extra accounts and older history become read-only. Records are kept when a subscription ends and are deleted only when you delete them or ask us to; export and deletion stay available on every plan. In the Android app, purchases will go through Google Play, whose payment and refund terms apply as well.";
 
 const decisions =
   "You remain responsible for checking source records and for your spending, payment, borrowing, tax and investment decisions. To the extent permitted by applicable law, we accept no liability for decisions you make in reliance on the tool. Nothing here excludes liability or consumer remedies that cannot lawfully be excluded.";
@@ -35,7 +35,7 @@ const documents = {
     path: "/privacy",
     title: "Privacy policy",
     description:
-      "What Wall·ette keeps, where it’s stored, what is read only on your device, and how to see, export or delete your data.",
+      "What Wall·ette keeps, where it’s stored, what is processed only on your device, who can see it, and how to see, export or delete your data.",
     sections: [
       {
         id: "who-we-are",
@@ -48,11 +48,21 @@ const documents = {
       },
       {
         id: "statement-reading",
-        title: "Statements are read on your device",
+        title: "Statements are processed on your device",
         paragraphs: [
-          "Statement files (PDF or Excel) are read entirely on your phone or computer. The file itself is never uploaded to any server. A password you type to open a protected PDF is used only to open that file and is never saved. We never need your internet-banking password, PIN, CVV or OTP; never send these to anyone, including us.",
+          "Statement files (PDF or Excel) are processed entirely on your device, in the app or your browser. The file itself is never uploaded to any server. A password you type to open a protected PDF is used only to open that file and is never saved. We never need your internet-banking password, PIN, CVV or OTP; never send these to anyone, including us.",
           "What is saved from an import is the transactions you choose to keep: date, amount, the bank’s description of each payment, category and notes. To tell your bank accounts apart and keep each one’s balance right, Wall·ette also keeps each account’s opening balance, the bank’s name and the last four digits of the account number, never the full number. Each import leaves a record of the statement’s bank, period, how many rows were added or skipped, and the balance check.",
           "Bank descriptions can contain the names of people and businesses you paid. Import only statements you are entitled to use. If you send a statement or screenshot to us by email, that copy leaves your device; cover account numbers and anything unrelated first.",
+        ],
+      },
+      {
+        id: "payments-from-apps",
+        title: "Payments from your apps (Android)",
+        paragraphs: [
+          "From version 1.6.0, the Android app can add payments for you from the notifications that payment and bank apps show. It is off until you turn it on in Self → Your data → Payments from your apps, after a screen that explains it, and Android then asks you to allow notification access for Wall·ette.",
+          "Once on, Android shows Wall·ette every notification, but it keeps only those from Google Pay, PhonePe, Paytm, BHIM and the banks’ apps listed in that screen, and only ones that show an amount. Every other notification is dropped at once, unread, including your messages, chats, emails and one-time passwords. It never reads SMS.",
+          "What it keeps (the app, the notification’s title and text, and when it arrived) stays in the app’s private storage on your phone until Wall·ette next opens, when it is processed on your device and deleted. From each payment it keeps the amount, the day and time, who it was with, the payment reference and the last digits of an account, and adds that entry to your wallet like one you type; payments it isn’t sure about wait on your phone for you to add or dismiss. Each entry is marked with the app it came from. A statement you import later takes that entry’s place.",
+          "Turn it off in the same screen, or remove Wall·ette’s notification access in Android’s settings; signing out turns it off too. Text you share to Wall·ette from another app (Share → Wall·ette) is processed on your device the same way, and only when you share it.",
         ],
       },
       {
@@ -64,6 +74,7 @@ const documents = {
           "Your settings: currency, daily limit, budgets, savings goal, alerts, and which payees count as spending. Security log (Android app): the time and method (password or biometric) of each unlock, kept in your account so you can see who opened your wallet.",
           "Crash reports (Android app): when the app crashes or hits an error, it sends what went wrong (the error, with email addresses, IDs and numbers removed), where in the app’s code it happened, the screens opened just before, the app version, device details such as model, Android version and free memory, and a random ID for this installation. Reports never include your transactions, statements, balances, payee names or account details, and aren’t linked to your account. Turn them off in Self → Your data.",
           "This website: what you send in the contact form (name, email, topic and message), and, if you subscribe to the Monthly Check-in, your email address and where you signed up. Website forms are optional.",
+          "Marketing email only with your separate consent: creating an account never subscribes you to anything. The Monthly Check-in has its own form and its own box, unticked until you tick it, and every issue lets you unsubscribe.",
           "We do not collect your contacts, location, advertising identifiers or analytics profiles, and there is no advertising in Wall·ette.",
         ],
       },
@@ -72,7 +83,7 @@ const documents = {
         title: "Why we use it",
         paragraphs: [
           "To run your account, save your entries and keep them the same on every device, keep your account secure, fix crashes, answer your messages and, if you asked for it, send the newsletter. We do not sell your data, use it for advertising or send it to any AI service.",
-          "Insights are worked out on your device: spending and income analysis, recurring payments, budgets and Left to spend are computed from your own data where you use the app. Phone notifications, if you switch them on, are made on your phone too; nothing is sent to us to make them.",
+          "Insights are processed on your device: spending and income analysis, recurring payments, budgets and Left to spend are computed from your own data where you use the app. Phone notifications, if you switch them on, are made on your phone too; nothing is sent to us to make them.",
           "Where we rely on your consent, such as the newsletter or crash reports, you can withdraw it at any time: unsubscribe from the email, turn crash reports off, or delete your account. Withdrawing doesn’t undo processing that was lawful before.",
         ],
       },
@@ -80,8 +91,9 @@ const documents = {
         id: "processors-and-disclosures",
         title: "Services we use",
         paragraphs: [
-          "Google Firebase stores your account and transaction data (Firestore and Authentication) and hosts this website, as our data processor. Firebase Crashlytics receives the crash reports described above and deletes them after 90 days.",
-          "The app fetches public currency exchange rates from exchangerate-api.com; that request carries no personal or financial information. The app and this website load fonts from Google Fonts, which sees the usual web-request details such as your IP address. On Android, the app asks Google Play whether a newer version is available; Google Play receives the app version and device details for that, as it does when it updates apps.",
+          "Google, through Firebase, is our data processor: Firebase Authentication runs sign-in, including Sign in with Google; Cloud Firestore stores your wallet (entries, settings, security log) and what you send through this website’s forms; Firebase Hosting serves this website and the web app; and Firebase Crashlytics receives the crash reports described above and deletes them after 90 days.",
+          "Google Play distributes the Android app and, on Android, says whether a newer version is available; it receives the app version and device details for that, as it does when it updates apps. When paid plans start, purchases in the Android app go through Google Play’s billing.",
+          "The app fetches public currency exchange rates from exchangerate-api.com; that request carries no personal or financial information. The app and this website load fonts from Google Fonts, which sees the usual web-request details such as your IP address. Email you send us is handled by Google (Gmail).",
           "We share data only with these providers, for these purposes, or where the law requires it. Google’s servers may be outside India; any transfer follows Indian law. Ask us for details of the providers handling your data.",
         ],
       },
@@ -89,18 +101,28 @@ const documents = {
         id: "how-we-protect",
         title: "How we keep your data private",
         paragraphs: [
-          "Your data is encrypted in transit and at rest. Database rules let only your signed-in account read or write your data: not other users, and not SERNET. Two-step sign-in and, on Android, a biometric or password lock add protection, and the Android app keeps your wallet out of device backups and hides its screen from screenshots and the app switcher.",
+          "Your data is encrypted in transit and at rest by Google’s systems. It is not end-to-end encrypted: our database can read it, so that the app can show it to you on every device you sign in on. Database rules let only your signed-in account read or write your data through the app or website: other users can’t, and SERNET can’t. Two-step sign-in and, on Android, a biometric or password lock add protection, and the Android app keeps your wallet out of device backups and hides its screen from screenshots and the app switcher.",
           "No system can be guaranteed completely secure. Use a device you trust, keep your password to yourself, and tell us at once if you suspect someone else has used your account. If a breach affects your personal data, we will tell you and the authorities as the law requires.",
+        ],
+      },
+      {
+        id: "who-can-see",
+        title: "Who can see your data",
+        paragraphs: [
+          "Database rules keep accounts apart, but they don’t stop the people who run the service. Akshat Vora, who runs Wall·ette, is the administrator of the Firebase project that holds your data and so can technically open it. No one else at Wall·ette has that access, and SERNET has none.",
+          "He doesn’t look at your entries or account data except: when you ask for help with a problem and agree that he may look at what’s needed to fix it, only that and only for that; to keep the service secure and working, where that can’t be done without it; or when the law requires it, such as a lawful request from an authority. Google, as our processor, runs the systems under its own security and access commitments.",
         ],
       },
       {
         id: "delete",
         title: "Keeping and deleting your data",
         paragraphs: [
-          "Your data is kept for as long as your account exists. To delete everything yourself: in the app open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are erased at once, from our servers and from that device. To remove only transactions, use Vault → Clear all history.",
+          "Your data is kept for as long as your account exists. To delete everything yourself: in the app open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are removed at once from our live database and from that device. To remove only transactions, use Vault → Clear all history.",
           "If you can no longer use the app, email us from your registered address with the subject “Data deletion request” and we will delete everything within 30 days. See the data-deletion page for details.",
           "Each device keeps an offline copy of your wallet so the app works without a connection. Signing out (once your changes have synced), deleting your account or uninstalling the app removes it from that device.",
-          "Contact messages are kept while we need them to answer you. Newsletter addresses are kept until you unsubscribe. Crash reports are deleted after 90 days. Google, which runs our database, removes deleted data from its own systems on its usual schedule.",
+          "Contact messages are kept while we need them to answer you. Newsletter addresses are kept until you unsubscribe. Crash reports are deleted after 90 days.",
+          "Deleted data doesn’t vanish from every copy at the same moment. Google, which runs our database, then removes it from its active systems and backups on its own deletion timeline, which it states takes no more than about six months; until then those copies can’t be opened in Wall·ette.",
+          "Records are never deleted because a plan ends, lapses or moves down. Only you delete them, or we do when you ask us to.",
         ],
       },
       {
@@ -288,7 +310,7 @@ const documents = {
         title: "Calculators and statements stay local",
         paragraphs: [
           "The website’s calculators work in your browser. What you type into them is not sent anywhere or saved.",
-          "Statements you import are read in your browser or on your phone. Only the transactions you choose to keep are saved to your account; see the privacy policy.",
+          "Statements you import are processed on your device. Only the transactions you choose to keep are saved to your account; see the privacy policy.",
         ],
       },
       {
@@ -363,7 +385,7 @@ const documents = {
         id: "in-the-app",
         title: "Delete it yourself, in the app",
         paragraphs: [
-          "Open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are erased at once, from our servers and from that device.",
+          "Open Self → Account and security → Delete account and all data, type DELETE and enter your password (or confirm with Google, if you sign in with Google). Your transactions, settings, security log and account are removed at once from our live database and from that device.",
           "Want a copy first? Data Studio → Export → Full backup saves everything as a file you keep. To remove only transactions and keep the account, use Vault → Clear all history.",
         ],
       },
@@ -379,7 +401,7 @@ const documents = {
         id: "verification-and-timing",
         title: "How long it takes",
         paragraphs: [
-          "Deleting in the app takes effect at once. Email requests are acknowledged within 48 hours and completed within 30 days of confirming the account is yours; we will tell you when it’s done.",
+          "Deleting in the app takes effect in our live database at once. Email requests are acknowledged within 48 hours and completed within 30 days of confirming the account is yours; we will tell you when it’s done.",
         ],
       },
       {
@@ -394,7 +416,7 @@ const documents = {
         id: "exceptions-and-backups",
         title: "After deletion",
         paragraphs: [
-          "Deletion can’t be undone. Crash reports, which aren’t linked to your account, expire after 90 days. Google, which runs our database, removes deleted data from its own systems on its usual schedule. Uninstalling the app or clearing your browser alone does not delete your account.",
+          "Deletion can’t be undone. Crash reports, which aren’t linked to your account, expire after 90 days. Google, which runs our database, then removes deleted data from its active systems and backups on its own deletion timeline, which it states takes no more than about six months; until then those copies can’t be opened in Wall·ette. Uninstalling the app or clearing your browser alone does not delete your account.",
         ],
       },
       {

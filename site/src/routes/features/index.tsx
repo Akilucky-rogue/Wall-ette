@@ -226,7 +226,7 @@ function Extras() {
         {EXTRAS.map((e, i) => <Reveal key={e.title} delay={i * 50} className="flex gap-4 py-2"><span className="grid size-12 shrink-0 place-items-center rounded-full bg-accent text-forest" style={{ rotate: `${i % 2 ? 5 : -5}deg` }}><e.icon className="size-5" aria-hidden /></span><div className="min-w-0"><p className="flex flex-wrap items-center gap-2 font-semibold">{e.title}<span className={e.plan === "Plus" ? "rounded-full bg-sand px-2 py-0.5 text-xs" : "rounded-full bg-accent px-2 py-0.5 text-xs text-forest"}>{e.plan === "Plus" ? "Plus" : "Both plans"}</span></p><p className="mt-1 text-sm text-muted-foreground">{e.body}</p></div></Reveal>)}
       </div>
       <Reveal className="mt-12 grid gap-4 rounded-3xl bg-accent p-6 text-sm sm:grid-cols-3 sm:p-8">
-        <p className="flex items-start gap-3"><Lock className="mt-0.5 size-5 shrink-0 text-forest" /> Statements are read on your device; no bank login needed.</p>
+        <p className="flex items-start gap-3"><Lock className="mt-0.5 size-5 shrink-0 text-forest" /> Statements are processed on your device; no bank login needed.</p>
         <p className="flex items-start gap-3"><Landmark className="mt-0.5 size-5 shrink-0 text-forest" /> Built for Indian bank statements and rupee figures.</p>
         <p className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-forest" /> A tracking tool — not investment or financial advice.</p>
       </Reveal>

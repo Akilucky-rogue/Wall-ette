@@ -9,7 +9,7 @@ import { CtaBand } from "@/components/site/CtaBand";
 import { COMPANY } from "@/lib/site";
 import { useState } from "react";
 import { inr } from "@/lib/money";
-import { PLAN_CHANGE_FAQ, PLANS } from "@/lib/plans";
+import { PLAN_CHANGE_FAQ, PLAN_TERMS_AT_A_GLANCE, PLANS } from "@/lib/plans";
 
 const PATH = "/pricing";
 const FAQ = [{"q": "What happens after the first 30 days?", "a": "Both plans start at ₹0 for 30 days, with card or bank details required. Day 31 is the first charge: Essential ₹49 monthly or ₹449 yearly; Plus ₹99 monthly or ₹899 yearly, according to the billing option you choose."}, {"q": "How much do I save with yearly billing?", "a": "Essential costs ₹449/year rather than ₹588 for twelve monthly payments, saving ₹139 (23.64%, rounded to 24%). Plus costs ₹899/year rather than ₹1,188, saving ₹289 (24.33%, rounded to 24%). The approximate monthly equivalents are ₹37 and ₹75; the yearly amount is charged as one payment."}, {"q": "What extra features does Plus include?", "a": "Essential includes statement imports, Vault/Pulse, categories, transfers and Left to spend, with 1 bank account and 12 months of history. Plus includes everything in Essential plus unlimited bank accounts, full history, Money flow/Rewind, recurring/subscription tracking and priority support/bank requests. Accuracy checks, privacy, no ads and data export/deletion are identical on both plans."}, {"q": "Which payment methods are supported?", "a": "UPI, cards and netbanking are planned payment methods. This marketing page is not an active checkout, and does not confirm that a specific method is currently available."}, {"q": "Will I get a reminder before the first charge?", "a": "The planned trial policy includes a Day 25 reminder before the Day 31 first charge. Reminder delivery is not implemented by this marketing page; confirm the final terms during signup."}, ...PLAN_CHANGE_FAQ];
@@ -76,11 +76,18 @@ function Page() {
         <p className="mt-5 text-xs opacity-70">Card or bank details required. Accuracy checks, privacy, no ads and data export/deletion are identical on both plans.</p>
         <div className="mt-6">{plus ? <Button asChild variant="ghostIvory" size="xl"><Link to="/signup">Start Plus signup</Link></Button> : <Start label="Start Essential signup" />}</div>
         </div>
-      </Reveal>; })}</div><p className="mt-10 text-sm text-muted-foreground">Yearly equivalents are rounded, not monthly charges. Essential saves 23.64%; Plus saves 24.33%, each rounded to 24% versus 12 monthly payments.</p><p className="mt-2 text-sm text-muted-foreground">Upgrade to Plus anytime; move down to Essential after your first year. The free month is for new members only — a paused or stopped plan restarts as a paid month one.</p></div></section>
+      </Reveal>; })}</div><p className="mt-10 text-sm text-muted-foreground">Yearly equivalents are rounded, not monthly charges. Essential saves 23.64%; Plus saves 24.33%, each rounded to 24% versus 12 monthly payments.</p><p className="mt-2 text-sm text-muted-foreground">Move up to Plus at any time; move down to Essential after your first year, from your next renewal. The free month is for new members only — a paused or stopped plan restarts as a paid month one.</p></div></section>
     <section className="section-fit container-site relative py-16">
       <Doodle kind="arrow" className="right-[20%] top-10 hidden size-14 text-forest/40 lg:block" />
       <h2 className="text-section">Compare Essential and <Mark>Plus</Mark></h2><p className="mt-4 max-w-3xl text-muted-foreground">Choose by account count, history and planning tools — not by security or accuracy. Both plans have identical accuracy checks, privacy protections, no ads and data export/deletion.</p>
       <div className="mt-12 overflow-x-auto pt-4"><table className="w-full border-separate text-sm sm:text-base border-spacing-0 text-left"><caption className="sr-only">Essential and Plus plan comparison</caption><thead><tr><th scope="col" className="p-4 text-muted-foreground">Capability</th><th scope="col" className="p-4 text-center">Essential</th><th scope="col" className="relative rounded-t-[1.75rem] bg-forest-gradient p-4 text-center text-on-forest">Plus</th></tr></thead><tbody>{CAPABILITIES.map((item, i) => <tr key={item.name}><th scope="row" className={`rounded-l-2xl p-4 font-medium ${i % 2 === 0 ? "bg-card" : ""}`}>{item.name}</th><td className={`p-4 text-center text-muted-foreground ${i % 2 === 0 ? "bg-card" : ""}`}>{item.essential}</td><td className={`bg-forest-gradient p-4 text-center font-semibold text-on-forest ${i === CAPABILITIES.length - 1 ? "rounded-b-[1.75rem]" : ""}`}>{item.plus}</td></tr>)}</tbody></table></div>
+    </section>
+    <section className="container-site pb-16" aria-labelledby="plan-terms-title">
+      <h2 id="plan-terms-title" className="text-section">How plans <Mark>work</Mark></h2>
+      <p className="mt-4 max-w-3xl text-muted-foreground">Everything about trials, charges and changing plans, before you choose. The terms of service say the same.</p>
+      <dl className="mt-10 grid gap-4 md:grid-cols-2">
+        {PLAN_TERMS_AT_A_GLANCE.map(item => <div key={item.term} className="rounded-[1.5rem_1rem_1.5rem_1rem] border border-border bg-card p-5 shadow-soft"><dt className="font-display text-lg font-semibold text-foreground">{item.term}</dt><dd className="mt-2 text-muted-foreground">{item.text}</dd></div>)}
+      </dl>
     </section>
     <section className="edge edge-scallop relative z-[3] overflow-hidden tint-sand py-16">
       <Shape kind="cloud" tone="--shape-sun" className="-right-20 -top-10 size-64 opacity-50" />

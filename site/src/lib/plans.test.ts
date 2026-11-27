@@ -41,3 +41,21 @@ describe("operator and billing rules", () => {
     expect(CO.grievanceOfficer).toBe("Akshat Vora");
   });
 });
+
+import { PLAN_TERMS_AT_A_GLANCE, PLAN_RULES as RULES3, SUBSCRIPTION_TERMS } from "./plans";
+describe("plan terms shown before choosing", () => {
+  it("covers trial, payment details, first charge, renewal, plan and cycle changes, moving down and records", () => {
+    expect(PLAN_TERMS_AT_A_GLANCE.map(t => t.term)).toEqual([
+      "Trial", "Payment details", "First charge", "Renewal and cancelling", "Essential and Plus", "Monthly and yearly", "After moving down", "Your records",
+    ]);
+  });
+  it("moves down at the next renewal and never deletes records when a plan ends", () => {
+    expect(RULES3.moveDownAtRenewal).toBe(true);
+    expect(RULES3.recordsKeptAfterPlanEnds).toBe(true);
+    expect(SUBSCRIPTION_TERMS.records).toMatch(/deleted only when you delete them yourself/);
+  });
+  it("says what each direction of a billing change does", () => {
+    expect(SUBSCRIPTION_TERMS.cycleSwitch).toMatch(/Monthly to yearly starts straight away/);
+    expect(SUBSCRIPTION_TERMS.cycleSwitch).toMatch(/Yearly to monthly starts when your paid year ends/);
+  });
+});

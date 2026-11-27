@@ -114,8 +114,8 @@ function Introduction() {
 
 function Steps() {
   const steps = [
-    { tint: "tint-sage", shape: "pebble", tone: "--sage-soft", t: "Upload your statement", b: "PDF or Excel from your bank's app. Password-locked PDFs are fine.", ex: <div className="flex items-center gap-2"><FileCheck2 className="size-5 text-forest" /><span className="font-semibold">HDFC_Nov.pdf</span><span className="ml-auto rounded-full bg-sage/30 px-2 text-xs">PDF · CSV</span></div> },
-    { tint: "tint-sand", shape: "cloud", tone: "--shape-sun", t: "We sort it for you", b: "Read on your device and checked against your balance before anything is saved.", ex: <div><p className="text-xs text-muted-foreground line-through">UPI/SWIGGY8812/OK</p><p className="flex justify-between font-semibold"><span>Swiggy · Food</span><span>{inr(486)}</span></p></div> },
+    { tint: "tint-sage", shape: "pebble", tone: "--sage-soft", t: "Choose your statement", b: "PDF or Excel from your bank's app. Password-locked PDFs are fine.", ex: <div className="flex items-center gap-2"><FileCheck2 className="size-5 text-forest" /><span className="font-semibold">HDFC_Nov.pdf</span><span className="ml-auto rounded-full bg-sage/30 px-2 text-xs">PDF · CSV</span></div> },
+    { tint: "tint-sand", shape: "cloud", tone: "--shape-sun", t: "We sort it for you", b: "Processed on your device and checked against your balance before anything is saved.", ex: <div><p className="text-xs text-muted-foreground line-through">UPI/SWIGGY8812/OK</p><p className="flex justify-between font-semibold"><span>Swiggy · Food</span><span>{inr(486)}</span></p></div> },
     { tint: "tint-peach", shape: "arch", tone: "--shape-clay", t: "See where it went", b: "Mark your own accounts once, and every total counts only real spending.", ex: <div><p className="text-xs text-muted-foreground">Left before payday</p><p className="font-display text-xl font-bold text-forest">{inr(21384)}</p></div> },
   ] as const;
   return (

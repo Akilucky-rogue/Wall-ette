@@ -426,14 +426,22 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions.filter(t => !isCaptured(t)));
       const standsFor = capturedRows(mappedTransactions.filter(t => !foundDuplicates.has(t.id)), existingTransactions);
       setReplacing(standsFor);
+      // A row that takes an app entry's place keeps the category and note it
+      // was given from here on: the review shows them, and a change made in
+      // the review is the one that's saved.
+      const stored = new Map(storedTransactions.map(t => [t.id, t]));
+      const staged = mappedTransactions.map(t => {
+          const entry = stored.get(standsFor.get(t.id) ?? '');
+          return entry ? carryOver(t, entry) : t;
+      });
 
-      log.debug(`Import staged: ${mappedTransactions.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
+      log.debug(`Import staged: ${staged.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
 
       setParserUsed(parserLabel);
       setDuplicateIds(foundDuplicates);
-      setExtractedData(mappedTransactions);
+      setExtractedData(staged);
       // Select all EXCEPT duplicates by default
-      setSelectedIds(new Set(mappedTransactions.filter(t => !foundDuplicates.has(t.id)).map(t => t.id)));
+      setSelectedIds(new Set(staged.filter(t => !foundDuplicates.has(t.id)).map(t => t.id)));
       setShowDuplicateInfo(foundDuplicates.size > 0);
       setReviewStep('balance');
       setStage('REVIEW');
@@ -609,12 +617,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   };
 
   const confirmImport = () => {
-      // A row that takes an app entry's place keeps the category and note it was given.
-      const byId = new Map(storedTransactions.map(t => [t.id, t]));
-      const toImport = extractedData.filter(t => selectedIds.has(t.id)).map(t => {
-          const entry = byId.get(replacing.get(t.id) ?? '');
-          return entry ? carryOver(t, entry) : t;
-      });
+      // Rows that take an app entry's place got its category and note when
+      // staged (stageForReview); what the review shows is what's saved.
+      const toImport = extractedData.filter(t => selectedIds.has(t.id));
       if (!reviewSummary || (toImport.length === 0 && !canUpdate)) return;
 
       // One adjustment entry that stands in for a missing statement window,

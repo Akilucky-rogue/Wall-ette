@@ -28,6 +28,12 @@ const config: CapacitorConfig = {
       providers: { google: true, facebook: false, apple: false, twitter: false },
       logLevel: 1,
     },
+    // Google Play billing (services/billing.ts): only Wall-ette's server
+    // acknowledges a purchase, after checking it with Google Play, so the
+    // plugin never does it on its own.
+    NativePurchases: {
+      autoFinishTransactions: false,
+    },
   },
 };
 

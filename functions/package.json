@@ -1,7 +1,7 @@
 {
   "name": "wallette-functions",
   "private": true,
-  "description": "Server side of Wall-ette Premium: checks Google Play purchases and keeps entitlements/{uid}.",
+  "description": "Server side of Wall-ette's paid plans (Essential and Plus) and Spread: checks Google Play purchases and keeps entitlements/{uid}.",
   "type": "module",
   "main": "lib/index.js",
   "engines": { "node": "22" },

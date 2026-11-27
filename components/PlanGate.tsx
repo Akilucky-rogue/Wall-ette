@@ -3,8 +3,11 @@ import { AppScreen } from '../types';
 import { usePlan } from '../services/plan';
 import { canAdd, opens, type PlusFeature } from '../services/planRules';
 import PlanLock, { type LockReason } from './PlanLock';
+import PageHeader from './ui/PageHeader';
 
 const REASON: Partial<Record<PlusFeature, LockReason>> = { rewind: 'rewind', recurring: 'recurring', 'flow-story': 'flow-story' };
+/** Where Back goes, as the other pages name it. */
+const BACK_LABEL: Partial<Record<AppScreen, string>> = { [AppScreen.ANALYSIS]: 'Back to Pulse', [AppScreen.DASHBOARD]: 'Back to Home' };
 
 /**
  * A page that needs Plus (`feature`) or any plan (`adds`: new entries and
@@ -24,16 +27,7 @@ const PlanGate: React.FC<{
   const reason: LockReason = feature ? REASON[feature] ?? 'rewind' : adds ?? 'add';
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto pb-32 lg:pb-12 bg-zen-bg">
-      <div className="flex items-center gap-2 px-5 pt-6 pb-3">
-        <button
-          onClick={() => onNavigate(back)}
-          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
-          aria-label="Back"
-        >
-          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
-        </button>
-        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">{title}</h2>
-      </div>
+      <PageHeader title={title} onBack={() => onNavigate(back)} backLabel={BACK_LABEL[back] ?? 'Back'} />
       <div className="px-6 pt-2">
         <PlanLock reason={reason} />
       </div>

@@ -28,6 +28,7 @@ const SpendAnalysis = React.lazy(() => import('./components/SpendAnalysis'));
 const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
+const BankAccounts = React.lazy(() => import('./components/BankAccounts'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
@@ -63,6 +64,7 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   // Money moved opens from Home, Pulse, Category split, the Vault and Your
   // data; Back returns to whichever it came from (AppContent's backOf).
   [AppScreen.MONEY_MOVED]: AppScreen.SELF_DATA,
+  [AppScreen.BANK_ACCOUNTS]: AppScreen.SELF_DATA,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
   [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
 };
@@ -364,6 +366,8 @@ function AppContent() {
         return <CategorySplit onNavigate={handleNavigate} />;
       case AppScreen.MONEY_MOVED:
         return <MoneyMoved onNavigate={handleNavigate} backTo={movedFromRef.current} />;
+      case AppScreen.BANK_ACCOUNTS:
+        return <BankAccounts onNavigate={handleNavigate} />;
       case AppScreen.IMPORT:
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:

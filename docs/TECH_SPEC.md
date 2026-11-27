@@ -389,6 +389,14 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   the Firestore emulator: the rules, whole-entry saves, two devices, the move to the paisa) and
   in Chrome against the emulators: a 2,700-entry wallet moved and shown in about 2 s, then on a
   new device in 0.3 s (3.1 s before), or 0.9 s (10.7 s before) at a quarter of the CPU.
+- **Bank accounts** (1.6.0, `components/BankAccounts.tsx`, Self → Your data) — each account
+  Wall-ette has read a statement from (`accounts` in settings, from 1.5.9) with its balance:
+  its opening balance plus its entries (`services/accounts.ts` `accountSummaries`). Rows
+  imported before 1.5.9 count in the account that took over the opening balance from then,
+  from that balance's day; entries typed in, and rows from statements that don't show their
+  number, are "Other entries". Together they make the balance on Home. Tapping one opens
+  Vault filtered to it (`utils/vaultAccount.ts`); Vault's filters offer every account once
+  entries are in more than one place. Checked by `check-accounts`.
 - **Vault's list** (1.5.9) — draws 100 entries, then 100 more per "Show 100 more"; a new
   search, filter or order starts again from 100. The count, the totals and the CSV export cover
   every match. A wallet of thousands drawn at once was slow to open and to scroll.

@@ -81,6 +81,7 @@ export enum AppScreen {
   INCOME_INSIGHTS = 'INCOME_INSIGHTS', // Flow
   CATEGORY_SPLIT = 'CATEGORY_SPLIT',
   MONEY_MOVED = 'MONEY_MOVED', // payee rules: what counts as spending
+  BANK_ACCOUNTS = 'BANK_ACCOUNTS', // Self → Your data → Bank accounts
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
   REWIND = 'REWIND', // Time Machine + Wrapped

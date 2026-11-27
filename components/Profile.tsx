@@ -147,8 +147,9 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   const { user } = useAuth();
   const {
     dailyLimit, setDailyLimit, formatAmount, formatWhole, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
-    clearAllTransactions, currency, counted, budgets, shownRate, shownCurrency,
+    clearAllTransactions, currency, counted, budgets, shownRate, shownCurrency, accounts,
   } = useWallet();
+  const accountCount = Object.keys(accounts).length;
 
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -633,6 +634,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
               {chevron}
             </Row>
             <Row icon="description" iconCls="bg-blue-zen-light text-blue-zen" title="Export and reports" sub="Statements, CSV and a full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
+              {chevron}
+            </Row>
+            <Row icon="account_balance" iconCls="bg-sage-light text-sage" title="Bank accounts"
+                 sub={accountCount > 0 ? `${accountCount} ${accountCount === 1 ? 'account' : 'accounts'}, each with its balance` : 'Each account from your statements, with its balance'}
+                 onClick={() => onNavigate(AppScreen.BANK_ACCOUNTS)}>
               {chevron}
             </Row>
             <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money moved" sub="Your own accounts, family and investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>

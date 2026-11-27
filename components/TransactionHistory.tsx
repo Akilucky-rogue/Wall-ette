@@ -12,6 +12,8 @@ import DuplicateEntries from './DuplicateEntries';
 import WalletArriving from './WalletArriving';
 import { removed } from '../utils/haptics';
 import { useBackHandler } from '../utils/backStack';
+import { accountSummaries, entryAccount, legacyAccount } from '../services/accounts';
+import { takeVaultAccount } from '../utils/vaultAccount';
 
 // The list draws this many entries at a time, and the next lot on request:
 // thousands of rows at once made Vault slow to open and to scroll. The
@@ -30,7 +32,7 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline, accounts, unassignedOpening } = useWallet();
   // A saved amount as the edit box and the amount filter see it: as typed
   // when typed in the currency shown, else converted, to the decimals that
   // currency can hold.
@@ -47,6 +49,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const [showFilters, setShowFilters] = useState(false);
   const [dateFilter, setDateFilter] = useState<'ALL' | '7_DAYS' | '30_DAYS' | '90_DAYS' | 'THIS_MONTH'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  // One bank account's entries (services/accounts.ts), or 'ALL'.
+  const [accountFilter, setAccountFilter] = useState<string>('ALL');
+  // Opened from Bank accounts: just that account's entries.
+  React.useEffect(() => {
+    const key = takeVaultAccount();
+    if (key) setAccountFilter(key);
+  }, []);
+  // The accounts to filter by, once there's more than one place entries are.
+  const accountChoices = useMemo(() => {
+    const { accounts: list, other } = accountSummaries(transactions, accounts, unassignedOpening);
+    const all = other ? [...list, other] : list;
+    return all.length > 1 || accountFilter !== 'ALL' ? all : [];
+  }, [transactions, accounts, unassignedOpening, accountFilter]);
+  const legacy = useMemo(() => legacyAccount(accounts), [accounts]);
   const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
@@ -108,6 +124,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       // Category Filter
       if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
 
+      // Account Filter
+      if (accountFilter !== 'ALL' && entryAccount(t, legacy) !== accountFilter) return false;
+
       // Date Filter: this month, or the last N days counting today
       if (dateFilter === 'THIS_MONTH') {
         if (t.date.slice(0, 7) !== today.slice(0, 7)) return false;
@@ -129,7 +148,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     if (sortBy === 'AMOUNT_DESC') return filtered.sort((a, b) => b.amount - a.amount);
     if (sortBy === 'AMOUNT_ASC') return filtered.sort((a, b) => a.amount - b.amount);
     return filtered.sort(sortBy === 'DATE_ASC' ? (a, b) => byNewest(b, a) : byNewest);
-  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery, shownRate]);
+  }, [transactions, activeType, dateFilter, categoryFilter, accountFilter, legacy, sortBy, minAmount, maxAmount, searchQuery, shownRate]);
 
   // One group per day, newest first, with the day's net; sorted by amount,
   // one group in that order instead.
@@ -164,7 +183,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
 
   // How far down the list is drawn. A new search, filter or order starts
   // again from the first page.
-  const pageKey = [activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery].join('|');
+  const pageKey = [activeType, dateFilter, categoryFilter, accountFilter, sortBy, minAmount, maxAmount, searchQuery].join('|');
   const [paging, setPaging] = useState({ key: pageKey, count: PAGE });
   const shownCount = paging.key === pageKey ? paging.count : PAGE;
   const showMore = () => setPaging({ key: pageKey, count: shownCount + PAGE });
@@ -202,10 +221,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     let count = 0;
     if (dateFilter !== 'ALL') count++;
     if (categoryFilter !== 'ALL') count++;
+    if (accountFilter !== 'ALL') count++;
     if (minAmount || maxAmount) count++;
     if (sortBy !== 'DATE_DESC') count++;
     return count;
-  }, [dateFilter, categoryFilter, minAmount, maxAmount, sortBy]);
+  }, [dateFilter, categoryFilter, accountFilter, minAmount, maxAmount, sortBy]);
 
   // Debounce: update searchQuery 250ms after debouncedSearch changes
   React.useEffect(() => {
@@ -221,6 +241,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setActiveType('ALL');
     setDateFilter('ALL');
     setCategoryFilter('ALL');
+    setAccountFilter('ALL');
     setSortBy('DATE_DESC');
     setMinAmount('');
     setMaxAmount('');
@@ -459,6 +480,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 {categoryFilter}
               </span>
             )}
+            {accountFilter !== 'ALL' && (
+              <span className="px-2 py-1 bg-sage/10 text-sage text-[10px] font-medium rounded-full flex items-center gap-1 max-w-[180px] truncate">
+                <span className="material-symbols-outlined text-[12px]">account_balance</span>
+                {accountChoices.find(a => a.key === accountFilter)?.label ?? 'One account'}
+              </span>
+            )}
             {(minAmount || maxAmount) && (
               <span className="px-2 py-1 bg-ocean/10 text-ocean text-[10px] font-medium rounded-full flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">payments</span>
@@ -598,6 +625,34 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             </div>
                         </div>
                     </div>
+
+                    {/* Account */}
+                    {accountChoices.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="material-symbols-outlined text-sage text-[18px]">account_balance</span>
+                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Account</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {[{ key: 'ALL', label: 'All accounts', entries: transactions.length }, ...accountChoices].map(a => (
+                            <button
+                              key={a.key}
+                              onClick={() => setAccountFilter(a.key)}
+                              className={`px-3 py-2 rounded-2xl text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                                accountFilter === a.key
+                                  ? 'bg-sage text-white border-sage shadow-md'
+                                  : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-sage/30'
+                              }`}
+                            >
+                              <span>{a.label}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${accountFilter === a.key ? 'bg-white/20' : 'bg-black/5'}`}>
+                                {a.entries}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Category */}
                     <div>

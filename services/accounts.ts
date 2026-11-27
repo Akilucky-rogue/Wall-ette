@@ -7,8 +7,9 @@
  * An account is told apart by its bank and the last four digits of its
  * number, which is all Wall-ette keeps of the number.
  *
- * No imports, so the check scripts can run it in Node.
+ * No runtime imports, so the check scripts can run it in Node.
  */
+import type { Transaction } from '../types';
 
 export interface AccountAnchor {
   /** The bank, as the statement reader names it ("HDFC Bank"). */
@@ -75,4 +76,90 @@ export function asAccountAnchors(raw: unknown): Record<string, AccountAnchor> {
     out[key] = { bank: a.bank.trim(), last4: a.last4, opening: Math.round(a.opening * 100) / 100, asOf, ...(a.legacy === true ? { legacy: true } : {}) };
   }
   return out;
+}
+
+/** Entries no account claims: typed in, or from statements that don't show their number. */
+export const OTHER_ENTRIES = 'other';
+
+/** The account that took over the wallet's opening balance from before 1.5.9, if one did. */
+export const legacyAccount = (anchors: AccountAnchors): { key: string; asOf: string | null } | null => {
+  for (const [key, a] of Object.entries(anchors)) if (a.legacy) return { key, asOf: a.asOf };
+  return null;
+};
+
+type Entry = Pick<Transaction, 'amount' | 'type' | 'account' | 'createdAt' | 'date'>;
+
+/**
+ * The account an entry counts in on Bank accounts and in Vault's filter: its
+ * own (imported from 1.5.9); for a row imported before 1.5.9 (no account,
+ * not typed in), the account that took over the opening balance from then,
+ * from that balance's day on; otherwise OTHER_ENTRIES.
+ */
+export function entryAccount(t: Pick<Entry, 'account' | 'createdAt' | 'date'>, legacy: { key: string; asOf: string | null } | null): string {
+  if (t.account) return t.account;
+  if (!t.createdAt && legacy && (!legacy.asOf || t.date.slice(0, 10) >= legacy.asOf)) return legacy.key;
+  return OTHER_ENTRIES;
+}
+
+/** "hdfc-bank:1234" as "Hdfc Bank ••1234", for an account the settings don't name. */
+const labelOfKey = (key: string): string => {
+  const [bank = '', last4 = ''] = key.split(':');
+  const name = bank.split('-').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ') || 'Bank account';
+  return /^\d{4}$/.test(last4) ? `${name} ••${last4}` : name;
+};
+
+export interface AccountSummary {
+  /** accountKey, or OTHER_ENTRIES. */
+  key: string;
+  label: string;
+  /** Its opening balance plus every entry it holds, to the paisa. */
+  balance: number;
+  entries: number;
+  /** Its newest entry's day. */
+  latest: string | null;
+}
+
+/**
+ * Each account's balance and entries, busiest first, and what no account
+ * claims (with the opening balance from before 1.5.9 that no account took
+ * over). Together they make the wallet's balance, to the paisa.
+ */
+export function accountSummaries(
+  transactions: readonly Entry[],
+  anchors: AccountAnchors,
+  unassignedOpening: number,
+): { accounts: AccountSummary[]; other: AccountSummary | null; total: number } {
+  const legacy = legacyAccount(anchors);
+  const sums = new Map<string, { paise: number; entries: number; latest: string | null }>();
+  const at = (key: string) => {
+    let s = sums.get(key);
+    if (!s) { s = { paise: 0, entries: 0, latest: null }; sums.set(key, s); }
+    return s;
+  };
+  for (const [key, a] of Object.entries(anchors)) at(key).paise += Math.round(a.opening * 100);
+  at(OTHER_ENTRIES).paise += Math.round(unassignedOpening * 100);
+  for (const t of transactions) {
+    const s = at(entryAccount(t, legacy));
+    s.paise += (String(t.type) === 'INCOME' ? 1 : -1) * Math.round(t.amount * 100);
+    s.entries++;
+    const day = typeof t.date === 'string' ? t.date.slice(0, 10) : '';
+    if (day && (!s.latest || day > s.latest)) s.latest = day;
+  }
+  let total = 0;
+  const accounts: AccountSummary[] = [];
+  let other: AccountSummary | null = null;
+  for (const [key, s] of sums) {
+    total += s.paise;
+    const summary = {
+      key,
+      label: key === OTHER_ENTRIES ? 'Other entries' : anchors[key] ? accountLabel(anchors[key]) : labelOfKey(key),
+      balance: s.paise / 100,
+      entries: s.entries,
+      latest: s.latest,
+    };
+    if (key === OTHER_ENTRIES) { if (s.entries > 0 || s.paise !== 0) other = summary; }
+    else accounts.push(summary);
+  }
+  accounts.sort((a, b) => b.entries - a.entries || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+  return { accounts, other, total: total / 100 };
 }

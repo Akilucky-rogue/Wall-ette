@@ -165,7 +165,7 @@ As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
 - **Billing,** built (fd9df95 and the app commit): subscriptions `essential`
   and `plus`, base plans `essential-monthly`, `essential-yearly`,
   `plus-monthly`, `plus-yearly`, a `free-month` offer (30 days, new
-  customers) on each. Cloud Functions in asia-south1 check every purchase
+  customers) on each. Cloud Functions in us-central1 (beside the database, nam5) check every purchase
   with Google Play, follow its real-time notifications on the `play-billing`
   topic and keep `entitlements/{uid}`, which only they write. Play never
   reuses a product ID, so the products are created once, after the

@@ -52,7 +52,9 @@ import {
 
 const PACKAGE = 'com.wallette.app';
 
-setGlobalOptions({ region: 'asia-south1', maxInstances: 5 });
+// Next to the Firestore database (nam5), as Firebase advises: each call reads
+// and writes it several times. The app calls this region (services/billing.ts).
+setGlobalOptions({ region: 'us-central1', maxInstances: 5 });
 initializeApp();
 const db = getFirestore();
 

@@ -18,8 +18,11 @@ import {
   type Cycle, type Entitlement, type PlanId,
 } from './planRules';
 
-/** Where the functions run (functions/src/index.ts setGlobalOptions). */
-const REGION = 'asia-south1';
+/**
+ * Where the functions run (functions/src/index.ts setGlobalOptions): next to
+ * the Firestore database (nam5), as Firebase advises.
+ */
+const REGION = 'us-central1';
 
 /** Google Play Billing: Android builds only. The web app says how to subscribe instead. */
 export const billingSupported = (): boolean => Capacitor.getPlatform() === 'android';

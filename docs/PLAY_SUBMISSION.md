@@ -126,7 +126,7 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 1. The Blaze plan, which Cloud Functions and the scheduler need: **on already** (28 Nov 2026).
 2. Enable the Google Play Android Developer API, Cloud Pub/Sub, Cloud Scheduler and the APIs `firebase deploy` asks for.
 3. Pub/Sub topic `play-billing`; give `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it.
-4. `firebase deploy --only functions,firestore:rules,firestore:indexes` from the repo (functions in asia-south1).
+4. `firebase deploy --only functions,firestore:rules,firestore:indexes` from the repo (functions in us-central1, next to the database in nam5).
 5. Only for student checks by email: install the **Trigger Email from Firestore** extension on the `mail` collection with an email service, name that service in the privacy policy, then set `config/students` → `emailChecks: true` and `domains` (for example `["ac.in", "edu.in", "edu"]`).
 
 **Try it, then switch on:**

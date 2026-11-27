@@ -137,6 +137,7 @@ const TYPES = new Set<string>(Object.values(TransactionType));
 const PAYEE_KINDS = new Set<PayeeKind>(['mine', 'family', 'investment', 'ignore', 'counts', 'salary']);
 const CURRENCY = /^[A-Z]{3}$/;
 const ACCOUNT_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*:\d{4}$/;
+const VIA = /^[a-z][a-z0-9]{1,19}$/;
 /** Far above any real entry; guards against nonsense, not against big spenders. */
 const MAX_AMOUNT = 1e12;
 
@@ -167,6 +168,8 @@ export function asEntry(raw: unknown): Transaction | null {
   if (createdAt !== undefined) entry.createdAt = createdAt;
   // The account it was imported from: an account key ("hdfc-bank:1234").
   if (typeof raw.account === 'string' && ACCOUNT_KEY.test(raw.account)) entry.account = raw.account;
+  // The app it was read from ("gpay"), or "share" (from 1.6.0).
+  if (typeof raw.via === 'string' && VIA.test(raw.via)) entry.via = raw.via;
 
   const { typedAmount, typedCurrency } = raw;
   if (typedAmount !== undefined || typedCurrency !== undefined) {

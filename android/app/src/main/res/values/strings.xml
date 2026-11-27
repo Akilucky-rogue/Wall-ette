@@ -4,4 +4,6 @@
     <string name="title_activity_main">Wall-ette</string>
     <string name="package_name">com.wallette.app</string>
     <string name="custom_url_scheme">com.wallette.app</string>
+    <string name="share_label">Add to Wall-ette</string>
+    <string name="payment_alerts_label">Wall-ette: payments from your apps</string>
 </resources>

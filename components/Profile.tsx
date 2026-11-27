@@ -34,6 +34,8 @@ import {
 } from '../services/phoneNotifications';
 import { askPhonePermission, clearPhoneNotes, phonePermission } from '../services/phoneNotifier';
 import { hapticsOn, setHapticsOn, tick } from '../utils/haptics';
+import { readerSupported } from '../services/paymentAlertsBridge';
+import { getInbox, subscribeInbox } from '../services/paymentInbox';
 
 /** Self is a hub (who you are, and links) and a page for each group of settings. */
 export type SelfPage = 'hub' | 'account' | 'alerts' | 'data' | 'appearance' | 'about';
@@ -151,6 +153,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     clearAllTransactions, currency, counted, budgets, shownRate, shownCurrency, accounts,
   } = useWallet();
   const accountCount = Object.keys(accounts).length;
+  const toCheckCount = useSyncExternalStore(subscribeInbox, getInbox).toCheck.length;
 
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -645,6 +648,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money moved" sub="Your own accounts, family and investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
               {chevron}
             </Row>
+            {readerSupported() && (
+              <Row icon="bolt" iconCls="bg-ocean-light text-ocean" title="Payments from your apps"
+                   sub={toCheckCount > 0
+                     ? `${toCheckCount} ${toCheckCount === 1 ? 'payment' : 'payments'} to check`
+                     : 'Adds payments from Google Pay, PhonePe, Paytm and bank apps'}
+                   onClick={() => onNavigate(AppScreen.PAYMENT_APPS)}>
+                {chevron}
+              </Row>
+            )}
           </Card>
           {isNative() && (
             <Card>

@@ -62,6 +62,17 @@ android {
             // Debug builds never send crash reports.
             manifestPlaceholders = [crashlyticsCollection: "false"]
         }
+        // A test build that installs next to the real app, with its own id
+        // and name ("Wall-ette Test"), so a phone or emulator keeps its
+        // Play install and real wallet untouched: npm run android:qa. Like a
+        // debug build otherwise; sign it in with a made-up account (Google
+        // sign-in isn't set up for this id). Needs its own
+        // src/qa/google-services.json: node scripts/qa-google-services.mjs.
+        qa {
+            initWith debug
+            applicationIdSuffix ".test"
+            matchingFallbacks = ['debug']
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -103,6 +114,10 @@ apply from: 'capacitor.build.gradle'
 // build stops instead (docs/PLAY_SUBMISSION.md, step 1).
 if (!file('google-services.json').exists()) {
     throw new GradleException("android/app/google-services.json is missing. Download it with: npx firebase-tools apps:sdkconfig ANDROID 1:881370415293:android:b9d1da6f023d700e1877d4 --project wall-e-7a113 --out android/app/google-services.json")
+}
+def buildsQa = gradle.startParameter.taskNames.any { it.toLowerCase().contains('qa') }
+if (buildsQa && !file('src/qa/google-services.json').exists()) {
+    throw new GradleException("android/app/src/qa/google-services.json is missing. Make it from the app's own with: node scripts/qa-google-services.mjs")
 }
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'

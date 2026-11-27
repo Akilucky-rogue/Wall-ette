@@ -74,6 +74,7 @@ function wallet(n) {
     };
     if (i % 11 === 0) t.createdAt = new Date(2025, 5, 1, 10, i % 60).toISOString();
     if (i % 13 === 0) { t.typedAmount = Math.round(rand() * 50000) / 100; t.typedCurrency = 'USD'; }
+    if (i % 17 === 0) { t.id = `app-${(i * 40503 >>> 0).toString(16).padStart(16, '0')}`; t.via = i % 34 === 0 ? 'share' : 'gpay'; t.createdAt = new Date(2025, 5, 2, 9, i % 60).toISOString(); }
     transactions.push(t);
   }
   return {
@@ -110,6 +111,9 @@ console.log('Round trip');
   eq('total to the paisa', paise(r.backup.entries), paise(w.transactions));
   const typed = r.backup.entries.filter(t => t.typedCurrency);
   eq('typed in another currency, kept as typed', typed.map(t => [t.typedAmount, t.typedCurrency]), w.transactions.filter(t => t.typedCurrency).map(t => [t.typedAmount, t.typedCurrency]));
+  const viaApp = r.backup.entries.filter(t => t.via);
+  eq('read from an app: the app kept', viaApp.map(t => [t.id, t.via]), w.transactions.filter(t => t.via).map(t => [t.id, t.via]));
+  ok('… for several entries', viaApp.length > 50);
 
   const intoEmpty = B.planRestore(r.backup, new Set());
   eq('an empty wallet gets every entry', [intoEmpty.add.length, intoEmpty.already], [2000, 0]);
@@ -194,6 +198,10 @@ console.log('Malformed rows');
   eq('an older entry with a time keeps its date as saved', r.backup.entries[1].date, '2025-06-01T18:30:00.000Z');
   eq('a missing category becomes Uncategorized', r.backup.entries[2].category, 'Uncategorized');
   eq('only an entry\'s own fields come back', Object.keys(r.backup.entries[3]).sort(), ['amount', 'category', 'date', 'id', 'type']);
+  const odd = B.readBackup(JSON.stringify({ app: 'Wall-ette', version: 3, transactions: [
+    { ...base, id: 'v1', via: 'gpay' }, { ...base, id: 'v2', via: '<b>gpay</b>' }, { ...base, id: 'v3', via: 42 },
+  ] }));
+  eq('the app an entry was read from: kept when it reads as one, dropped otherwise', odd.backup.entries.map(t => t.via ?? null), ['gpay', null, null]);
   const plan = B.planRestore(r.backup, new Set());
   eq('the plan counts what was left out', [plan.unreadable, plan.repeated], [17, 1]);
 }

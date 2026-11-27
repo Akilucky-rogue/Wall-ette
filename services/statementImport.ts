@@ -687,8 +687,14 @@ export function importTally(args: {
   duplicates?: ReadonlySet<string>;
   /** The statement's account, when it shows its number. */
   account?: StatementAccount;
+  /**
+   * Entries read from payment apps that ticked rows take the place of
+   * (services/captured.ts capturedRows): out of the wallet in the same step.
+   */
+  replaces?: readonly string[];
 }): ImportTally | null {
   const { wallet, selected, minDate, maxDate, opening, closing, bridge, account } = args;
+  const replaces = args.replaces ?? [];
   if (closing === undefined || !Number.isFinite(closing)) return null;
   const rows = args.rows ?? selected;
   const rowIds = new Set(rows.map(t => t.id));
@@ -712,7 +718,7 @@ export function importTally(args: {
   const stale = staleAdjustments(view.transactions, minDate, maxDate);
   const incoming = bridge && gap ? [bridgeAdjustment(gap), ...selected] : [...selected];
   // The whole wallet: what its balance will be.
-  const all = mergeImport(wallet, incoming, { opening, statementStart: minDate, removeIds: stale, account, rowIds });
+  const all = mergeImport(wallet, incoming, { opening, statementStart: minDate, removeIds: [...stale, ...replaces], account, rowIds });
   const wholeAfter = afterMerge(wallet, all);
   const projectedFinal = ledgerBalance(wholeAfter);
   // The account on its own: what the check compares with the bank.
@@ -723,7 +729,7 @@ export function importTally(args: {
     const own = accountView({ ...wholeAfter, openingBalance: wallet.openingBalance, openingBalanceAsOf: wallet.openingBalanceAsOf }, account, statement);
     mineAfter = { transactions: own.transactions, openingBalance: anchor ? anchor.opening : own.openingBalance, openingBalanceAsOf: null };
   } else {
-    mineAfter = afterMerge(view, mergeImport(view, incoming, { opening, statementStart: minDate, removeIds: stale }));
+    mineAfter = afterMerge(view, mergeImport(view, incoming, { opening, statementStart: minDate, removeIds: [...stale, ...replaces] }));
   }
   const later = mineAfter.transactions.filter(t => t.date.slice(0, 10) > maxDate);
   const projected = (paise(ledgerBalance(mineAfter)) - netPaise(later)) / 100;

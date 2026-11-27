@@ -106,7 +106,7 @@ const BankAccounts: React.FC<BankAccountsProps> = ({ onNavigate }) => {
                 {row(other, 'edit_note', 'bg-lavender-light text-lavender', entriesLine(other))}
               </div>
               <p className="text-muted-taupe text-[12px] leading-relaxed px-1">
-                Other entries are ones you typed in, or from statements that don't show an account number.
+                Other entries are ones you typed in, payments read from your apps until a statement brings them, and rows from statements that don't show an account number.
               </p>
             </>
           )}

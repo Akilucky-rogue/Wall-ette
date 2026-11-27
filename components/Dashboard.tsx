@@ -8,6 +8,7 @@ import { openAt } from '../utils/screenSection';
 import { tick } from '../utils/haptics';
 import CurrencySelector from './CurrencySelector';
 import UnsortedTransfers from './UnsortedTransfers';
+import PaymentsToCheckCard from './PaymentsToCheckCard';
 import NotificationCenter from './NotificationCenter';
 import LeftToSpendCard from './LeftToSpendCard';
 import WalletArriving from './WalletArriving';
@@ -416,6 +417,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           phones/APK keep the single column (CSS columns are inert below md). */}
       <div className="md:columns-2 md:gap-x-0 lg:columns-3 lg:px-2">
       {transactions.length === 0 && !isNewWallet && !arriving && <div className="break-inside-avoid">{startPanel}</div>}
+
+      {/* Payments read from your apps that wait for a tap (Android): first, as they need you */}
+      <PaymentsToCheckCard className="px-6 pt-2 break-inside-avoid" />
 
       {/* What's left until pay day, once something has come in */}
       <LeftToSpendCard onNavigate={onNavigate} className="px-6 pt-2 break-inside-avoid" />

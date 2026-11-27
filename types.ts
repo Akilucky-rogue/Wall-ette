@@ -28,6 +28,14 @@ export interface Transaction {
    */
   typedAmount?: number;
   typedCurrency?: string;
+  /**
+   * Set on an entry Wall-ette added by itself (from 1.6.0): the payment app
+   * whose notification it was read from (services/paymentAlerts.ts
+   * PAYMENT_APPS id, e.g. 'gpay'), or 'share' for text shared to
+   * Wall-ette. It stands in for the payment until a statement brings the
+   * same one, whose row then takes its place (services/captured.ts).
+   */
+  via?: string;
 }
 
 export interface IncomeSource {
@@ -82,6 +90,7 @@ export enum AppScreen {
   CATEGORY_SPLIT = 'CATEGORY_SPLIT',
   MONEY_MOVED = 'MONEY_MOVED', // payee rules: what counts as spending
   BANK_ACCOUNTS = 'BANK_ACCOUNTS', // Self → Your data → Bank accounts
+  PAYMENT_APPS = 'PAYMENT_APPS', // Self → Your data → Payments from your apps (Android)
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
   REWIND = 'REWIND', // Time Machine + Wrapped

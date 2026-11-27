@@ -19,6 +19,7 @@ import { auth, db } from './firebase';
 import { forgetGoogleAccount, signsInWithGoogle } from './googleSignIn';
 import { clearPhoneNotes } from './phoneNotifier';
 import { log } from '../utils/log';
+import { setReaderOn } from './paymentAlertsBridge';
 
 const QUIET_START_KEY = 'walletQuietStart';
 /** How long sign-out waits for unsynced changes to reach the cloud. */
@@ -82,6 +83,9 @@ export async function signOutOfDevice(): Promise<void> {
   if (google) await forgetGoogleAccount();
   // Bill reminders and alerts are this user's; none may show after sign-out.
   await clearPhoneNotes();
+  // Payments from your apps stops, and forgets notifications not read yet:
+  // they'd go to whoever signs in next.
+  await setReaderOn(false).catch(() => {});
   if (uid) removeUserKeys(uid);
   if (synced) {
     await clearOfflineCache();
@@ -92,6 +96,7 @@ export async function signOutOfDevice(): Promise<void> {
 /** After the account is deleted: removes what's left of it on this device, then reloads. */
 export async function forgetDeletedAccount(uid: string): Promise<void> {
   await clearPhoneNotes();
+  await setReaderOn(false).catch(() => {});
   removeUserKeys(uid);
   await clearOfflineCache();
   reloadQuietly();

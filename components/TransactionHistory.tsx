@@ -14,6 +14,8 @@ import { removed } from '../utils/haptics';
 import { useBackHandler } from '../utils/backStack';
 import { accountSummaries, entryAccount, legacyAccount } from '../services/accounts';
 import { takeVaultAccount } from '../utils/vaultAccount';
+import { viaName } from '../services/paymentAlerts';
+import { bankReference } from '../services/statementImport';
 
 // The list draws this many entries at a time, and the next lot on request:
 // thousands of rows at once made Vault slow to open and to scroll. The
@@ -791,6 +793,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     const sub = [
                       paymentRail(t.merchant),
                       t.category && t.category.trim() ? t.category : 'Uncategorized',
+                      t.via ? viaName(t.via) : null,
                       group.net === null ? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : null,
                     ].filter(Boolean).join(' · ');
                     return (
@@ -823,7 +826,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                     const { narration, note } = bankWords(t.merchant, t.note);
                                     return (
                                         <>
-                                            {narration && narration !== name && (
+                                            {t.via ? (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">Added by Wall-ette</p>
+                                                    <p className="text-[12px] text-premium-charcoal leading-snug">
+                                                        {t.via === 'share' ? 'From text you shared' : `From ${viaName(t.via) ?? 'an app'}'s notification`}
+                                                        {(() => { const ref = bankReference(t.merchant); return ref ? ` · reference ${ref.slice(4)}` : ''; })()}.
+                                                        {' '}A statement with this payment takes its place when you import it.
+                                                    </p>
+                                                </div>
+                                            ) : narration && narration !== name && (
                                                 <div>
                                                     <p className="text-[11px] text-muted-taupe mb-0.5">From the bank</p>
                                                     <p className="text-[12px] text-premium-charcoal break-all leading-snug">{narration}</p>

@@ -1,5 +1,6 @@
 package com.wallette.app;
 
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -34,6 +35,9 @@ public class MainActivity extends BridgeActivity {
         if (!debuggable) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
+        // The app's own plugin: payments from notifications and Share to
+        // Wall-ette. Registered before the bridge starts in super.onCreate.
+        registerPlugin(PaymentAlertsPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Edge to edge on every Android version, as Android 15+ is anyway:
@@ -53,6 +57,28 @@ public class MainActivity extends BridgeActivity {
                 return recoverFromRendererLoss(view, detail.didCrash());
             }
         });
+
+        takeShare(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        takeShare(intent);
+    }
+
+    /**
+     * Share to Wall-ette: text shared from another app (a bank SMS, a
+     * payment app's receipt) goes to the app, which offers it as "Add this?".
+     * Nothing is read unless the person shares it.
+     */
+    private void takeShare(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        String type = intent.getType();
+        if (type == null || !type.startsWith("text/")) return;
+        PaymentAlertsPlugin.shareArrived(intent.getCharSequenceExtra(Intent.EXTRA_TEXT));
+        // Taken: not again when the screen is recreated.
+        intent.setAction(Intent.ACTION_MAIN);
     }
 
     /**

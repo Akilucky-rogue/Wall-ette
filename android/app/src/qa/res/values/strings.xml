@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- The test build's name (app/build.gradle, qa), so it can't be taken for the real app. -->
+<resources>
+    <string name="app_name">Wall-ette Test</string>
+    <string name="title_activity_main">Wall-ette Test</string>
+</resources>

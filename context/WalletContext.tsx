@@ -160,6 +160,12 @@ interface WalletContextType {
   setSavingsGoal: (amount: number) => void;
   setOpeningBalance: (balance: number, asOf?: string | null) => void;
   addTransaction: (transaction: Transaction) => Promise<boolean>;
+  /**
+   * Adds several entries in one step (payments read from your apps,
+   * services/captured.ts), leaving out ids the wallet has. Returns how many
+   * were added.
+   */
+  addTransactions: (list: Transaction[]) => number;
   editTransaction: (id: string, updates: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => void;
   /** Bulk delete in ONE state update — looping deleteTransaction would race itself. */
@@ -1011,6 +1017,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return true;
   }, [persistTransactions, user, saveEntries]);
 
+  const addTransactions = useCallback((list: Transaction[]): number => {
+    const have = new Set(listRef.current.map(t => t.id));
+    const fresh: Transaction[] = [];
+    for (const t of list) {
+      if (have.has(t.id)) continue;
+      have.add(t.id);
+      fresh.push(t);
+    }
+    if (fresh.length === 0) return 0;
+    const next = [...fresh, ...listRef.current].sort(byNewest);
+    listRef.current = next;
+    setTransactions(next);
+    persistTransactions(next);
+    if (user) void saveEntries(user.uid, `add:${fresh[0].id}`, fresh);
+    return fresh.length;
+  }, [persistTransactions, user, saveEntries]);
+
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
     const current = listRef.current;
     const transaction = current.find(t => t.id === id);
@@ -1267,6 +1290,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSavingsGoal,
       setOpeningBalance,
       addTransaction,
+      addTransactions,
       editTransaction,
       deleteTransaction,
       deleteTransactions,
@@ -1301,7 +1325,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       shown, transactions, importReceipts, saveImportReceipt, currency, payeeRules, flowOf, counted, dailyLimit, mfaEnabled, isOnline,
       isBackendReady, walletLoaded, openingBalance, walletOpening, openingBalanceAsOf, accounts, budgets, savingsGoal,
       setCurrency, setDailyLimit, setMfaEnabled, setBudget, setSavingsGoal,
-      setOpeningBalance, addTransaction, editTransaction, deleteTransaction,
+      setOpeningBalance, addTransaction, addTransactions, editTransaction, deleteTransaction,
       deleteTransactions, clearAllTransactions, importTransactions, restoreSettings, savePayeeRule, deletePayeeRule, getBalance,
       getMonthlyIncome, getMonthlyExpense, getDailyIncome, getDailyExpense,
       getTotalIncome, getTotalExpense, formatAmount, formatWhole, formatAmountCompact,

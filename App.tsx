@@ -5,6 +5,7 @@ import AndroidInstallBanner from './components/AndroidInstallBanner';
 import AppUpdates from './components/AppUpdates';
 import CloudSaveBanner from './components/CloudSaveBanner';
 import PhoneNotifications from './components/PhoneNotifications';
+import PaymentIntake from './components/PaymentIntake';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -29,6 +30,7 @@ const IncomeInsights = React.lazy(() => import('./components/IncomeInsights'));
 const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
 const BankAccounts = React.lazy(() => import('./components/BankAccounts'));
+const PaymentsFromApps = React.lazy(() => import('./components/PaymentsFromApps'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
@@ -65,6 +67,7 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   // data; Back returns to whichever it came from (AppContent's backOf).
   [AppScreen.MONEY_MOVED]: AppScreen.SELF_DATA,
   [AppScreen.BANK_ACCOUNTS]: AppScreen.SELF_DATA,
+  [AppScreen.PAYMENT_APPS]: AppScreen.SELF_DATA,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
   [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
 };
@@ -142,7 +145,9 @@ function AppContent() {
     let backHandle: any = null;
     (async () => {
       listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive && currentScreenRef.current !== AppScreen.IMPORT) {
+        // Android's notification access screen, opened from Payments from
+        // your apps, backgrounds the app the same way the file picker does.
+        if (!isActive && currentScreenRef.current !== AppScreen.IMPORT && currentScreenRef.current !== AppScreen.PAYMENT_APPS) {
           setIsLocked(true);
         }
       });
@@ -368,6 +373,8 @@ function AppContent() {
         return <MoneyMoved onNavigate={handleNavigate} backTo={movedFromRef.current} />;
       case AppScreen.BANK_ACCOUNTS:
         return <BankAccounts onNavigate={handleNavigate} />;
+      case AppScreen.PAYMENT_APPS:
+        return <PaymentsFromApps onNavigate={handleNavigate} />;
       case AppScreen.IMPORT:
         return <ImportStatement onNavigate={handleNavigate} />;
       case AppScreen.EXPORT:
@@ -419,6 +426,7 @@ function AppContent() {
       <AppUpdates signedInThisRun={signedInThisRun} />
       <CloudSaveBanner />
       <PhoneNotifications />
+      <PaymentIntake />
     </WalletProvider>
   );
 }

@@ -15,6 +15,7 @@ import ReviewPayees from './ReviewPayees';
 import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
 import { receiptLines, type ImportReceipt } from '../services/importReceipt';
 import styles from './ImportStatement.module.css';
+import { capturedRows, carryOver, isCaptured } from '../services/captured';
 
 // Pagination settings
 const ITEMS_PER_PAGE = 20;
@@ -75,7 +76,7 @@ interface EditingTransaction {
 
 const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const {
-      importTransactions, transactions: existingTransactions,
+      importTransactions, transactions: existingTransactions, storedTransactions,
       unassignedOpening, openingBalanceAsOf, accounts, formatAmount,
       flowOf, importReceipts, saveImportReceipt,
   } = useWallet();
@@ -96,6 +97,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   const [extractedData, setExtractedData] = useState<Transaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
+  // Rows that stand for payments read from your apps: row id → that entry's id
+  // (services/captured.ts). Ticked, each takes its entry's place.
+  const [replacing, setReplacing] = useState<ReadonlyMap<string, string>>(new Map());
+  const replaces = useMemo(
+    () => [...replacing].filter(([row]) => selectedIds.has(row)).map(([, entry]) => entry),
+    [replacing, selectedIds],
+  );
   const [showDuplicateInfo, setShowDuplicateInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedOpeningBalance, setParsedOpeningBalance] = useState<number | undefined>(undefined);
@@ -207,9 +215,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       closing: parsedClosingBalance,
       bridge: bridgeGap,
       account,
+      replaces,
     });
   }, [parsedClosingBalance, parsedOpeningBalance, reviewSummary, extractedData, selectedIds, duplicateIds,
-      wallet, bridgeGap, account]);
+      wallet, bridgeGap, account, replaces]);
   // What the import does to the account itself: its opening balance (set,
   // moved to an earlier statement, or kept) and the entries from before
   // 1.5.9 it marks as the account's. Worked out with the import's own merge.
@@ -363,7 +372,11 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
           throw new Error('No transactions found in this statement. Check it lists transactions with dates and amounts.');
       }
 
-      const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions);
+      // Payments read from your apps aren't duplicates: the statement's row
+      // takes the place of each (services/captured.ts).
+      const foundDuplicates = findDuplicates(mappedTransactions, existingTransactions.filter(t => !isCaptured(t)));
+      const standsFor = capturedRows(mappedTransactions.filter(t => !foundDuplicates.has(t.id)), existingTransactions);
+      setReplacing(standsFor);
 
       log.debug(`Import staged: ${mappedTransactions.length} transactions, ${foundDuplicates.size} duplicates (${parserLabel})`);
 
@@ -535,7 +548,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   };
 
   const confirmImport = () => {
-      const toImport = extractedData.filter(t => selectedIds.has(t.id));
+      // A row that takes an app entry's place keeps the category and note it was given.
+      const byId = new Map(storedTransactions.map(t => [t.id, t]));
+      const toImport = extractedData.filter(t => selectedIds.has(t.id)).map(t => {
+          const entry = byId.get(replacing.get(t.id) ?? '');
+          return entry ? carryOver(t, entry) : t;
+      });
       if (!reviewSummary || (toImport.length === 0 && !canUpdate)) return;
 
       // One adjustment entry that stands in for a missing statement window,
@@ -556,7 +574,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       const result = importTransactions(toImport, {
           opening: parsedOpeningBalance,
           statementStart: reviewSummary.minDate,
-          removeIds: stale,
+          removeIds: [...stale, ...replaces],
           account,
           rowIds: extractedData.map(t => t.id),
       });
@@ -578,13 +596,14 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
           duplicates: extractedData.filter(t => duplicateIds.has(t.id) && !selectedIds.has(t.id)).length,
           leftOut: extractedData.filter(t => !duplicateIds.has(t.id) && !selectedIds.has(t.id)).length,
           unreadable,
-          replaced: result.removed,
+          replaced: Math.max(0, result.removed - replaces.length),
           bridged: !!(bridgeGap && tally?.gap),
           check: tally ? tallyToneOf(tally, bridgeGap) : null,
           ...(tally ? { closing: tally.closing, difference: tally.diff } : {}),
           ...(toReview > 0 ? { toReview: Math.round(toReview * 100) / 100 } : {}),
           ...(result.openingSet && accountPlan?.next ? { opening: accountPlan.next.opening } : {}),
           ...(result.retagged > 0 ? { marked: result.retagged } : {}),
+          ...(replaces.length > 0 ? { fromApps: replaces.length } : {}),
       };
       saveImportReceipt(done);
       setReceipt(done);
@@ -786,6 +805,18 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
         {stage === 'REVIEW' && (
             <div className="flex flex-col h-full animate-slide-up">
+                {/* Rows for payments read from your apps: the row takes the entry's place */}
+                {replaces.length > 0 && (
+                    <div className="mb-4 p-4 rounded-2xl bg-ocean-light/60 border border-ocean/20 animate-slide-up" role="status">
+                        <div className="flex items-start gap-3">
+                            <span className="material-symbols-outlined text-ocean text-[20px] mt-0.5" aria-hidden="true">bolt</span>
+                            <p className="flex-1 text-xs text-premium-charcoal leading-relaxed">
+                                {replaces.length === 1 ? 'One row is a payment' : `${replaces.length} rows are payments`} Wall-ette read from your apps.
+                                Importing puts the statement's {replaces.length === 1 ? 'row' : 'rows'} in {replaces.length === 1 ? 'its' : 'their'} place, keeping the categories and notes you gave {replaces.length === 1 ? 'it' : 'them'}, so nothing counts twice.
+                            </p>
+                        </div>
+                    </div>
+                )}
                 {/* Duplicate detection notification */}
                 {showDuplicateInfo && duplicateIds.size > 0 && (
                     <div className="mb-4 p-4 rounded-2xl bg-blue-50 border border-blue-200 animate-slide-up">

@@ -57,6 +57,8 @@ export interface ImportReceipt {
   opening?: number;
   /** Entries already in the wallet that this import marked with the account (from 1.5.9). */
   marked?: number;
+  /** Payments read from your apps whose entries this statement's rows took the place of (from 1.6.0). */
+  fromApps?: number;
 }
 
 export const MAX_RECEIPTS = 20;
@@ -91,6 +93,7 @@ export function asImportReceipts(raw: unknown): ImportReceipt[] {
     if (typeof x.last4 === 'string' && /^\d{4}$/.test(x.last4)) receipt.last4 = x.last4;
     if (money(x.opening)) receipt.opening = x.opening;
     if (count(x.marked) && x.marked > 0) receipt.marked = x.marked;
+    if (count(x.fromApps) && x.fromApps > 0) receipt.fromApps = x.fromApps;
     out.push(receipt);
   }
   return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, MAX_RECEIPTS);
@@ -117,5 +120,6 @@ export function receiptLines(r: ImportReceipt, money?: (inr: number) => string):
     lines.push(`This account's opening balance is now ${amount}`);
   }
   if (r.marked) lines.push(`${plural(r.marked, 'entry', 'entries')} from earlier imports now belong to this account`);
+  if (r.fromApps) lines.push(`${plural(r.fromApps, 'payment')} read from your apps now ${r.fromApps === 1 ? 'comes' : 'come'} from this statement`);
   return lines;
 }

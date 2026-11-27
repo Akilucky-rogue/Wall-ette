@@ -18,6 +18,9 @@
  *     (same reference and amount) cancel out, and only an exact pair does;
  *     fund redemptions are money coming back, not income; Vault shows the
  *     bank's narration, never the IDFC Excel reader's "UPI ID: DR" note
+ *   - (1.5.9) Flow's money diagram names each payee and category once: one
+ *     payee's narrations are one stream, and Other is only the pool of
+ *     smaller streams; the column still adds up to the month
  *
  * Usage (after `npm ci`):
  *   node scripts/check-spend.mjs
@@ -39,7 +42,7 @@ await build({
   stdin: {
     contents: [
       `export * from ${JSON.stringify(join(root, 'services', 'spend.ts'))};`,
-      `export { analyzeIncome, detectRecurringCharges, prettyMerchant } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
+      `export { analyzeIncome, byLabel, detectRecurringCharges, flowColumn, prettyMerchant } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
       `export { tidyName, paymentRail } from ${JSON.stringify(join(root, 'utils', 'names.ts'))};`,
       `export * from ${JSON.stringify(join(root, 'services', 'review.ts'))};`,
       `export { reversalPairs } from ${JSON.stringify(join(root, 'services', 'reversals.ts'))};`,
@@ -55,7 +58,7 @@ await build({
   format: 'esm',
   logLevel: 'error',
 });
-const { analyzeIncome, detectRecurringCharges, flowClassifier, matchText, payeeName, paymentRail, prettyMerchant, suggestPayees, tidyName,
+const { analyzeIncome, byLabel, detectRecurringCharges, flowClassifier, flowColumn, matchText, payeeName, paymentRail, prettyMerchant, suggestPayees, tidyName,
   shownCategory, withShownCategories, categoryToStore, suggestChoice, reviewPayees, toReviewTotal, REVIEW_CHOICES, reversalPairs, categorizeNarration, bankWords } =
   await import(pathToFileURL(bundle).href);
 rmSync(tmp, { recursive: true, force: true });
@@ -304,6 +307,43 @@ eq('rail: from the first field', ['UPI/DR/1/X', 'NEFT/2/Y', 'MB/IMPS/3/Z', 'POS 
   eq('… a renamed payee keeps its narration in the note', bankWords('Zomato', upiRow), { narration: upiRow, note: null });
   eq('… typed by hand: the note is a note', bankWords('Coffee', 'with Ravi'), { narration: null, note: 'with Ravi' });
   eq('… nothing at all', bankWords('Coffee', ''), { narration: null, note: null });
+}
+
+// ── Money Flow diagram: each name once (1.5.9) ─────────────────────────────
+{
+  const sum = col => Math.round(col.reduce((s, [, v]) => s + v, 0) * 100) / 100;
+  // Income: one clearing house paid by NEFT and by RTGS, a salary, and small bits.
+  const sources = new Map([
+    ['NEFT/N3120000001/NORTHWIND CLEARING LIMITED/HDFC0000123', 400000],
+    ['RTGS/HDFCR52026000001/NORTHWIND CLEARING LIMITED/HDFC0000123', 250000],
+    ['NEFT/N3120000002/ACME TECH SOLUTIONS/ICIC0001234', 300000],
+    ['UPI/CR/612300000001/RAVI KUMAR/OKAXIS/ravi@okaxis/UPI', 9000],
+    ['UPI/CR/612300000002/ASHA RAO/OKSBI/asha@oksbi/UPI', 6000],
+  ]);
+  const inc = 965000;
+  const left = flowColumn(byLabel(sources, prettyMerchant), inc, 4);
+  eq('flow: one payee, two narrations, one stream', left.map(([n]) => n),
+    ['Northwind Clearing Limited', 'Acme Tech Solutions', 'Other']);
+  eq('flow: its amount is both payments', left[0][1], 650000);
+  eq('flow: the income column still adds up', sum(left), inc);
+  ok('flow: no name twice (in)', new Set(left.map(([n]) => n)).size === left.length);
+
+  // Spending: a real "Other" category in the top four, and small categories.
+  const cats = new Map([['Rent', 30000], ['Other', 12000], ['Groceries', 9000], ['Dining', 6000], ['Travel', 5000], ['Gifts', 1500], ['Books', 900]]);
+  const out = 64400;
+  const right = flowColumn(cats, out, 4);
+  eq('flow: Other is the pool, last, and once', right.map(([n]) => n), ['Rent', 'Groceries', 'Dining', 'Travel', 'Other']);
+  eq('flow: the pool holds the Other category and the small ones', right[4][1], 12000 + 1500 + 900);
+  eq('flow: the spending column still adds up', sum(right), out);
+  ok('flow: no name twice (out)', new Set(right.map(([n]) => n)).size === right.length);
+
+  // Only the Other category: one stream, called Other.
+  eq('flow: only Other', flowColumn(new Map([['Other', 500]]), 500, 4), [['Other', 500]]);
+  // Everything under 4%: the largest still gets a slot, the rest pool.
+  const crumbs = new Map(Array.from({ length: 30 }, (_, k) => [`Shop ${k + 1}`, 100 + k]));
+  const crumbCol = flowColumn(crumbs, 3435, 4);
+  eq('flow: scattered spending keeps the largest and pools the rest', crumbCol.map(([n]) => n), ['Shop 30', 'Other']);
+  eq('flow: … and still adds up', sum(crumbCol), 3435);
 }
 
 console.log(`${checks - failures}/${checks} checks passed.`);

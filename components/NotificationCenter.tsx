@@ -7,6 +7,7 @@ import { getUpdateState, installUpdate, restartToUpdate, subscribe } from '../se
 import { latestNotes, RELEASE_NOTES } from '../services/releaseNotes';
 import { recentUnlocks } from '../services/securityLog';
 import { openAt } from '../utils/screenSection';
+import { useBackHandler } from '../utils/backStack';
 import {
   arrange, buildNotifications, dismiss, emptyState, loadState, markSeen, prune, saveState,
   type AppNotification, type NotificationState, type NotificationTone, type UnlockEvent,
@@ -97,6 +98,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
     bellRef.current?.focus();
   }, [commit, state, fresh, all]);
 
+  useBackHandler(open, close);
   useEffect(() => { if (open) titleRef.current?.focus(); }, [open]);
   useEffect(() => {
     if (!open) return;

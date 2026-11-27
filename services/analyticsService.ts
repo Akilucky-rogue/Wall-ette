@@ -68,6 +68,43 @@ export function prettyMerchant(raw: string | undefined | null): string {
   return gateway ? `${gateway} payment` : clip(tidyName(best));
 }
 
+/**
+ * Amounts keyed by the name a screen shows (`label`), so one name is one
+ * entry: a payee's narration differs from payment to payment
+ * ("NEFT/…/BSE CLEARING LIMITED/…", "RTGS/…/BSE CLEARING LIMITED/…").
+ */
+export function byLabel(amounts: Map<string, number>, label: (name: string) => string): Map<string, number> {
+  const merged = new Map<string, number>();
+  for (const [name, v] of amounts) {
+    const shown = label(name);
+    merged.set(shown, (merged.get(shown) ?? 0) + v);
+  }
+  return merged;
+}
+
+/** The pool of smaller streams in a Money Flow column. */
+export const FLOW_OTHER = 'Other';
+
+/**
+ * One column of the Money Flow diagram (Flow → Story): the streams worth a
+ * slot of their own (at least 4% of the column, at most `maxN`), largest
+ * first, then everything smaller pooled as "Other", so tiny flows can't
+ * shred the diagram. A stream already called Other (the category) joins
+ * the pool, so the column never names Other twice.
+ */
+export function flowColumn(amounts: Map<string, number>, total: number, maxN: number): [string, number][] {
+  const sorted = [...amounts.entries()].filter(([name]) => name !== FLOW_OTHER).sort((a, b) => b[1] - a[1]);
+  const top: [string, number][] = [];
+  let rest = amounts.get(FLOW_OTHER) ?? 0;
+  for (const [name, v] of sorted) {
+    if (top.length < maxN && total > 0 && v / total >= 0.04) top.push([name, v]);
+    else rest += v;
+  }
+  if (top.length === 0 && sorted.length > 0) { top.push(sorted[0]); rest -= sorted[0][1]; }
+  if (rest > 0.005) top.push([FLOW_OTHER, rest]);
+  return top;
+}
+
 /** Normalize a merchant string for grouping (same rules as import dedup). */
 export const normalizeMerchant = (merchant: string): string =>
   merchant

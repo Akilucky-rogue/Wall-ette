@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BackupSettings, RestorePlan } from '../services/backup';
 import { accountLabel } from '../services/accounts';
+import { useBackHandler } from '../utils/backStack';
 
 interface RestoreBackupSheetProps {
   plan: RestorePlan;
@@ -47,6 +48,7 @@ export function settingsText(s: BackupSettings, money: (inr: number) => string):
 const RestoreBackupSheet: React.FC<RestoreBackupSheetProps> = ({ plan, walletEmpty, money, onRestore, onClose }) => {
   const [withSettings, setWithSettings] = useState(walletEmpty && plan.hasSettings);
 
+  useBackHandler(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);

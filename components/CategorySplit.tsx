@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
+import { useBackHandler } from '../utils/backStack';
 import { MOVED_LABELS } from '../services/spend';
 import UnsortedTransfers from './UnsortedTransfers';
 import { prettyMerchant } from '../services/analyticsService';
@@ -57,6 +58,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
 
   const [selectedDate, setSelectedDate] = useState(latestTxDate);
   useEffect(() => { setSelectedDate(latestTxDate); }, [latestTxDate]);
+  useBackHandler(showDatePicker, () => setShowDatePicker(false));
   useEffect(() => { setSelCat(null); setExpanded(null); }, [timeRange, selectedDate, view]);
 
   // Filter expenses for the period

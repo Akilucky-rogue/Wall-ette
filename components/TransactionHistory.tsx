@@ -10,6 +10,12 @@ import { prettyMerchant } from '../services/analyticsService';
 import { paymentRail } from '../utils/names';
 import DuplicateEntries from './DuplicateEntries';
 import { removed } from '../utils/haptics';
+import { useBackHandler } from '../utils/backStack';
+
+// The list draws this many entries at a time, and the next lot on request:
+// thousands of rows at once made Vault slow to open and to scroll. The
+// totals, the count and the CSV export still cover every match.
+const PAGE = 100;
 
 interface TransactionHistoryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -155,6 +161,27 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     return groups;
   }, [filteredTransactions, sortBy]);
 
+  // How far down the list is drawn. A new search, filter or order starts
+  // again from the first page.
+  const pageKey = [activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery].join('|');
+  const [paging, setPaging] = useState({ key: pageKey, count: PAGE });
+  const shownCount = paging.key === pageKey ? paging.count : PAGE;
+  const showMore = () => setPaging({ key: pageKey, count: shownCount + PAGE });
+
+  // The first `shownCount` entries, in their groups. A day cut short keeps
+  // its whole day's net, and the rest of the day follows under it.
+  const shownGroups = useMemo(() => {
+    let left = shownCount;
+    const shown: typeof groupedTransactions = [];
+    for (const g of groupedTransactions) {
+      if (left <= 0) break;
+      shown.push(g.items.length <= left ? g : { ...g, items: g.items.slice(0, left) });
+      left -= g.items.length;
+    }
+    return shown;
+  }, [groupedTransactions, shownCount]);
+  const hiddenCount = Math.max(0, filteredTransactions.length - shownCount);
+
   // Exact amounts in the ledger, without ".00".
   const exact = (t: Transaction) => { const s = formatEntry(t); return s.endsWith('.00') ? s.slice(0, -3) : s; };
 
@@ -283,6 +310,12 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       type: TransactionType.EXPENSE
     });
   };
+
+  // Back closes the filters and these dialogs first (utils/backStack.ts).
+  useBackHandler(showFilters, () => setShowFilters(false));
+  useBackHandler(!!deleteId, () => setDeleteId(null));
+  useBackHandler(showClearConfirm, () => { setShowClearConfirm(false); setClearInput(''); });
+  useBackHandler(!!editingTransaction, () => { if (!editSaving) closeEditModal(); });
 
   const handleEditSubmit = async () => {
     if (!editingTransaction) return;
@@ -682,7 +715,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 )}
             </div>
         ) : (
-            groupedTransactions.map(group => (
+            shownGroups.map(group => (
             <section key={group.key} aria-label={group.label}>
                 <div className="flex items-baseline justify-between px-1 mb-2">
                   <h3 className="text-[12px] font-semibold text-muted-taupe">{group.label}</h3>
@@ -797,6 +830,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 </ul>
             </section>
             ))
+        )}
+        {hiddenCount > 0 && (
+          <div className="flex flex-col items-center gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={showMore}
+              className="px-5 py-2.5 rounded-full bg-white border border-sage/30 text-sage text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+            >
+              Show {Math.min(PAGE, hiddenCount).toLocaleString('en-IN')} more
+            </button>
+            <p className="text-[11px] text-muted-taupe tabular-nums">
+              {shownCount.toLocaleString('en-IN')} of {filteredTransactions.length.toLocaleString('en-IN')} shown
+            </p>
+          </div>
         )}
       </main>
 

@@ -4,7 +4,7 @@ import { useWallet } from '../context/WalletContext';
 import { getSymbol, toBase, toShown, inputDigits } from '../utils/currencyUtils';
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
-import { analyzeIncome, StreamBadge, prettyMerchant } from '../services/analyticsService';
+import { analyzeIncome, byLabel, flowColumn, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { Mascot } from './ui/Brand';
 import BalanceTrend from './BalanceTrend';
 import { tick } from '../utils/haptics';
@@ -42,21 +42,6 @@ const monthLabel = (key: string, style: 'long' | 'short' = 'long') => {
 const prevMonthKey = (key: string) => {
   const y = +key.slice(0, 4), m = +key.slice(5);
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-};
-
-// Keep only streams worth a visual slot (≥4% of the column) — everything
-// smaller pools into "Other" so tiny flows can't shred the diagram.
-const topShare = (m: Map<string, number>, total: number, maxN: number): [string, number][] => {
-  const sorted = [...m.entries()].sort((a, b) => b[1] - a[1]);
-  const top: [string, number][] = [];
-  let rest = 0;
-  for (const [name, v] of sorted) {
-    if (top.length < maxN && total > 0 && v / total >= 0.04) top.push([name, v]);
-    else rest += v;
-  }
-  if (top.length === 0 && sorted.length > 0) { top.push(sorted[0]); rest -= sorted[0][1]; }
-  if (rest > 0.005) top.push(['Other', rest]);
-  return top;
 };
 
 const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
@@ -128,7 +113,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     const prev = monthAgg.get(prevMonthKey(storyKey)) ?? null;
     const saved = m.inc - m.out;
 
-    const topSource = [...m.sources.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    // Payees as the screen names them: one payee's narrations differ.
+    const topSource = [...byLabel(m.sources, prettyMerchant).entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
     const topCat = [...m.cats.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
 
     const isCurrent = storyKey === currentKey;
@@ -142,7 +128,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     if (m.inc > 0) {
       lines.push({
         icon: 'south_west', tone: 'pos',
-        text: <><b>{formatWhole(m.inc)}</b> came in{topSource ? <> — mostly from <b>{prettyMerchant(topSource[0])}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
+        text: <><b>{formatWhole(m.inc)}</b> came in{topSource ? <> — mostly from <b>{topSource[0]}</b> ({formatAmountCompact(topSource[1])})</> : null}.</>,
       });
     }
     if (m.out > 0) {
@@ -191,8 +177,10 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     const m = monthAgg.get(storyKey);
     if (!m || m.inc <= 0) return null;
 
-    const left = topShare(m.sources, m.inc, 4);
-    const right = topShare(m.cats, m.out, 4);
+    // Each name once: payees as the screen names them, and Other only as
+    // the pool of smaller streams (services/analyticsService.ts).
+    const left = flowColumn(byLabel(m.sources, prettyMerchant), m.inc, 4);
+    const right = flowColumn(m.cats, m.out, 4);
     const savings = m.inc - m.out;
     if (savings > 0) right.push(['Saved', savings]);
 
@@ -361,7 +349,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                         n.h >= 9 && (
                         <div key={i} className="absolute left-0 w-full flex flex-col justify-center text-right pr-1 overflow-hidden"
                              style={{ top: `${n.y}%`, height: `${n.h}%` }}>
-                          <span className="block text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{prettyMerchant(n.name)}</span>
+                          <span className="block text-[9px] font-semibold text-premium-charcoal truncate leading-tight" title={n.name}>{n.name}</span>
                           <span className="block text-[8px] text-muted-taupe truncate">{formatAmountCompact(n.value)}</span>
                         </div>
                       )))}
@@ -402,7 +390,7 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
                       {flowSvg.leftNodes.map((n, i) => (
                         <div key={i} className="flex items-center gap-1.5 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: n.color }} />
-                          <span className="text-[10px] text-premium-charcoal truncate flex-1" title={n.name}>{prettyMerchant(n.name)}</span>
+                          <span className="text-[10px] text-premium-charcoal truncate flex-1" title={n.name}>{n.name}</span>
                           <span className="text-[10px] text-muted-taupe shrink-0 tabular-nums">{formatAmountCompact(n.value)}</span>
                         </div>
                       ))}

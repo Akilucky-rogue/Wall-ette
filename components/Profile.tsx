@@ -28,6 +28,7 @@ import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoog
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 import { openAt } from '../utils/screenSection';
+import { useBackHandler } from '../utils/backStack';
 import {
   currentAlerts, loadShown, markShown, phoneNotificationsOn, saveShown, setPhoneNotificationsOn, subscribePhoneSwitch,
 } from '../services/phoneNotifications';
@@ -460,6 +461,11 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
       preview: `Version ${__APP_VERSION__}`,
     },
   ];
+
+  // Back closes these dialogs first, unless they're busy (utils/backStack.ts).
+  useBackHandler(mfaModal, () => { if (!mfaBusy) setMfaModal(false); });
+  useBackHandler(pwModal, () => { if (!pwBusy) setPwModal(false); });
+  useBackHandler(delOpen, () => { if (!delBusy) setDelOpen(false); });
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">

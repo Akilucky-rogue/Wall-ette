@@ -16,6 +16,7 @@ import { consumeQuietStart, signOutOfDevice } from './services/session';
 import { breadcrumb } from './services/crashReports';
 import { onPhoneNoteTap } from './services/phoneNotifier';
 import { openAt } from './utils/screenSection';
+import { closeNewestPanel } from './utils/backStack';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -144,10 +145,12 @@ function AppContent() {
       });
 
       // System back gesture / back button: navigate WITHIN the app instead
-      // of exiting. Sub-screen → its parent; any tab → Home; Home → minimize
-      // (Android convention for a "root" screen), which also engages the
-      // background lock.
+      // of exiting. An open sheet, dialog or panel closes first
+      // (utils/backStack.ts); then sub-screen → its parent; any tab → Home;
+      // Home → minimize (Android convention for a "root" screen), which also
+      // engages the background lock.
       backHandle = await CapacitorApp.addListener('backButton', () => {
+        if (closeNewestPanel()) return;
         const cur = currentScreenRef.current;
         const back = backOf(cur);
         if (back) {

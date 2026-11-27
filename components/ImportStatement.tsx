@@ -8,6 +8,7 @@ import { accountKey, accountLabel } from '../services/accounts';
 import { useWallet } from '../context/WalletContext';
 import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
+import { useBackHandler } from '../utils/backStack';
 import { Mascot } from './ui/Brand';
 import { Diya, FloatingLeaf, PottedPlant, RangoliCorner, Sprout } from './ui/Decor';
 import ReviewPayees from './ReviewPayees';
@@ -350,6 +351,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
 
   // Cancel edit
   const cancelEdit = () => setEditingTx(null);
+  useBackHandler(!!editingTx, cancelEdit);
 
   // Shared staging: map raw parser output -> validate -> detect duplicates ->
   // populate the review screen. Used by both Excel and PDF paths

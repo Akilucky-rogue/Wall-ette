@@ -7,7 +7,7 @@ One-off development and debugging tools. None of these ship with the app.
 | `verify-statements.mjs` | Regression check (any bank the app reads): runs the real PDF and Excel parsers over every statement in a folder and checks totals against the bank, to the paisa |
 | `check-dates.mjs` | Regression check: transaction dates stay on the day picked, in several time zones (audit H4) |
 | `check-contrast.mjs` | Regression check: main, second and secondary text reach 4.5:1 on the page, cards and pale cards in every theme (utils/theme.ts) |
-| `check-spend.mjs` | Regression check: payee rules and defaults decide what counts as spending, income or money moved (audit H3, M8, M9); from 1.5.8, "To review" and rule categories, the review's guesses, reversals paired by bank reference, redemptions, and payee names (bank codes, UPI IDs, gateways, UPI Lite) |
+| `check-spend.mjs` | Regression check: payee rules and defaults decide what counts as spending, income or money moved (audit H3, M8, M9); from 1.5.8, "To review" and rule categories, the review's guesses, reversals paired by bank reference, redemptions, and payee names (bank codes, UPI IDs, gateways, UPI Lite); from 1.5.9, Flow's money diagram names each payee and category once |
 | `check-app-updates.mjs` | Regression check: when the app offers, requires or skips a Google Play update, when "What's new" appears, and that the release notes match `android/app/build.gradle` |
 | `check-duplicates.mjs` | Regression check: bank references, transaction keys, stable import ids and duplicate matching on made-up narrations (audit L1–L3). Given a statements folder, also replays the audit's re-import tests on real statements, before and after, printing counts only |
 | `check-cloud-saves.mjs` | Regression check: refused cloud writes are kept for the "didn't save" banner, sent again by Try again, and dropped on Dismiss or a new sign-in (audit M4) |
@@ -21,6 +21,7 @@ One-off development and debugging tools. None of these ship with the app.
 | `check-entry.mjs` | Regression check: New entry's keypad and the entry it saves (`entryFromForm`), amounts typed in any currency saved in rupees to the paisa and read back as typed, 2,000 typed entries summed to the paisa |
 | `check-currency.mjs` | Regression check: currency formatting (Indian grouping for rupees, each currency's decimals), the currency picker's list and quick amounts |
 | `check-notifications.mjs` | Regression check: the bell's notifications from made-up wallets (failed unlocks, budgets, the daily limit, entries imported twice, double charges, bank charges, price rises, bills due, the import reminder, the savings goal), and how seen and dismissed ones are kept |
+| `check-back-button.mjs` | Regression check: Android's back button closes the newest open sheet, dialog or panel first, one per press, before it moves between screens; a panel closed another way takes no press; one that's busy saving stays open and still takes the press (utils/backStack.ts) |
 | `test-parser.mjs`, `test-summary.mjs` | Exercise the IDFC statement parsers against local statement files |
 | `analyze-excel.mjs`, `analyze-excel-detailed.mjs` | Inspect raw Excel statement structure while developing the parser |
 | `analyze-last-transactions.mjs`, `compare-dashboard-vs-statement.mjs` | Reconciliation checks between parsed data and statement totals |

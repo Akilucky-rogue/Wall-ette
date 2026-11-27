@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReleaseNote } from '../services/releaseNotes';
+import { useBackHandler } from '../utils/backStack';
 
 interface WhatsNewSheetProps {
   notes: ReleaseNote[];
@@ -15,6 +16,7 @@ interface WhatsNewSheetProps {
  * header strip and cut off at the top. Escape closes it.
  */
 const WhatsNewSheet: React.FC<WhatsNewSheetProps> = ({ notes, onClose }) => {
+  useBackHandler(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);

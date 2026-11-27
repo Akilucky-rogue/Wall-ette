@@ -29,8 +29,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       'Each bank account keeps its own opening balance, so statements from two banks add up.',
       'Import statements from Equitas Small Finance Bank.',
       'No stray "UPI ID" note on Excel imports.',
-      "Money moved's Back goes where you came from.",
-      'Less waiting at start-up on a slow connection.',
+      'Back closes an open panel first.',
+      'Less waiting at start-up on a slow connection, and in Vault.',
     ],
   },
   {

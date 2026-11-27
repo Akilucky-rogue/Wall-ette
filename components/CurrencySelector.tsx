@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useWallet } from '../context/WalletContext';
 import { currencyChoices, currencyName, getSymbol, POPULAR_CURRENCIES } from '../utils/currencyUtils';
 import { tick } from '../utils/haptics';
+import { useBackHandler } from '../utils/backStack';
 
 /**
  * The currency amounts are shown in: any of the ~160 the rate service knows.
@@ -37,6 +38,7 @@ const CurrencySelector: React.FC<{ variant?: 'pill' | 'field' }> = ({ variant = 
 
   const close = () => { setOpen(false); setQuery(''); buttonRef.current?.focus(); };
   const pick = (code: string) => { if (code !== currency) tick(); setCurrency(code); close(); };
+  useBackHandler(open, close);
 
   const rateLine = (code: string) => {
     const r = exchangeRates[code];

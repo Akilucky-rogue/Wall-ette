@@ -48,7 +48,10 @@ Dev-only: `typescript-plugin-css-modules` (typed CSS modules), `@types/*` for no
   `BACK_TARGET` parent. Scrollable/interactive elements (`.overflow-x-auto`, inputs, svg,
   canvas) are excluded. Thresholds: ≥70 px, ≤600 ms, dx > 1.5·dy.
 - **Android system back** — Capacitor `backButton` listener mirrors the same map:
-  sub-screen → parent, tab → Home, Home → `minimizeApp()`.
+  sub-screen → parent, tab → Home, Home → `minimizeApp()`. An open sheet, dialog or panel
+  closes first (1.5.9): each one calls `useBackHandler(open, close)` from
+  `utils/backStack.ts` while it's open, and back closes the newest; one that's busy saving
+  stays open and still takes the press (`scripts/check-back-button.mjs`).
 - **Pages, not long scrolls** (1.5.6) — Pulse is a hub (`SpendAnalysis` with no `page`) that
   links to its own pages, `PULSE_TRENDS`, `PULSE_CATEGORIES`, `PULSE_RECURRING` and
   `PULSE_HEALTH` (Insights; the same component with `page` set); they share the month through
@@ -358,6 +361,14 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   Insights, with "Ask Wall-ette" marked coming soon), Category Split (interactive SVG donut with merchant drill-down), Income
   Insights (Flow), Left to spend, Rewind (lifetime timeline) with exportable "Wall·ette
   Wrapped" canvas cards. Fee Hunter was removed in 1.5.6.
+- **Vault's list** (1.5.9) — draws 100 entries, then 100 more per "Show 100 more"; a new
+  search, filter or order starts again from 100. The count, the totals and the CSV export cover
+  every match. A wallet of thousands drawn at once was slow to open and to scroll.
+- **Flow's money diagram** (1.5.9) — each column is `flowColumn` in
+  `services/analyticsService.ts`: streams of at least 4% (at most four), then "Other" for the
+  rest. Payees are grouped by the name shown (`byLabel` with `prettyMerchant`), so one payee's
+  NEFT and RTGS narrations are one stream, and the Other category joins the pool, so no name
+  appears twice (`scripts/check-spend.mjs`).
 - **Notifications** (from 1.5.6) — the bell on Home (`components/NotificationCenter.tsx`).
   `services/notifications.ts` builds them on the device from data the app already has:
   failed unlock attempts from the security log (`services/securityLog.ts` reads the latest 30;

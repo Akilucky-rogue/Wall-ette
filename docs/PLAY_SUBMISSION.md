@@ -125,9 +125,9 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 
 1. The Blaze plan, which Cloud Functions and the scheduler need: **on already**.
 2. The Google Play Android Developer API, Cloud Pub/Sub and Cloud Scheduler: **enabled 28 Nov 2026**, with the APIs `firebase deploy` turned on.
-3. Pub/Sub topic `play-billing`: **created 28 Nov 2026**. Still to do: give `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it (`gcloud pubsub topics add-iam-policy-binding play-billing --member=serviceAccount:google-play-developer-notifications@system.gserviceaccount.com --role=roles/pubsub.publisher --project wall-e-7a113`), before Play's test notification.
+3. Pub/Sub topic `play-billing`: **created 28 Nov 2026**, with the **Pub/Sub Publisher** role on it for `google-play-developer-notifications@system.gserviceaccount.com`, so Google Play can send to it.
 4. `firebase deploy --only functions,firestore:rules,firestore:indexes` (functions in us-central1, next to the database in nam5): **deployed 28 Nov 2026** from commit 103fd2c, 11 functions and the 1.6.0 rules and indexes. The first deploy of 2nd gen functions on a project fails while Google sets up its service agents: retry after a few minutes. If a callable function then answers 403 to a request without sign-in, its Cloud Run service lacks the public invoker that `firebase deploy` adds on create: `gcloud run services add-iam-policy-binding <name> --region us-central1 --member=allUsers --role=roles/run.invoker` (the functions check sign-in themselves; a working one answers 401).
-   Still to choose: a cleanup policy for old container images (`firebase functions:artifacts:setpolicy --location us-central1 --days 1`), or they build up a small monthly bill.
+   Old container images are deleted after 1 day (`firebase functions:artifacts:setpolicy --location us-central1 --days 1`, **set 28 Nov 2026**); running functions don't need them.
 5. Only for student checks by email: install the **Trigger Email from Firestore** extension on the `mail` collection with an email service, name that service in the privacy policy, then set `config/students` → `emailChecks: true` and `domains` (for example `["ac.in", "edu.in", "edu"]`).
 
 **Try it, then switch on:**

@@ -176,7 +176,7 @@ Plain React context — no Redux/Zustand.
 | **Firestore** | Per-user data under `users/{uid}` (entries, settings, security log, consent record). From 1.6.0 a wallet's entries live in one document per month, `months/{YYYY-MM}` (see "Entries stored by month" in §5); up to 1.5.9 each entry was its own document in `transactions`. `persistentLocalCache` gives offline-first behavior with automatic sync. |
 | **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Month documents must have a month id and only an `entries` map; once a wallet's settings say `entriesIn: 'moving'` or `'months'`, nothing can be added to or changed in its old `transactions` (read and delete stay open for the move). `firestore.indexes.json` leaves `months.entries` unindexed. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
 | **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
-| **Cloud Functions** (from 1.6.0, not deployed yet) | `functions/` (Node 22, asia-south1), the paid plans' server; see "Paid plans" below. Needs the Blaze plan. |
+| **Cloud Functions** (from 1.6.0, not deployed yet) | `functions/` (Node 22, asia-south1), the paid plans' server; see "Paid plans" below. The project is on the Blaze plan. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
 (public FX rates for the currency selector) and, on Android, Google Play's update check,

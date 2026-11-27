@@ -7,13 +7,26 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ========== TRANSACTIONS ==========
+    // ========== ENTRIES, ONE DOCUMENT PER ENTRY (up to 1.5.9) ==========
+    // From 1.6.0 a wallet's entries live in month documents (below). The app
+    // moves each wallet once (services/monthStore.ts): it sets
+    // settings.entriesIn to 'moving', reads these documents, writes the
+    // months, sets 'months' and deletes these. From 'moving' on, older
+    // versions can't add or change entries here, so the move misses nothing;
+    // they show "didn't save" until updated. Reading and deleting stay open
+    // for the move.
+    function entriesMoved(userId) {
+      let prefs = /databases/$(database)/documents/users/$(userId)/settings/preferences;
+      return exists(prefs) && get(prefs).data.get('entriesIn', '') in ['moving', 'months'];
+    }
+
     match /users/{userId}/transactions/{transactionId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
 
       allow create: if request.auth != null
                     && request.auth.uid == userId
+                    && !entriesMoved(userId)
                     && request.resource.data.amount is number
                     && request.resource.data.amount > 0
                     && request.resource.data.type in ['INCOME', 'EXPENSE']
@@ -22,9 +35,27 @@ service cloud.firestore {
 
       allow update: if request.auth != null
                     && request.auth.uid == userId
+                    && !entriesMoved(userId)
                     && request.resource.data.amount is number
                     && request.resource.data.amount > 0
                     && request.resource.data.type in ['INCOME', 'EXPENSE'];
+    }
+
+    // ========== ENTRIES BY MONTH (from 1.6.0) ==========
+    // users/{uid}/months/{YYYY-MM}, or YYYY-MM-2 when a month spills over:
+    // one field, `entries`, a map from entry id to the entry. Rules can't
+    // check a map entry by entry, so the app checks each entry before
+    // writing (services/months.ts); Firestore keeps each document under
+    // 1 MiB. firestore.indexes.json leaves `entries` unindexed.
+    match /users/{userId}/months/{monthId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+                    && request.auth.uid == userId
+                    && monthId.matches('^[0-9]{4}-[0-9]{2}(-[0-9]+)?$')
+                    && request.resource.data.keys().hasOnly(['entries'])
+                    && (!('entries' in request.resource.data)
+                        || (request.resource.data.entries is map
+                            && request.resource.data.entries.size() <= 5000));
     }
 
     // ========== SETTINGS (preferences, ignore rules, limits, MFA) ==========

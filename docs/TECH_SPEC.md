@@ -173,8 +173,8 @@ Plain React context — no Redux/Zustand.
 | Service | Use |
 |---|---|
 | **Authentication** | Email/password sign-in (Identity Platform). Email enumeration protection is **off** (20 Nov 2026), so Forgot Password can say when no account uses an address; sign-up already revealed that. Password policy, enforced by Firebase: 8+ characters with upper and lower case, a number and a symbol, for new passwords only (existing ones still sign in). Reset emails come from `noreply@wall-e-7a113.firebaseapp.com` through Firebase's own page. TOTP MFA (authenticator apps) is fully implemented via `TotpMultiFactorGenerator` + QR enrollment but parked behind a "Coming Soon" UI. |
-| **Firestore** | Per-user data under `users/{uid}` (transactions, settings, security log, consent record). `persistentLocalCache` gives offline-first behavior with automatic sync. |
-| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
+| **Firestore** | Per-user data under `users/{uid}` (entries, settings, security log, consent record). From 1.6.0 a wallet's entries live in one document per month, `months/{YYYY-MM}` (see "Entries stored by month" in §5); up to 1.5.9 each entry was its own document in `transactions`. `persistentLocalCache` gives offline-first behavior with automatic sync. |
+| **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Month documents must have a month id and only an `entries` map; once a wallet's settings say `entriesIn: 'moving'` or `'months'`, nothing can be added to or changed in its old `transactions` (read and delete stay open for the move). `firestore.indexes.json` leaves `months.entries` unindexed. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
 | **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
@@ -370,6 +370,25 @@ The heart of the app. Rule-based and deterministic — no AI, no network.
   mounted into the app, so the entries start arriving two seconds sooner. User Timing marks
   (`utils/timing.ts`: `signin:done`, `wallet:listen`, `wallet:arrived`, `wallet:shown`) time
   it in a performance trace.
+- **Entries stored by month** (1.6.0, `services/months.ts`, `services/monthStore.ts`) — one
+  Firestore document per month, `users/{uid}/months/{YYYY-MM}`, holding `entries`, a map from
+  entry id to the entry; a month past 900 KB spills into `YYYY-MM-2`. Each entry is saved or
+  taken out by its own field (`setDoc` with `mergeFields`), so it's replaced whole and two
+  devices changing one month keep both changes; a new day in another month moves it in one
+  batch. `readMonths` reads an id found in two documents once. Where a wallet's entries are is
+  `storageRef` in WalletContext: `months`, or `legacy` (one document per entry) until its
+  one-time move has run. The move runs at the first start online of 1.6.0 (or the web app):
+  this device's queued changes reach the cloud, settings say `entriesIn: 'moving'` (from then
+  the rules refuse older versions' changes to the old documents), the old documents are read
+  through Firestore's REST API (the SDK would store each in the offline cache first), the
+  months are written, settings say `'months'`, and the old documents are deleted through the
+  REST API (`oldEntriesLeft` until done; an old document the months lack is saved first).
+  Changes made during the move wait for it. A move that fails clears `entriesIn` so older
+  versions can write again, and runs at the next start. Settings that say `'months'` while a
+  device listens to the old documents restart its listeners. Checked by `check-months` (with
+  the Firestore emulator: the rules, whole-entry saves, two devices, the move to the paisa) and
+  in Chrome against the emulators: a 2,700-entry wallet moved and shown in about 2 s, then on a
+  new device in 0.3 s (3.1 s before), or 0.9 s (10.7 s before) at a quarter of the CPU.
 - **Vault's list** (1.5.9) — draws 100 entries, then 100 more per "Show 100 more"; a new
   search, filter or order starts again from 100. The count, the totals and the CSV export cover
   every match. A wallet of thousands drawn at once was slow to open and to scroll.
@@ -494,10 +513,11 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 
 ## 10. Known limitations & roadmap
 
-- **First sign-in on a device** — about a minute on the emulator for a wallet of 2,700
-  entries: Firestore's on-device cache stores each entry as its own document (about 16,000
-  IndexedDB operations). Normal opens use the stored copy. Planned: entries stored by month
-  (`docs/PLAN_1.6.0.md`).
+- **First sign-in on a device** — up to 1.5.9, about a minute on the emulator for a wallet of
+  2,700 entries: Firestore's on-device cache stored each entry as its own document (about
+  16,000 IndexedDB operations). 1.6.0 stores entries by month (§5), about 30 documents for that
+  wallet. The cost: a change to one entry sends its whole month document (tens of KB) to each
+  device listening.
 - **TOTP MFA** — built end-to-end, parked as "Coming Soon" (needs Firebase console MFA toggle before enabling the UI).
 - **iOS** — pipeline exists, product decision parked.
 - **Android system bars** — follow the theme on every version with WebView 140+; with an

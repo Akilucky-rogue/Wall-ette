@@ -53,4 +53,11 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache()
 });
 
+/**
+ * Firestore's REST API, for the one-time move to month storage
+ * (services/monthStore.ts); undefined means Firestore's own address. The
+ * browser checks point it at the emulator.
+ */
+export const firestoreRestBase: string | undefined = undefined;
+
 export default app;

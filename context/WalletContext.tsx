@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { Transaction, TransactionType, CurrencyCode, PayeeKind, PayeeRule, CATEGORIES, canonicalCategory } from '../types';
-import { auth, db } from '../services/firebase';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference, deleteField } from 'firebase/firestore';
+import app, { auth, db, firestoreRestBase } from '../services/firebase';
+import { collection, query, onSnapshot, doc, setDoc, getDoc, getDocsFromServer, serverTimestamp, writeBatch, getDocs, orderBy, DocumentReference, deleteField } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { FALLBACK_RATES, getCurrencyFormatter, getCompactCurrencyFormatter, getWholeCurrencyFormatter, isCurrencyCode } from '../utils/currencyUtils';
 import { byNewest, fromTimestamp, isDay, localDay } from '../utils/dates';
@@ -15,6 +15,12 @@ import { reversalPairs } from '../services/reversals';
 import { categoryToStore, shownCategory, withShownCategories } from '../services/review';
 import { asImportReceipts, withReceipt, type ImportReceipt } from '../services/importReceipt';
 import type { BackupSettings } from '../services/backup';
+import { changesSynced } from '../services/session';
+import { emptyLayout, MONTH_DOC_ID, readMonths, type MonthLayout } from '../services/months';
+import {
+  clearOldEntries, deleteMonths, deleteOldEntries, listOldEntries, monthsCollection, moveToMonths, saveToMonths,
+  type Moved, type RestTarget,
+} from '../services/monthStore';
 
 export interface ImportOptions {
   /** The statement's opening balance, when it shows one (or its rows give it). */
@@ -242,6 +248,19 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] => {
   return results;
 };
 
+// Rejects if `p` hasn't settled within `ms`; `p` itself carries on.
+const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('timeout')), ms);
+  p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+});
+
+// Firestore's REST API as the signed-in user, for the move to month storage.
+const restTarget = (): RestTarget => ({
+  projectId: app.options.projectId ?? '',
+  base: firestoreRestBase,
+  token: () => (auth.currentUser ? auth.currentUser.getIdToken() : Promise.reject(new Error('Signed out'))),
+});
+
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -457,11 +476,89 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     initUserProfile();
   }, [user, isBackendReady]);
 
+  // ── Where the entries are kept (docs/PLAN_1.6.0.md) ──────────────────────
+  // 'months' from 1.6.0: one document per month (services/monthStore.ts).
+  // 'legacy': one document per entry, as up to 1.5.9, until this wallet's
+  // one-time move has run; it runs at a start online. 'moving' meanwhile.
+  const storageRef = useRef<'legacy' | 'moving' | 'months'>('legacy');
+  const layoutRef = useRef<MonthLayout>(emptyLayout());
+  // Settles when a move in progress does: cloud writes wait for it.
+  const movingRef = useRef<Promise<void>>(Promise.resolve());
+  // The move running, so a listener restarted meanwhile joins it.
+  const moveRef = useRef<{ uid: string; done: Promise<Moved | null> } | null>(null);
+  // The listeners restarted once because another device moved this wallet.
+  const switchedRef = useRef(false);
+
+  // Moves this wallet's entries to month documents, once. Null if it
+  // couldn't (offline, refused); it's tried again at the next start.
+  const moveWallet = useCallback((uid: string): Promise<Moved | null> => {
+      if (moveRef.current?.uid === uid) return moveRef.current.done;
+      const settingsRef = doc(db, `users/${uid}/settings/preferences`);
+      const done = (async (): Promise<Moved | null> => {
+          // 1. This device's queued changes to the old documents reach the cloud first.
+          if (!(await changesSynced(20_000))) return null;
+          try {
+              // 2. From now on older versions can't change the old documents (firestore.rules).
+              await withTimeout(setDoc(settingsRef, { entriesIn: 'moving' }, { merge: true }), 15_000);
+              // 3. Read them through the REST API, not the offline cache, and write the months.
+              const moved = await withTimeout(moveToMonths(db, uid, restTarget()), 120_000);
+              // 4. Done. The old documents go once the months are listened to.
+              await withTimeout(setDoc(settingsRef,
+                  { entriesIn: 'months', entriesMovedAt: serverTimestamp(), oldEntriesLeft: moved.oldNames.length > 0 },
+                  { merge: true }), 15_000);
+              if (auth.currentUser?.uid === uid) {
+                  layoutRef.current = moved.layout;
+                  storageRef.current = 'months';
+                  saveToLocal('entriesIn', 'months');
+              }
+              log.debug(`Moved ${moved.entries.length} entries to month storage`);
+              return moved;
+          } catch (e: any) {
+              log.warn('Moving entries to month storage failed:', e?.code || e?.message);
+              // Older versions may write to the old documents again until the next try.
+              void setDoc(settingsRef, { entriesIn: deleteField() }, { merge: true }).catch(() => {});
+              return null;
+          }
+      })().then(moved => {
+          if (!moved && auth.currentUser?.uid === uid) storageRef.current = 'legacy';
+          if (moveRef.current?.uid === uid) moveRef.current = null;
+          return moved;
+      });
+      moveRef.current = { uid, done };
+      movingRef.current = done.then(() => undefined);
+      return done;
+  }, [saveToLocal]);
+
+  // Deletes what a move left in the old collection (settings.oldEntriesLeft),
+  // in the background; anything the months lack is saved to them first, so
+  // it needs the months as the cloud has them: the move's own layout, or a
+  // fresh read. Once done, this device stops asking.
+  const clearOldIfLeft = useCallback(async (uid: string, moved?: MonthLayout) => {
+      if (loadFromLocal('oldEntriesCleared') === true) return;
+      const settingsRef = doc(db, `users/${uid}/settings/preferences`);
+      try {
+          if ((await getDoc(settingsRef)).get('oldEntriesLeft') === true) {
+              const layout = moved ?? readMonths((await getDocsFromServer(monthsCollection(db, uid))).docs
+                  .filter(d => MONTH_DOC_ID.test(d.id))
+                  .map(d => ({ id: d.id, entries: d.get('entries') }))).layout;
+              const left = await clearOldEntries(db, uid, restTarget(), layout);
+              await setDoc(settingsRef, { oldEntriesLeft: false }, { merge: true });
+              log.debug(`Deleted ${left} old entry documents`);
+          }
+          saveToLocal('oldEntriesCleared', true);
+      } catch (e: any) {
+          log.warn('Old entry documents not deleted yet:', e?.code || e?.message);
+      }
+  }, [loadFromLocal, saveToLocal]);
+
   // Sync Transactions
   useEffect(() => {
     if (!user) {
         setTransactions([]);
         setWalletLoaded(false);
+        storageRef.current = 'legacy';
+        layoutRef.current = emptyLayout();
+        switchedRef.current = false;
         return;
     }
 
@@ -472,24 +569,59 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return;
     }
 
+    const uid = user.uid;
+    let cancelled = false;
     let unsubscribe = () => {};
+    let stopRetry = () => {};
+    // How long the entries take to arrive, in a performance trace.
+    markTiming('wallet:listen', 'signin:done');
+    let arrived = false;
+    // The wallet has arrived with its first entries from this device, or
+    // with the cloud's answer (an empty wallet is empty only once the cloud
+    // says so). Offline, an empty copy is all there is.
+    const markArrived = (size: number, fromCache: boolean) => {
+        if (arrived || !(size > 0 || !fromCache || !navigator.onLine)) return;
+        arrived = true;
+        markTiming('wallet:arrived', 'wallet:listen');
+        setWalletLoaded(true);
+    };
+    const onListenError = (error: { message: string }) => {
+        log.warn('Firestore access failed, switching to local-only mode:', error.message);
+        setWalletLoaded(true);
+        setIsBackendReady(false);
+        // Keep whatever is already in memory (freshest); only fall back to
+        // the mirror when we have nothing.
+        setTransactions(prev => {
+            if (prev.length > 0) return prev;
+            const localData = loadFromLocal('transactions');
+            return localData ? asLoaded(localData) : prev;
+        });
+    };
 
-    try {
+    // From 1.6.0: one document per month.
+    const listenMonths = () => {
+        storageRef.current = 'months';
+        unsubscribe = onSnapshot(monthsCollection(db, uid), (snapshot) => {
+            markArrived(snapshot.size, snapshot.metadata.fromCache);
+            // Ignore echoes while Clear All is deleting.
+            if (clearingRef.current) return;
+            const { entries, layout } = readMonths(snapshot.docs
+                .filter(d => MONTH_DOC_ID.test(d.id))
+                .map(d => ({ id: d.id, entries: d.get('entries') })));
+            layoutRef.current = layout;
+            const listed = asLoaded(entries);
+            setTransactions(listed);
+            scheduleMirror(listed);
+        }, onListenError);
+    };
+
+    // Up to 1.5.9, and until this wallet's move has run: one document per entry.
+    const listenLegacy = () => {
+        storageRef.current = 'legacy';
         // Sorted by date descending in the database
-        const q = query(collection(db, `users/${user.uid}/transactions`), orderBy('date', 'desc'));
-        // How long the entries take to arrive, in a performance trace.
-        markTiming('wallet:listen', 'signin:done');
-        let arrived = false;
+        const q = query(collection(db, `users/${uid}/transactions`), orderBy('date', 'desc'));
         unsubscribe = onSnapshot(q, (snapshot) => {
-            // The wallet has arrived with its first entries from this
-            // device, or with the cloud's answer (an empty wallet is
-            // empty only once the cloud says so). Offline, an empty copy
-            // is all there is.
-            if (!arrived && (snapshot.size > 0 || !snapshot.metadata.fromCache || !navigator.onLine)) {
-                arrived = true;
-                markTiming('wallet:arrived', 'wallet:listen');
-                setWalletLoaded(true);
-            }
+            markArrived(snapshot.size, snapshot.metadata.fromCache);
             // Ignore echoes while Clear All is deleting in batches — otherwise
             // half-deleted snapshots repopulate the UI mid-clear.
             if (clearingRef.current) return;
@@ -504,28 +636,59 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setTransactions(listed);
             scheduleMirror(listed);
             if (timestamped.length > 0) saveLocalDays(timestamped);
-        }, (error) => {
-            log.warn('Firestore access failed, switching to local-only mode:', error.message);
-            setWalletLoaded(true);
-            setIsBackendReady(false);
-            // Keep whatever is already in memory (freshest); only fall back to
-            // the mirror when we have nothing.
-            setTransactions(prev => {
-                if (prev.length > 0) return prev;
-                const localData = loadFromLocal('transactions');
-                return localData ? asLoaded(localData) : prev;
-            });
-        });
-    } catch (e) {
-        log.warn('Firestore setup error:', e);
-        setWalletLoaded(true);
-        setIsBackendReady(false);
-        const localData = loadFromLocal('transactions');
-        if (localData) setTransactions(asLoaded(localData));
-    }
+        }, onListenError);
+    };
 
-    return () => unsubscribe();
-  }, [user, isBackendReady, refreshNonce, loadFromLocal, scheduleMirror, saveLocalDays]);
+    // One document per entry for now; offline, the move runs once this
+    // device is back online.
+    const fallBack = () => {
+        listenLegacy();
+        if (navigator.onLine) return;
+        const retry = () => setRefreshNonce(n => n + 1);
+        window.addEventListener('online', retry, { once: true });
+        stopRetry = () => window.removeEventListener('online', retry);
+    };
+
+    void (async () => {
+        try {
+            let entriesIn: unknown = loadFromLocal('entriesIn');
+            if (entriesIn !== 'months') {
+                entriesIn = (await getDoc(doc(db, `users/${uid}/settings/preferences`))).get('entriesIn');
+                if (cancelled) return;
+            }
+            if (entriesIn === 'months') {
+                saveToLocal('entriesIn', 'months');
+                listenMonths();
+                // A move cut short before its old documents went.
+                if (navigator.onLine) void clearOldIfLeft(uid);
+                return;
+            }
+            if (!navigator.onLine) {
+                fallBack();
+                return;
+            }
+            // The move. Meanwhile this device's last copy shows (if it has
+            // one) and changes wait for it.
+            storageRef.current = 'moving';
+            const mirror = loadFromLocal('transactions');
+            if (mirror && listRef.current.length === 0) setTransactions(asLoaded(mirror));
+            const moved = await moveWallet(uid);
+            if (cancelled) return;
+            if (moved) {
+                listenMonths();
+                void clearOldIfLeft(uid, moved.layout);
+            } else {
+                fallBack();
+            }
+        } catch (e: any) {
+            // Offline with no settings on this device yet, say.
+            log.warn('Checking where the entries are kept failed:', e?.code || e?.message);
+            if (!cancelled) fallBack();
+        }
+    })();
+
+    return () => { cancelled = true; unsubscribe(); stopRetry(); };
+  }, [user, isBackendReady, refreshNonce, loadFromLocal, saveToLocal, scheduleMirror, saveLocalDays, moveWallet, clearOldIfLeft]);
 
   // Sync Settings (Currency, Rules, Limits, MFA, Opening Balance)
   useEffect(() => {
@@ -572,6 +735,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           unsubscribe = onSnapshot(settingsRef, (docSnap) => {
               if (docSnap.exists()) {
                   const data = docSnap.data();
+                  // Another device moved this wallet to month storage while
+                  // this one was listening to one document per entry.
+                  if (data.entriesIn === 'months' && storageRef.current === 'legacy' && !switchedRef.current) {
+                      switchedRef.current = true;
+                      setRefreshNonce(n => n + 1);
+                  }
                   if (isCurrencyCode(data.currency)) {
                       setCurrencyState(data.currency);
                       saveToLocal('currency', data.currency);
@@ -672,6 +841,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const settingsRef = doc(db, `users/${user.uid}/settings/preferences`);
       void sendToCloud(`settings:${field}`, 1, () => setDoc(settingsRef, fields, { merge: true }));
   }, [user]);
+
+  // Saves entries whole and takes entries out, wherever this wallet keeps
+  // them (storageRef), after any move in progress. A refusal is kept for the
+  // "didn't save" banner, and its Try again goes wherever they're kept then.
+  const saveEntries = useCallback((uid: string, key: string, set: Transaction[], remove: Pick<Transaction, 'id' | 'date'>[] = []): Promise<boolean> =>
+      sendToCloud(key, Math.max(1, set.length + remove.length), async () => {
+          await movingRef.current;
+          if (storageRef.current === 'months') {
+              await saveToMonths(db, uid, layoutRef.current, set, remove);
+              return;
+          }
+          // One document per entry. Every batch is handed to Firestore at
+          // once: an import made offline keeps every row (audit M4).
+          const writes = [...set.map(t => ({ t, gone: false })), ...remove.map(t => ({ t, gone: true }))];
+          await Promise.all(chunkArray(writes, 500).map(chunk => {
+              const batch = writeBatch(db);
+              for (const { t, gone } of chunk) {
+                  const ref = doc(db, `users/${uid}/transactions/${t.id}`);
+                  if (gone) batch.delete(ref);
+                  else batch.set(ref, forCloud(t as Transaction));
+              }
+              return batch.commit();
+          }));
+      }), []);
 
   // Manual refresh: re-arm backend mode and force both listeners to
   // re-subscribe (fresh server snapshot). Safe to spam.
@@ -810,12 +1003,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
-    if (user) {
-        const txRef = doc(db, `users/${user.uid}/transactions/${transaction.id}`);
-        void sendToCloud(`tx:${transaction.id}`, 1, () => setDoc(txRef, forCloud(transaction)));
-    }
+    if (user) void saveEntries(user.uid, `tx:${transaction.id}`, [transaction]);
     return true;
-  }, [persistTransactions, user]);
+  }, [persistTransactions, user, saveEntries]);
 
   const editTransaction = useCallback(async (id: string, updates: Partial<Transaction>): Promise<boolean> => {
     const current = listRef.current;
@@ -836,26 +1026,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
-    if (user) {
-      // The whole entry, so sending it again after a refusal, or for an entry
-      // only this device had, still works.
-      const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
-      void sendToCloud(`tx:${id}`, 1, () => setDoc(txRef, forCloud(updatedTx)));
-    }
+    // The whole entry, so sending it again after a refusal, or for an entry
+    // only this device had, still works.
+    if (user) void saveEntries(user.uid, `tx:${id}`, [updatedTx]);
     return true;
-  }, [persistTransactions, user, flowOf]);
+  }, [persistTransactions, user, flowOf, saveEntries]);
 
   const deleteTransaction = useCallback((id: string) => {
+    const gone = listRef.current.find(t => t.id === id) ?? { id, date: '' };
     const newTxs = listRef.current.filter(t => t.id !== id);
     listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
 
-    if (user) {
-      const txRef = doc(db, `users/${user.uid}/transactions/${id}`);
-      void sendToCloud(`tx:${id}`, 1, () => deleteDoc(txRef));
-    }
-  }, [persistTransactions, user]);
+    if (user) void saveEntries(user.uid, `tx:${id}`, [], [gone]);
+  }, [persistTransactions, user, saveEntries]);
 
   // Deletes in batches of 500, Firestore's limit, all handed over at once.
   const deleteInBatches = useCallback((uid: string, ids: string[]): Promise<boolean>[] =>
@@ -869,19 +1054,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const deleteTransactions = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
     const idSet = new Set(ids);
+    const byId = new Map(listRef.current.map(t => [t.id, t]));
     const newTxs = listRef.current.filter(t => !idSet.has(t.id));
     listRef.current = newTxs;
     setTransactions(newTxs);
     persistTransactions(newTxs);
-    if (user) deleteInBatches(user.uid, ids);
-  }, [persistTransactions, user, deleteInBatches]);
+    if (user) void saveEntries(user.uid, `delete:${ids[0]}`, [], ids.map(id => byId.get(id) ?? { id, date: '' }));
+  }, [persistTransactions, user, saveEntries]);
 
   const clearAllTransactions = useCallback(async (waitForCloud = false) => {
     // Capture ids BEFORE wiping state — deleting by known ids skips the
     // expensive getDocs read that made Clear All feel slow.
     const idsToDelete = listRef.current.map(t => t.id);
+    const monthIds = [...layoutRef.current.sizes.keys()];
+    const inMonths = storageRef.current !== 'legacy';
 
     clearingRef.current = true;
+    layoutRef.current = emptyLayout();
     listRef.current = [];
     setTransactions([]);
     saveToLocal('transactions', []);
@@ -905,17 +1094,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (waitForCloud) {
         // Account deletion: every delete must reach the server before the
         // account goes, or the rules leave the rest orphaned. A failure stops
-        // the deletion.
+        // the deletion. Both places entries can be kept, whichever this
+        // wallet uses: the old documents through the REST API, which skips
+        // the offline cache.
         try {
+            await movingRef.current;
             await setDoc(settingsRef, resetOpening, { merge: true });
-            const ids = idsToDelete.length > 0
-                ? idsToDelete
-                : (await getDocs(query(collection(db, `users/${uid}/transactions`)))).docs.map(d => d.id);
-            await Promise.all(chunkArray(ids, 500).map(chunk => {
-                const batch = writeBatch(db);
-                chunk.forEach(id => batch.delete(doc(db, `users/${uid}/transactions/${id}`)));
-                return batch.commit();
-            }));
+            await deleteMonths(db, uid, monthIds, true);
+            const rest = restTarget();
+            await deleteOldEntries(rest, (await listOldEntries(rest, uid)).map(d => d.name));
         } finally {
             clearingRef.current = false;
         }
@@ -927,7 +1114,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const work: Promise<boolean>[] = [
         sendToCloud('settings:openingBalance', 1, () => setDoc(settingsRef, resetOpening, { merge: true })),
     ];
-    if (idsToDelete.length > 0) {
+    if (inMonths) {
+        // Whole month documents; with none known yet, every one the cloud has.
+        work.push(sendToCloud('clear:months', 1, async () => {
+            await movingRef.current;
+            await deleteMonths(db, uid, monthIds, monthIds.length === 0);
+        }));
+    } else if (idsToDelete.length > 0) {
         work.push(...deleteInBatches(uid, idsToDelete));
     } else {
         // Local state was empty but the cloud may not be (e.g. clear before
@@ -946,6 +1139,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [transactions, user, saveToLocal, deleteInBatches]);
 
   const importTransactions = useCallback((newTransactions: Transaction[], options: ImportOptions = {}): ImportOutcome => {
+    const before = new Map(listRef.current.map(t => [t.id, t]));
     const result = mergeImport(
       { transactions: listRef.current, openingBalance, openingBalanceAsOf, accounts },
       newTransactions,
@@ -968,23 +1162,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     persistTransactions(result.transactions);
 
     if (user) {
-        // Every batch is handed to Firestore at once. Awaiting each in turn
-        // meant an import made offline, with the app closed before it
-        // reconnected, kept only its first 500 rows (audit M4). Entries
-        // marked with their account go back whole, like new ones.
-        const uid = user.uid;
-        if (result.removed.length > 0) deleteInBatches(uid, result.removed);
-        for (const chunk of chunkArray([...result.added, ...result.retagged], 500)) {
-            void sendToCloud(`import:${chunk[0].id}`, chunk.length, () => {
-                const batch = writeBatch(db);
-                chunk.forEach(tx => batch.set(doc(db, `users/${uid}/transactions/${tx.id}`), forCloud(tx)));
-                return batch.commit();
-            });
-        }
+        // One change: every batch is handed to Firestore at once, so an
+        // import made offline keeps every row (audit M4). Entries marked
+        // with their account go back whole, like new ones.
+        const first = result.added[0] ?? result.retagged[0];
+        void saveEntries(user.uid, `import:${first?.id ?? result.removed[0]}`, [...result.added, ...result.retagged],
+            result.removed.map(id => before.get(id) ?? { id, date: '' }));
         log.debug(`Importing ${result.added.length} transactions, marking ${result.retagged.length}, removing ${result.removed.length}`);
     }
     return outcome;
-  }, [openingBalance, openingBalanceAsOf, accounts, setOpeningBalance, setAccountAnchor, persistTransactions, user, deleteInBatches]);
+  }, [openingBalance, openingBalanceAsOf, accounts, setOpeningBalance, setAccountAnchor, persistTransactions, user, saveEntries]);
 
   // Receipts save on this device at once and to the cloud through Firestore's queue.
   const saveImportReceipt = useCallback((receipt: ImportReceipt) => {

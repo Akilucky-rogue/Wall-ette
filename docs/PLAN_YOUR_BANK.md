@@ -50,15 +50,14 @@ Excel or CSV download (most Indian banks offer one in net banking), which
 reads exactly. Mapping a PDF's columns by position can come later, with the
 same balance proof.
 
-## SMS (once SMS capture ships)
+## Bank apps (once notification capture ships)
 
-A message from a sender outside `BANK_SENDERS`, with a transactional DLT
-ending (-T, -S or -G; never -P), a currency amount and a debit or credit
-word, waits on the phone as "Is this your bank?" with what `parseBankSms`
-read. Confirming adds the sender's core to the person's own sender list
-(synced with their settings); corrections are kept per sender as small hints
-(which amount is the payment, where the payee sits). The message text stays
-on the phone.
+SMS capture is parked (see `PLAN_1.6.0.md`), so new banks arrive through
+their apps' notifications instead. A bank's app that isn't on Wall-ette's
+allowlist can be added in Self → Your data (never a messaging app). Its
+first payments wait as "Add this?" with what the parser read; corrections are
+kept per app as small hints (which amount is the payment, where the payee
+sits). The notification text stays on the phone.
 
 ## Later, opt-in: share a layout
 

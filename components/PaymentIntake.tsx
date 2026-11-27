@@ -142,9 +142,15 @@ const ToCheckSheet: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Once the last one is dealt with there's nothing to show, so the sheet
+  // goes. (Opened from Settings with none waiting, it says so instead.)
+  const handled = (ids: string[]) => {
+    removeToCheck(ids);
+    if (getInbox().toCheck.length === 0) closeToCheck();
+  };
   const add = (list: Transaction[]) => {
     addTransactions(list);
-    removeToCheck(list.map(t => t.id));
+    handled(list.map(t => t.id));
   };
 
   return createPortal(
@@ -196,7 +202,7 @@ const ToCheckSheet: React.FC = () => {
                     <button onClick={() => add([w.entry])} className="flex-1 py-2.5 rounded-xl bg-sage text-white text-[13px] font-semibold active:scale-[0.98] transition-transform">
                       Add
                     </button>
-                    <button onClick={() => removeToCheck([w.entry.id])} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-premium-charcoal text-[13px] font-semibold active:scale-[0.98] transition-transform">
+                    <button onClick={() => handled([w.entry.id])} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-premium-charcoal text-[13px] font-semibold active:scale-[0.98] transition-transform">
                       Not a payment
                     </button>
                   </div>

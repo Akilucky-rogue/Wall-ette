@@ -91,7 +91,19 @@ export function setAskFirst(on: boolean): void {
 
 export const openToCheck = (note: string | null = null): void => set({ open: true, note });
 export const closeToCheck = (): void => set({ open: false, note: null });
-export const showAdded = (added: Added | null): void => set({ added });
+/**
+ * Shows "Added N payments" with Undo, or hides it (null). Payments added
+ * while it shows join it, so one Undo takes them all back: two apps' alerts
+ * a second apart would otherwise leave the first one's Undo unreachable.
+ */
+export const showAdded = (added: Added | null): void => {
+  const shown = state.added;
+  set({
+    added: added && shown
+      ? { ids: [...shown.ids, ...added.ids], apps: [...shown.apps, ...added.apps], at: added.at }
+      : added,
+  });
+};
 
 /** Forgets this phone's lists for an account (on sign-out). */
 export function forgetInbox(uid: string): void {

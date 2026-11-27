@@ -41,6 +41,7 @@ writeFileSync(entry, [
   `export * from ${JSON.stringify(join(root, 'services', 'captured.ts'))};`,
   `export { readNotice, noticeEntryId, paymentEntry } from ${JSON.stringify(join(root, 'services', 'paymentAlerts.ts'))};`,
   `export { mergeImport, afterMerge, ledgerBalance, importTally } from ${JSON.stringify(join(root, 'services', 'statementImport.ts'))};`,
+  `export { showAdded, getInbox } from ${JSON.stringify(join(root, 'services', 'paymentInbox.ts'))};`,
 ].join('\n'));
 const bundle = join(tmp, 'captured.mjs');
 await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'esm', logLevel: 'error' });
@@ -218,6 +219,17 @@ console.log('Lists');
   eq('one per entry, the newest first', [kept.filter(w => w.entry.id === 'a').length, kept[0].entry.id], [1, 'n0']);
   const seen = C.keepSeen([{ key: 'k', at: now - 8 * 86_400_000 }, ...Array.from({ length: 600 }, (_, i) => ({ key: `k${i}`, at: now - i }))], now);
   ok('notifications remembered a week, at most 500', seen.length === 500 && seen.every(s => now - s.at <= 7 * 86_400_000));
+}
+
+{
+  // "Added N payments" with Undo: payments added while it shows join it.
+  C.showAdded({ ids: ['p1'], apps: ['phonepe'], at: 1 });
+  C.showAdded({ ids: ['g1'], apps: ['gpay'], at: 2 });
+  eq('payments added while the message shows join it, so one Undo takes both back', C.getInbox().added, { ids: ['p1', 'g1'], apps: ['phonepe', 'gpay'], at: 2 });
+  C.showAdded(null);
+  C.showAdded({ ids: ['h1'], apps: ['hdfc'], at: 3 });
+  eq('once it has gone, the next payments start a new one', C.getInbox().added, { ids: ['h1'], apps: ['hdfc'], at: 3 });
+  C.showAdded(null);
 }
 
 console.log(failures ? `\n${failures} of ${checks} checks failed` : `\nAll ${checks} checks passed`);

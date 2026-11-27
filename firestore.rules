@@ -81,6 +81,26 @@ service cloud.firestore {
       allow get: if request.auth != null;
     }
 
+    // ========== PLANS (written by Cloud Functions only) ==========
+    // entitlements/{uid}: the member's plan, the summary of its grants
+    // (functions/src/grants.ts); grants/{source} under it, each source
+    // (Google Play, a gift, student access, a referral month).
+    // referrals/{uid}: their invite code and the friend's code they joined
+    // with. Readable by their owner; nothing here is written from the app,
+    // so a plan can't be switched on by hand. codes, playTokens,
+    // studentChecks, studentEmails, studentRequests and mail fall to the
+    // deny-by-default rule below: server only. config/app.plansLive
+    // switches paid plans on (docs/PLAN_1.6.0.md).
+    match /entitlements/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      match /grants/{source} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    match /referrals/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+    }
+
     // ========== WEBSITE FORMS (wall-ette.com) ==========
     // Anyone may send a contact message or join the Monthly Check-in; no one
     // can read, change or delete them from outside (read them in the Firebase

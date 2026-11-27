@@ -118,15 +118,16 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 2. On each of the four base plans, add an offer with ID `free-month`: eligibility **New customer acquisition → Never had any subscription** (the free month is for new members only; a restart pays from day one), one phase **Free trial, 30 days**. Activate the base plans and the offers.
 3. Keep Play's **grace period** and **account hold** on (the defaults). The app tells members when Google Play couldn't take a payment.
 4. Settings → **License testing**: add the testers' Google accounts. Their purchases are free and renew in minutes; the server marks them as tests.
-5. Users and permissions → invite the Cloud Functions service account (`<project number>-compute@developer.gserviceaccount.com` of wall-e-7a113) with access to Wall-ette: *View app information*, *View financial data, orders and cancellation survey responses* and *Manage orders and subscriptions*. Without it the server can't read or acknowledge purchases, and Google Play refunds purchases that aren't acknowledged within 3 days.
+5. Users and permissions → invite the Cloud Functions service account (`881370415293-compute@developer.gserviceaccount.com`, wall-e-7a113's default compute account) with access to Wall-ette: *View app information*, *View financial data, orders and cancellation survey responses* and *Manage orders and subscriptions*. Without it the server can't read or acknowledge purchases, and Google Play refunds purchases that aren't acknowledged within 3 days.
 6. Monetize with Play → Monetization setup → **Real-time developer notifications**: topic `projects/wall-e-7a113/topics/play-billing`, content *Subscriptions and voided purchases*, then **Send test notification**.
 
 **Firebase / Google Cloud (wall-e-7a113, the owner's go each):**
 
-1. The Blaze plan, which Cloud Functions and the scheduler need: **on already** (28 Nov 2026).
-2. Enable the Google Play Android Developer API, Cloud Pub/Sub, Cloud Scheduler and the APIs `firebase deploy` asks for.
-3. Pub/Sub topic `play-billing`; give `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it.
-4. `firebase deploy --only functions,firestore:rules,firestore:indexes` from the repo (functions in us-central1, next to the database in nam5).
+1. The Blaze plan, which Cloud Functions and the scheduler need: **on already**.
+2. The Google Play Android Developer API, Cloud Pub/Sub and Cloud Scheduler: **enabled 28 Nov 2026**, with the APIs `firebase deploy` turned on.
+3. Pub/Sub topic `play-billing`: **created 28 Nov 2026**. Still to do: give `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it (`gcloud pubsub topics add-iam-policy-binding play-billing --member=serviceAccount:google-play-developer-notifications@system.gserviceaccount.com --role=roles/pubsub.publisher --project wall-e-7a113`), before Play's test notification.
+4. `firebase deploy --only functions,firestore:rules,firestore:indexes` (functions in us-central1, next to the database in nam5): **deployed 28 Nov 2026** from commit 103fd2c, 11 functions and the 1.6.0 rules and indexes. The first deploy of 2nd gen functions on a project fails while Google sets up its service agents: retry after a few minutes. If a callable function then answers 403 to a request without sign-in, its Cloud Run service lacks the public invoker that `firebase deploy` adds on create: `gcloud run services add-iam-policy-binding <name> --region us-central1 --member=allUsers --role=roles/run.invoker` (the functions check sign-in themselves; a working one answers 401).
+   Still to choose: a cleanup policy for old container images (`firebase functions:artifacts:setpolicy --location us-central1 --days 1`), or they build up a small monthly bill.
 5. Only for student checks by email: install the **Trigger Email from Firestore** extension on the `mail` collection with an email service, name that service in the privacy policy, then set `config/students` → `emailChecks: true` and `domains` (for example `["ac.in", "edu.in", "edu"]`).
 
 **Try it, then switch on:**

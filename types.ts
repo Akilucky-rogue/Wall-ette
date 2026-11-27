@@ -100,6 +100,7 @@ export enum AppScreen {
   SELF_DATA = 'SELF_DATA', // Your data
   SELF_APPEARANCE = 'SELF_APPEARANCE',
   SELF_ABOUT = 'SELF_ABOUT',
+  SELF_PLAN = 'SELF_PLAN', // Self → Your plan (once paid plans are on)
 }
 
 // The one category list: statement parsers (services/categorize.ts), New

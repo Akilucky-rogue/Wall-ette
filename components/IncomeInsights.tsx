@@ -4,6 +4,9 @@ import { useWallet } from '../context/WalletContext';
 import { getSymbol, toBase, toShown, inputDigits } from '../utils/currencyUtils';
 import { parseDay } from '../utils/dates';
 import { takeSection } from '../utils/screenSection';
+import { usePlan } from '../services/plan';
+import { opens } from '../services/planRules';
+import PlanLock from './PlanLock';
 import { analyzeIncome, byLabel, flowColumn, StreamBadge, prettyMerchant } from '../services/analyticsService';
 import { Mascot } from './ui/Brand';
 import BalanceTrend from './BalanceTrend';
@@ -53,7 +56,9 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     budgets, savingsGoal, setBudget, setSavingsGoal, shownRate, shownCurrency,
   } = useWallet();
 
-  const [tab, setTab] = useState<'STORY' | 'GOALS'>('STORY');
+  // The story is Plus's; budgets and the savings goal (Goals) are every plan's.
+  const storyOpen = opens(usePlan().access, 'flow-story');
+  const [tab, setTab] = useState<'STORY' | 'GOALS'>(storyOpen ? 'STORY' : 'GOALS');
   // A budget or savings notification opens Goals (utils/screenSection.ts).
   useLayoutEffect(() => { if (takeSection('goals')) setTab('GOALS'); }, []);
   const [selectedMonthIdx, setSelectedMonthIdx] = useState<number | null>(null);
@@ -301,7 +306,9 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
             ))}
           </div>
 
-          {tab === 'STORY' && (
+          {tab === 'STORY' && !storyOpen && <PlanLock reason="flow-story" />}
+
+          {tab === 'STORY' && storyOpen && (
             <div className="space-y-4 lg:columns-2 lg:gap-x-5">
               {/* Month selector */}
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 break-inside-avoid">

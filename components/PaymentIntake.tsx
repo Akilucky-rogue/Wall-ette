@@ -13,6 +13,8 @@ import { prettyMerchant } from '../services/analyticsService';
 import { useBackHandler } from '../utils/backStack';
 import { parseDay } from '../utils/dates';
 import { log } from '../utils/log';
+import { usePlan } from '../services/plan';
+import { canAdd } from '../services/planRules';
 
 const count = (n: number, one: string, many: string) => `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
 const listText = (parts: string[]) =>
@@ -47,6 +49,9 @@ const whenText = (w: ToCheck): string => {
 const PaymentIntake: React.FC = () => {
   const { user } = useAuth();
   const { storedTransactions, walletLoaded, addTransactions } = useWallet();
+  // With no plan (once paid plans are on), payments stay on the phone,
+  // unread, and are added when a plan starts again.
+  const adding = canAdd(usePlan().access);
   const inbox = useSyncExternalStore(subscribeInbox, getInbox);
   const listRef = useRef(storedTransactions);
   listRef.current = storedTransactions;
@@ -57,7 +62,7 @@ const PaymentIntake: React.FC = () => {
   useEffect(() => { loadInbox(uid); }, [uid]);
 
   const run = useCallback(async () => {
-    if (!uid || !walletLoaded || !readerSupported()) return;
+    if (!uid || !walletLoaded || !adding || !readerSupported()) return;
     if (running.current) { again.current = true; return; }
     running.current = true;
     try {
@@ -89,7 +94,7 @@ const PaymentIntake: React.FC = () => {
     } finally {
       running.current = false;
     }
-  }, [uid, walletLoaded, addTransactions]);
+  }, [uid, walletLoaded, adding, addTransactions]);
 
   useEffect(() => { void run(); }, [run]);
   useEffect(() => onReaderEvent(() => { void run(); }), [run]);

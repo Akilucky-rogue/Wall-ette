@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
+import { usePlan } from '../services/plan';
+import { opens } from '../services/planRules';
 import { getUpdateState, installUpdate, restartToUpdate, subscribe } from '../services/appUpdates';
 import { latestNotes, RELEASE_NOTES } from '../services/releaseNotes';
 import { recentUnlocks } from '../services/securityLog';
@@ -62,13 +64,21 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNavigate }) =
   useEffect(() => { readLog(); }, [readLog]);
 
   const money = formatWhole;
+  const { live, entitlement, access } = usePlan();
+  const recurring = opens(access, 'recurring');
+  // The same plan keeps the same object, so the list isn't rebuilt each render.
+  const planKey = live && entitlement ? [entitlement.plan, entitlement.cycle, entitlement.trial, entitlement.expiresAt, entitlement.autoRenewing, entitlement.state].join('|') : '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const plan = useMemo(() => (live ? entitlement : null), [planKey]);
   const all = useMemo(() => buildNotifications({
     now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks,
     updateReady: update.phase === 'ready',
     updateAvailable: update.finding === 'available' && update.phase === 'idle' ? update.availableVersionCode : 0,
     release: RELEASE,
     money,
-  }), [now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks, update.phase, update.finding, update.availableVersionCode, money]);
+    plan,
+    recurring,
+  }), [now, transactions, counted, budgets, dailyLimit, savingsGoal, unlocks, update.phase, update.finding, update.availableVersionCode, money, plan, recurring]);
   const { fresh, earlier } = useMemo(() => arrange(all, state, now.getTime()), [all, state, now]);
 
   const commit = useCallback((next: NotificationState) => {

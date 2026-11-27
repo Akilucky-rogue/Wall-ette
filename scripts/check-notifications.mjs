@@ -9,9 +9,13 @@
  *     month's spending; a budget going over after nearing is news again
  *   - entries imported twice (removed in Vault) and price rises still
  *     being charged (Pulse → Recurring) are found
- *   - recurring charges due in the next three days are listed, later ones not
+ *   - recurring charges due in the next three days are listed, later ones not;
+ *     bills due and price rises stay off where recurring tracking is (Essential)
  *   - an import reminder appears once the newest entry is a month old, and
  *     last month's savings goal only once that month is complete
+ *   - once paid plans are on: the free month's reminder from day 25 with the
+ *     first charge, a payment Google Play couldn't take, a plan that won't
+ *     renew; nothing without a plan or after it ends
  *   - seen, dismissed and old records: "New", "Earlier", pruning, and a
  *     storage key that sign-out removes
  *
@@ -170,6 +174,9 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   const stopped = list.filter(t => !(t.merchant.includes('SPOTIFY') && t.date >= '2026-10-01'));
   eq('creep: not once the charges stopped weeks ago', ids(byPrefix(build_({ transactions: stopped, now: new Date(2026, 11, 28) }), 'creep:')), []);
 
+  eq('creep: not on Essential (recurring is in Plus)', ids(byPrefix(build_({ transactions: list, recurring: false }), 'creep:')), []);
+  eq('copies: still on Essential', ids(byPrefix(build_({ transactions: list, recurring: false }), 'copies:')), ['copies:1:-15000']);
+
   const thrice = [...list, out('2026-11-05', 15000, 'Rent', imported, 'import-3')];
   eq('copies: three of one row', byPrefix(build_({ transactions: thrice }), 'copies:')[0]?.title, 'A transaction is in your wallet more than once');
 }
@@ -190,6 +197,7 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('due: tomorrow', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 21, 9) }), 'due:')[0]?.title, 'Netflix.com is due tomorrow');
   eq('due: today', byPrefix(build_({ transactions: list, now: new Date(2026, 10, 22, 9) }), 'due:')[0]?.title, 'Netflix.com is due today');
   eq('due: not when it is already past', ids(byPrefix(build_({ transactions: list, now: new Date(2026, 10, 24, 9) }), 'due:')), []);
+  eq('due: not on Essential (recurring is in Plus)', ids(byPrefix(build_({ transactions: list, recurring: false }), 'due:')), []);
 }
 
 // ── How recent the data is; last month's savings ───────────────────────────
@@ -225,6 +233,34 @@ const byPrefix = (list, prefix) => list.filter(n => n.id.startsWith(prefix));
   eq('app: a downloaded update wins over one on Play', ids(build_({ updateReady: true, updateAvailable: 15, release })), ['update:14']);
   eq('app: nothing newer than this version', ids(build_({ updateAvailable: 14, release })), []);
   eq('app: a newer one is a new note', ids(build_({ updateAvailable: 16, release })), ['update-available:16']);
+}
+
+// ── The plan's dates (only while paid plans are on) ─────────────────────────
+{
+  const DAY = 24 * 60 * 60 * 1000;
+  // A free month started on day 1 ends 30 days later: the charge falls on day 31.
+  const plan = (daysLeft, over = {}) => ({
+    plan: 'essential', cycle: 'monthly', trial: true, autoRenewing: true, state: 'active',
+    expiresAt: new Date(NOW.getTime() + daysLeft * DAY).toISOString(), ...over,
+  });
+  eq('plan: no plan, nothing', ids(build_({ plan: null })), []);
+  eq('plan: day 24 of the free month is too early', ids(build_({ plan: plan(6.5) })), []);
+  const [trial] = build_({ plan: plan(6) });
+  eq('plan: the reminder from day 25', trial?.id, `trial-end:${plan(6).expiresAt.slice(0, 10)}`);
+  eq('plan: says the day', trial?.title, 'Your free month ends on 26 Nov');
+  eq('plan: says the first charge', trial?.body, 'Google Play then charges ₹49 for Essential monthly. To pay nothing, cancel in Google Play before then.');
+  eq('plan: Plus yearly price', build_({ plan: plan(2, { plan: 'plus', cycle: 'yearly' }) })[0]?.body, 'Google Play then charges ₹899 for Plus yearly. To pay nothing, cancel in Google Play before then.');
+  eq('plan: opens Your plan', trial?.action, { kind: 'screen', screen: 'SELF_PLAN' });
+  eq('plan: after security, before budgets', trial?.rank, 5);
+  eq('plan: a cancelled free month says nothing is charged', build_({ plan: plan(3, { autoRenewing: false }) })[0]?.title, 'Your free month ends on 23 Nov');
+  eq('plan: a renewing paid plan is quiet', ids(build_({ plan: plan(2, { trial: false }) })), []);
+  const ending = build_({ plan: plan(4, { trial: false, autoRenewing: false, plan: 'plus' }) })[0];
+  eq('plan: a paid plan that won\'t renew', [ending?.title, ending?.tone], ['Plus ends on 24 Nov', 'info']);
+  eq('plan: not yet a week out', ids(build_({ plan: plan(8, { trial: false, autoRenewing: false }) })), []);
+  eq('plan: nothing once it has ended', ids(build_({ plan: plan(-1, { autoRenewing: false }) })), []);
+  const pay = build_({ plan: plan(-1, { trial: false, state: 'grace' }) })[0];
+  eq('plan: a payment Play couldn\'t take', [pay?.title, pay?.tone, pay?.icon], ["Google Play couldn't take your payment", 'alert', 'credit_card_off']);
+  eq('plan: account hold too', build_({ plan: plan(-3, { trial: false, state: 'on-hold' }) })[0]?.id.startsWith('plan-payment:'), true);
 }
 
 // ── Seen, dismissed, pruned ────────────────────────────────────────────────

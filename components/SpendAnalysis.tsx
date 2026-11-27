@@ -15,6 +15,10 @@ import { Card, IconChip, SectionTitle } from './ui/Paper';
 import MoneyInOut from './charts/MoneyInOut';
 import PaceChart from './charts/PaceChart';
 import { CalendarHeat, RankedBars, SplitBar, UsualBars, WeekdayBars } from './charts/SpendCharts';
+import PlanLock from './PlanLock';
+import { useLimits } from '../services/plan';
+import { opens } from '../services/planRules';
+import { openPlans } from '../services/planSheet';
 
 /** Pulse is a hub (the month at a glance) with a page for each topic. */
 export type PulsePage = 'hub' | 'trends' | 'categories' | 'recurring' | 'health';
@@ -40,7 +44,18 @@ const shortDay = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', mo
 const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' }) => {
   // Pulse analyses real spending and income only: money moved to your own
   // accounts, family or investments is left out (audit H3).
-  const { counted, formatWhole, formatAmountCompact, budgets, dailyLimit } = useWallet();
+  const { counted: all, formatWhole, formatAmountCompact, budgets, dailyLimit, accounts } = useWallet();
+  // Essential (and no plan) look at the last 12 months; older entries stay
+  // saved, in Vault, read-only (services/planRules.ts).
+  const limits = useLimits(accounts);
+  const fullHistory = opens(limits.access, 'full-history');
+  const floorKey = fullHistory ? '' : limits.from.slice(0, 7);
+  const counted = useMemo(
+    () => (fullHistory ? all : all.filter(t => t.date.slice(0, 10) >= limits.from)),
+    [all, fullHistory, limits.from],
+  );
+  const olderHidden = counted.length < all.length;
+  const recurringOpen = opens(limits.access, 'recurring');
   const view = usePulseView();
   const [heatDay, setHeatDay] = useState<number | null>(null);
   const now = new Date();
@@ -57,8 +72,10 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
     return { firstKey: first.slice(0, 7), newestKey: newest.slice(0, 7) };
   }, [counted]);
   const nowKey = monthKey(now);
-  const selected = view.month
+  const picked = view.month
     ?? (newestKey && newestKey < nowKey ? parseDay(`${newestKey}-01`) : new Date(now.getFullYear(), now.getMonth(), 1));
+  // A month picked on Plus, before Essential's 12 months, opens at their start.
+  const selected = floorKey && monthKey(picked) < floorKey ? parseDay(`${floorKey}-01`) : picked;
   const selKey = monthKey(selected);
 
   const r = useMemo(
@@ -68,15 +85,18 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
   );
 
   // Recurring charges for the hub's preview (hooks stay above the pages' early returns).
-  const recurringCount = useMemo(() => detectRecurringCharges(counted, new Date(), Infinity), [counted]);
+  const recurringCount = useMemo(() => (recurringOpen ? detectRecurringCharges(counted, new Date(), Infinity) : []), [counted, recurringOpen]);
   const recurringMonthly = recurringCount.reduce((s, c) => s + c.monthlyCost, 0);
 
+  // Back from the first month Essential shows, with older ones saved: say why it stops.
+  const atFloor = !!floorKey && olderHidden && selKey <= (firstKey || floorKey);
   const goMonth = (offset: number) => {
+    if (offset < 0 && atFloor) { openPlans('history'); return; }
     tick();
     setHeatDay(null);
     pulseView.setMonth(new Date(selected.getFullYear(), selected.getMonth() + offset, 1));
   };
-  const canBack = !!firstKey && selKey > firstKey;
+  const canBack = (!!firstKey && selKey > firstKey) || atFloor;
   const canForward = selKey < nowKey;
 
   const open = (screen: AppScreen, section?: ScreenSection) => { if (section) openAt(section); onNavigate(screen); };
@@ -137,7 +157,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
     },
     {
       screen: AppScreen.PULSE_RECURRING, title: 'Recurring', icon: 'autorenew', tint: 'bg-lavender-light text-lavender',
-      preview: recurringCount.length > 0 ? `${recurringCount.length} ${recurringCount.length === 1 ? 'charge' : 'charges'}, about ${formatAmountCompact(recurringMonthly)} a month` : 'Bills and subscriptions',
+      preview: !recurringOpen ? 'Bills and subscriptions, in Plus'
+        : recurringCount.length > 0 ? `${recurringCount.length} ${recurringCount.length === 1 ? 'charge' : 'charges'}, about ${formatAmountCompact(recurringMonthly)} a month` : 'Bills and subscriptions',
     },
     {
       screen: AppScreen.PULSE_HEALTH, title: 'Insights', icon: 'lightbulb', tint: 'bg-sand-light text-sand-ink',
@@ -225,6 +246,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           ))}
         </ul>
       </nav>
+
+      {olderHidden && <PlanLock reason="history" compact className="lg:col-span-12" />}
 
       <AskSoon className="lg:col-span-12" />
     </div>,

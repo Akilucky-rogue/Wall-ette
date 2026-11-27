@@ -10,6 +10,9 @@ import { askFirst, getInbox, openToCheck, setAskFirst, subscribeInbox } from '..
 import { useBackHandler } from '../utils/backStack';
 import { tick } from '../utils/haptics';
 import PageHeader from './ui/PageHeader';
+import PlanLock from './PlanLock';
+import { usePlan } from '../services/plan';
+import { canAdd } from '../services/planRules';
 
 interface PaymentsFromAppsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -88,6 +91,7 @@ const Disclosure: React.FC<{ onContinue: () => void; onClose: () => void }> = ({
  */
 const PaymentsFromApps: React.FC<PaymentsFromAppsProps> = ({ onNavigate }) => {
   const supported = readerSupported();
+  const adding = canAdd(usePlan().access);
   const [status, setStatus] = useState<ReaderStatus | null>(null);
   const [disclosure, setDisclosure] = useState(false);
   const [ask, setAsk] = useState(askFirst);
@@ -172,6 +176,7 @@ const PaymentsFromApps: React.FC<PaymentsFromAppsProps> = ({ onNavigate }) => {
         </section>
       ) : (
         <div className="px-6 space-y-4">
+          {!adding && <PlanLock reason="payments-paused" compact />}
           <Card>
             <div className="flex items-center justify-between gap-3 px-4 py-3.5">
               <span className="min-w-0">

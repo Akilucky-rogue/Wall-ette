@@ -28,6 +28,9 @@ import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoog
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
 import { openAt } from '../utils/screenSection';
+import { PREVIEWS, setPreview, usePlan, type Preview } from '../services/plan';
+import { opens } from '../services/planRules';
+import { billingSupported, manageSubscription } from '../services/billing';
 import { useBackHandler } from '../utils/backStack';
 import {
   currentAlerts, loadShown, markShown, phoneNotificationsOn, saveShown, setPhoneNotificationsOn, subscribePhoneSwitch,
@@ -439,10 +442,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   const themeName = themeMode === 'auto'
     ? 'Matches your phone'
     : `${themeSwatches().find(s => s.id === themeMode)?.name ?? 'Sage'} theme`;
+  const plan = usePlan();
   const chevron = <span className="material-symbols-outlined text-muted-taupe/60 text-[20px]" aria-hidden="true">chevron_right</span>;
   const external = <span className="material-symbols-outlined text-muted-taupe/60 text-[18px]" aria-hidden="true">open_in_new</span>;
 
+  const planLabel = plan.entitlement?.plan
+    ? `${plan.entitlement.plan === 'plus' ? 'Plus' : 'Essential'}${plan.entitlement.trial ? ', free month' : ''}`
+    : 'Essential or Plus, invites, codes and students';
   const pages: { screen: AppScreen; title: string; icon: string; tint: string; preview: string }[] = [
+    ...(plan.live ? [{ screen: AppScreen.SELF_PLAN, title: 'Your plan', icon: 'workspace_premium', tint: 'bg-sand-light text-sand-ink', preview: planLabel }] : []),
     {
       screen: AppScreen.SELF_ACCOUNT, title: PAGE_TITLE.account, icon: 'shield_person', tint: 'bg-sage-light text-sage',
       preview: isNative() && bioOn ? 'Biometric unlock is on' : 'Password, unlock and sign-in',
@@ -596,7 +604,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
           {isNative() && (
             <Card>
               <Row icon="notifications_active" iconCls="bg-ocean-light text-ocean" title="Phone notifications"
-                   sub="Bills due tomorrow, budgets and your daily limit. Made on this phone; nothing is sent.">
+                   sub={`${opens(plan.access, 'recurring') ? 'Bills due tomorrow, budgets' : 'Budgets'} and your daily limit. Made on this phone; nothing is sent.`}>
                 <Toggle checked={phoneOn} onChange={() => { void togglePhone(); }} label="Phone notifications" />
               </Row>
               {phoneMsg && <p className="px-4 py-3 text-[12px] text-rose leading-snug" role="status">{phoneMsg}</p>}
@@ -743,6 +751,27 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
             )}
             {isNative() && updatesSupported() && <UpdateCheckResult />}
           </div>
+          {__QA_BUILD__ && (
+            <Card>
+              <div className="px-4 py-3.5">
+                <p className="text-[14px] font-semibold text-premium-charcoal">Preview a plan</p>
+                <p className="text-[12px] text-muted-taupe leading-snug">Test build only: pretend paid plans are on, without the server or Google Play.</p>
+                <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Preview a plan">
+                  {([null, ...PREVIEWS] as (Preview | null)[]).map(p => (
+                    <button
+                      key={p ?? 'off'}
+                      role="radio"
+                      aria-checked={plan.preview === p}
+                      onClick={() => setPreview(p)}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${plan.preview === p ? 'bg-sage text-white border-sage' : 'border-black/[0.1] text-muted-taupe'}`}
+                    >
+                      {p === null ? 'Off' : p === 'none' ? 'No plan' : p === 'essential-after-plus' ? 'Essential after Plus' : p === 'plus' ? 'Plus' : p === 'free-month' ? 'Free month ending' : 'Essential'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
           <Card>
             <Row icon="policy" iconCls="bg-sand-light text-sand-ink" title="Privacy policy" sub="How your data is handled"
                  onClick={() => window.open(PRIVACY_URL, '_blank')}>
@@ -904,6 +933,16 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
               This permanently erases your account and every transaction from the cloud. There is no undo.
               Consider exporting a backup first.
             </p>
+            {plan.entitlement?.source === 'play' && (
+              <div className="mb-4 p-3 bg-sand-light/70 rounded-xl text-[12px] text-premium-charcoal leading-relaxed">
+                Deleting your account doesn't cancel your plan. It keeps renewing in Google Play until you cancel it there.
+                {billingSupported() && (
+                  <button onClick={() => { void manageSubscription(); }} className="block mt-1.5 font-semibold text-sage">
+                    Open Google Play subscriptions
+                  </button>
+                )}
+              </div>
+            )}
             {delError && <div className="mb-4 p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-rose text-xs font-medium leading-relaxed">{delError}</div>}
 
             {delResolver ? (

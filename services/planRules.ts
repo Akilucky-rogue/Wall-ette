@@ -84,8 +84,8 @@ export interface Entitlement {
   autoRenewing: boolean;
   /** When this membership started; a restart starts it again. */
   memberSince: string | null;
-  /** A move down or to monthly that starts at the next renewal. */
-  pendingChange: { plan: PlanId; cycle: Cycle } | null;
+  /** A move down or to monthly that starts at the next renewal; cycle is null when Play doesn't say. */
+  pendingChange: { plan: PlanId; cycle: Cycle | null } | null;
   /** A licence tester's purchase: nothing was charged. */
   test: boolean;
 }

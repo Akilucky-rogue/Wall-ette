@@ -4,6 +4,8 @@ import { useWallet } from '../context/WalletContext';
 import { accountSummaries, type AccountSummary } from '../services/accounts';
 import { showAccountInVault } from '../utils/vaultAccount';
 import { parseDay } from '../utils/dates';
+import { useLimits } from '../services/plan';
+import { openPlans } from '../services/planSheet';
 
 interface BankAccountsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -31,6 +33,10 @@ const BankAccounts: React.FC<BankAccountsProps> = ({ onNavigate }) => {
     () => accountSummaries(transactions, accounts, unassignedOpening),
     [transactions, accounts, unassignedOpening],
   );
+  // Essential keeps one account to add to and edit; the rest stay, read-only.
+  const limits = useLimits(accounts);
+  const kept = limits.access === 'essential' ? list.find(s => s.key === limits.account) ?? null : null;
+  const readOnly = (s: AccountSummary) => !!kept && s.key !== kept.key;
 
   const open = (key: string) => {
     showAccountInVault(key);
@@ -98,8 +104,14 @@ const BankAccounts: React.FC<BankAccountsProps> = ({ onNavigate }) => {
       ) : (
         <section className="px-6 space-y-3">
           <div className="bg-white rounded-2xl shadow-soft border border-black/[0.02] divide-y divide-black/[0.04] overflow-hidden">
-            {list.map(s => row(s, 'account_balance', 'bg-sage-light text-sage', entriesLine(s)))}
+            {list.map(s => row(s, readOnly(s) ? 'lock' : 'account_balance', 'bg-sage-light text-sage', readOnly(s) ? `${entriesLine(s)} · read-only` : entriesLine(s)))}
           </div>
+          {kept && list.some(readOnly) && (
+            <p className="text-muted-taupe text-[12px] leading-relaxed px-1">
+              Essential holds one bank account: {kept.label}. The others stay saved and read-only.{' '}
+              <button type="button" onClick={() => openPlans('read-only')} className="text-sage font-semibold hover:underline">See Plus</button>
+            </p>
+          )}
           {other && (
             <>
               <div className="bg-white rounded-2xl shadow-soft border border-black/[0.02] overflow-hidden">

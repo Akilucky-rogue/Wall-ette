@@ -8,6 +8,11 @@ export const SITE_HOST = 'wall-ette.com';
 export const SITE_URL = `https://${SITE_HOST}`;
 export const PRIVACY_URL = `${SITE_URL}/privacy`;
 export const TERMS_URL = `${SITE_URL}/terms`;
+/** Referrals, student access and gifts (wall-ette.com/spread). */
+export const SPREAD_URL = `${SITE_URL}/spread`;
+
+/** Where support and bank requests go: the website's contact address (site/src/lib/site.ts). */
+export const SUPPORT_EMAIL = 'akshatbvora@gmail.com';
 
 /**
  * Sender of the password-reset email (Firebase's default for this project).

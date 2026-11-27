@@ -16,6 +16,9 @@ import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
 import { receiptLines, type ImportReceipt } from '../services/importReceipt';
 import styles from './ImportStatement.module.css';
 import { capturedRows, carryOver, isCaptured } from '../services/captured';
+import { useLimits } from '../services/plan';
+import { takesAccount } from '../services/planRules';
+import PlanLock from './PlanLock';
 
 // Pagination settings
 const ITEMS_PER_PAGE = 20;
@@ -109,6 +112,10 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
       unassignedOpening, openingBalanceAsOf, accounts, formatAmount,
       flowOf, importReceipts, saveImportReceipt,
   } = useWallet();
+  // Essential's limits (services/planRules.ts): one bank account, and rows
+  // older than its 12 months saved read-only. Open everything until paid
+  // plans are switched on.
+  const limits = useLimits(accounts);
 
   // Stages: IDLE (choose a file), PROCESSING (reading it), REVIEW (the rows),
   // DONE (the receipt, and the payments to review)
@@ -265,6 +272,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   // Importing a statement again, with every row already in the wallet,
   // still sets the account's opening balance or marks its entries.
   const nothingToAdd = selectedIds.size === 0;
+  // Essential: a statement of a second bank account isn't taken; rows older
+  // than its 12 months are taken, read-only (planRules.ts editable).
+  const secondAccount = limits.access === 'essential' && !takesAccount(limits, statementAccount ? accountKey(statementAccount.bank, statementAccount.last4) : null);
+  const olderRows = limits.access === 'essential'
+    ? extractedData.filter(t => selectedIds.has(t.id) && t.date.slice(0, 10) < limits.from).length
+    : 0;
   const canUpdate = !!accountPlan && (!!accountPlan.next || accountPlan.marks > 0);
   const accountNote = (): string => {
     if (!account || !accountPlan) return '';
@@ -617,6 +630,7 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   };
 
   const confirmImport = () => {
+      if (secondAccount) return;
       // Rows that take an app entry's place got its category and note when
       // staged (stageForReview); what the review shows is what's saved.
       const toImport = extractedData.filter(t => selectedIds.has(t.id));
@@ -926,6 +940,12 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     <button onClick={handleDiscard} className="shrink-0 text-rose text-[13px] font-semibold pt-1">Discard</button>
                 </div>
                 <div className="mb-4"><StatusLine label="Balance check" tone={balanceStatus.tone} text={balanceStatus.text} /></div>
+                {secondAccount && <div className="mb-4"><PlanLock reason="second-account" compact /></div>}
+                {!secondAccount && olderRows > 0 && (
+                    <p className="mb-4 text-xs text-premium-charcoal leading-relaxed p-3 rounded-2xl bg-sand-light/70" role="status">
+                        {olderRows === 1 ? 'One row is' : `${olderRows} rows are`} from before Essential's 12 months. {olderRows === 1 ? 'It is' : 'They are'} saved read-only; Plus keeps your full history editable.
+                    </p>
+                )}
                 {/* Rows for payments read from your apps: the row takes the entry's place */}
                 {replaces.length > 0 && (
                     <div className="mb-4 p-4 rounded-2xl bg-ocean-light/60 border border-ocean/20 animate-slide-up" role="status">
@@ -1377,7 +1397,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                     {reviewStep === 'balance' ? (
                     <button
                         onClick={() => { setReviewStep('categories'); window.scrollTo(0, 0); }}
-                        className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90"
+                        disabled={secondAccount}
+                        className="w-full bg-sage text-white font-semibold py-4 rounded-[24px] shadow-soft active:scale-[0.99] transition-transform flex items-center justify-center gap-2 hover:bg-sage/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Continue to categories
                         <span className="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_forward</span>

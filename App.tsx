@@ -6,6 +6,8 @@ import AppUpdates from './components/AppUpdates';
 import CloudSaveBanner from './components/CloudSaveBanner';
 import PhoneNotifications from './components/PhoneNotifications';
 import PaymentIntake from './components/PaymentIntake';
+import PlanGate from './components/PlanGate';
+import PlansHost from './components/PlansHost';
 import Auth, { AuthType } from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Navigation from './components/Navigation';
@@ -17,6 +19,8 @@ import { consumeQuietStart, signOutOfDevice } from './services/session';
 import { breadcrumb } from './services/crashReports';
 import { onPhoneNoteTap } from './services/phoneNotifier';
 import { openAt } from './utils/screenSection';
+import { lockHeld, resumed } from './utils/externalFlow';
+import { watchPlan } from './services/plan';
 import { closeNewestPanel } from './utils/backStack';
 import { markTiming } from './utils/timing';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -31,6 +35,7 @@ const CategorySplit = React.lazy(() => import('./components/CategorySplit'));
 const MoneyMoved = React.lazy(() => import('./components/MoneyMoved'));
 const BankAccounts = React.lazy(() => import('./components/BankAccounts'));
 const PaymentsFromApps = React.lazy(() => import('./components/PaymentsFromApps'));
+const YourPlan = React.lazy(() => import('./components/YourPlan'));
 const ImportStatement = React.lazy(() => import('./components/ImportStatement'));
 const ExportReports = React.lazy(() => import('./components/ExportReports'));
 const Rewind = React.lazy(() => import('./components/Rewind'));
@@ -68,6 +73,7 @@ const BACK_TARGET: Partial<Record<AppScreen, AppScreen>> = {
   [AppScreen.MONEY_MOVED]: AppScreen.SELF_DATA,
   [AppScreen.BANK_ACCOUNTS]: AppScreen.SELF_DATA,
   [AppScreen.PAYMENT_APPS]: AppScreen.SELF_DATA,
+  [AppScreen.SELF_PLAN]: AppScreen.SELF,
   [AppScreen.REWIND]: AppScreen.DASHBOARD,
   [AppScreen.LEFT_TO_SPEND]: AppScreen.DASHBOARD,
 };
@@ -134,6 +140,10 @@ function AppContent() {
   // The screens leading up to a crash, in its report (Android).
   useEffect(() => { breadcrumb(`screen ${currentScreen}`); }, [currentScreen]);
 
+  // The member's plan (services/plan.ts): Essential, Plus or none, once paid
+  // plans are switched on; until then everything stays open.
+  useEffect(() => { watchPlan(user?.uid ?? null); }, [user]);
+
   // Lock the app when it goes to background on native (Mobile Security).
   // We lock (requiring re-authentication on resume) rather than sign the user
   // out, so returning from a notification or quick context switch doesn't
@@ -147,9 +157,12 @@ function AppContent() {
     let backHandle: any = null;
     (async () => {
       listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) { resumed(); return; }
         // Android's notification access screen, opened from Payments from
-        // your apps, backgrounds the app the same way the file picker does.
-        if (!isActive && !__QA_BUILD__ && currentScreenRef.current !== AppScreen.IMPORT && currentScreenRef.current !== AppScreen.PAYMENT_APPS) {
+        // your apps, backgrounds the app the same way the file picker does;
+        // so do Google Play's purchase sheet and subscriptions page
+        // (utils/externalFlow.ts).
+        if (!__QA_BUILD__ && !lockHeld() && currentScreenRef.current !== AppScreen.IMPORT && currentScreenRef.current !== AppScreen.PAYMENT_APPS) {
           setIsLocked(true);
         }
       });
@@ -356,7 +369,11 @@ function AppContent() {
       case AppScreen.HISTORY:
         return <TransactionHistory onNavigate={handleNavigate} />;
       case AppScreen.NEW_ENTRY:
-        return <NewEntry onNavigate={handleNavigate} />;
+        return (
+          <PlanGate adds="add" title="New entry" back={AppScreen.DASHBOARD} onNavigate={handleNavigate}>
+            <NewEntry onNavigate={handleNavigate} />
+          </PlanGate>
+        );
       case AppScreen.ANALYSIS:
         return <SpendAnalysis onNavigate={handleNavigate} />;
       case AppScreen.PULSE_TRENDS:
@@ -364,7 +381,11 @@ function AppContent() {
       case AppScreen.PULSE_CATEGORIES:
         return <SpendAnalysis onNavigate={handleNavigate} page="categories" />;
       case AppScreen.PULSE_RECURRING:
-        return <SpendAnalysis onNavigate={handleNavigate} page="recurring" />;
+        return (
+          <PlanGate feature="recurring" title="Recurring" back={AppScreen.ANALYSIS} onNavigate={handleNavigate}>
+            <SpendAnalysis onNavigate={handleNavigate} page="recurring" />
+          </PlanGate>
+        );
       case AppScreen.PULSE_HEALTH:
         return <SpendAnalysis onNavigate={handleNavigate} page="health" />;
       case AppScreen.INCOME_INSIGHTS:
@@ -378,11 +399,19 @@ function AppContent() {
       case AppScreen.PAYMENT_APPS:
         return <PaymentsFromApps onNavigate={handleNavigate} />;
       case AppScreen.IMPORT:
-        return <ImportStatement onNavigate={handleNavigate} />;
+        return (
+          <PlanGate adds="import" title="Import a statement" back={AppScreen.DASHBOARD} onNavigate={handleNavigate}>
+            <ImportStatement onNavigate={handleNavigate} />
+          </PlanGate>
+        );
       case AppScreen.EXPORT:
         return <ExportReports onNavigate={handleNavigate} />;
       case AppScreen.REWIND:
-        return <Rewind onNavigate={handleNavigate} />;
+        return (
+          <PlanGate feature="rewind" title="Rewind" back={AppScreen.DASHBOARD} onNavigate={handleNavigate}>
+            <Rewind onNavigate={handleNavigate} />
+          </PlanGate>
+        );
       case AppScreen.LEFT_TO_SPEND:
         return <LeftToSpend onNavigate={handleNavigate} />;
       case AppScreen.SELF:
@@ -397,6 +426,8 @@ function AppContent() {
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="appearance" />;
       case AppScreen.SELF_ABOUT:
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} page="about" />;
+      case AppScreen.SELF_PLAN:
+        return <YourPlan onNavigate={handleNavigate} />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }
@@ -429,6 +460,7 @@ function AppContent() {
       <CloudSaveBanner />
       <PhoneNotifications />
       <PaymentIntake />
+      <PlansHost />
     </WalletProvider>
   );
 }

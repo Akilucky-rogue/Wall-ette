@@ -2,8 +2,9 @@
  * In-app notifications: the bell on Home (components/NotificationCenter.tsx).
  *
  * Built on the phone from what the app already holds: transactions, budgets,
- * the daily limit and savings goal, the security log of unlock attempts and
- * the update state. Nothing new is collected or sent anywhere.
+ * the daily limit and savings goal, the security log of unlock attempts, the
+ * update state and, once paid plans are on, the plan's dates. Nothing new is
+ * collected or sent anywhere.
  *
  * Each notification's id names what it is about (a budget and month, a
  * charge's day, a failed unlock's time), so the bell can tell new ones from
@@ -18,6 +19,7 @@ import { AppScreen, Transaction, TransactionType } from '../types';
 import { detectRecurringCharges, normalizeMerchant, prettyMerchant, priceRises } from './analyticsService';
 import { walletCopies } from './statementImport';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
+import { PRICES, type Entitlement } from './planRules';
 import type { ScreenSection } from '../utils/screenSection';
 
 export type NotificationTone = 'alert' | 'warn' | 'good' | 'info';
@@ -73,6 +75,13 @@ export interface NotificationInput {
   release: { versionCode: number; version: string; first: string | null };
   /** An amount in the base currency as the app shows it, without paise. */
   money: (amountInBase: number) => string;
+  /**
+   * Recurring charges are tracked (Plus, or plans not on yet): bills due and
+   * price rises. Off on Essential or with no plan. Default on.
+   */
+  recurring?: boolean;
+  /** The member's plan (services/plan.ts), only while paid plans are on. */
+  plan?: Pick<Entitlement, 'plan' | 'cycle' | 'trial' | 'expiresAt' | 'autoRenewing' | 'state'> | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -86,12 +95,20 @@ const STALE_DAYS = 30;
 const SECURITY_DAYS = 14;
 /** A wrong password followed this soon by an unlock was a typo, not news. */
 const TYPO_GRACE_MS = 5 * 60 * 1000;
+/**
+ * The free month's reminder shows from day 25 of its 30 (6 days left, the
+ * charge falling on day 31), as wall-ette.com/pricing says. Google Play
+ * emails one too.
+ */
+const TRIAL_REMIND_DAYS = 6;
+/** A plan that won't renew is news this close to its end. */
+const ENDING_DAYS = 5;
 /** A budget this full is nearly used up. */
 const NEAR_BUDGET = 0.8;
 const MAX_SHOWN = 20;
 
 const RANK = {
-  security: 0, overBudget: 10, overLimit: 11, copies: 20, creep: 23,
+  security: 0, plan: 5, overBudget: 10, overLimit: 11, copies: 20, creep: 23,
   due: 30, nearBudget: 31, stale: 40, goal: 50, update: 60, release: 61,
 } as const;
 
@@ -195,7 +212,7 @@ function budgetNotes({ counted, budgets, dailyLimit, now, money }: NotificationI
   return notes;
 }
 
-function walletNotes({ transactions, counted, now, money }: NotificationInput): AppNotification[] {
+function walletNotes({ transactions, counted, now, money, recurring = true }: NotificationInput): AppNotification[] {
   const notes: AppNotification[] = [];
   const from = addDays(localDay(now), -RECENT_DAYS);
 
@@ -218,7 +235,7 @@ function walletNotes({ transactions, counted, now, money }: NotificationInput): 
   }
 
   // A subscription or bill that went up, while it's still being charged.
-  for (const rise of priceRises(counted).slice(0, 2)) {
+  for (const rise of recurring ? priceRises(counted).slice(0, 2) : []) {
     if (rise.lastDay < from) continue;
     notes.push({
       id: `creep:${rise.key}:${Math.round(rise.to)}`,
@@ -237,7 +254,8 @@ const CADENCE: Record<string, string> = {
   WEEKLY: 'a week', BIWEEKLY: 'every two weeks', MONTHLY: 'a month', YEARLY: 'a year',
 };
 
-function dueNotes({ counted, now, money }: NotificationInput): AppNotification[] {
+function dueNotes({ counted, now, money, recurring = true }: NotificationInput): AppNotification[] {
+  if (!recurring) return [];
   const today = localDay(now);
   return detectRecurringCharges(counted, now, Infinity)
     .map(r => ({ r, day: localDay(r.nextExpected) }))
@@ -346,6 +364,63 @@ function appNotes({ updateReady, updateAvailable = 0, release }: NotificationInp
   return notes;
 }
 
+const PLAN_NAME = { essential: 'Essential', plus: 'Plus' } as const;
+
+/**
+ * The plan's dates: the free month ending, a payment Google Play couldn't
+ * take, a plan that won't renew. Each opens Self → Your plan.
+ */
+function planNotes({ plan, now }: NotificationInput): AppNotification[] {
+  if (!plan?.plan || !plan.expiresAt) return [];
+  const end = new Date(plan.expiresAt);
+  if (!Number.isFinite(end.getTime())) return [];
+  const name = PLAN_NAME[plan.plan];
+  const day = shortDay(end);
+  const key = plan.expiresAt.slice(0, 10);
+  const action: NotificationAction = { kind: 'screen', screen: AppScreen.SELF_PLAN };
+  if (plan.state === 'grace' || plan.state === 'on-hold') {
+    return [{
+      id: `plan-payment:${key}`,
+      tone: 'alert',
+      icon: 'credit_card_off',
+      title: "Google Play couldn't take your payment",
+      body: `Update your payment method in Google Play to keep ${name}. Your records stay either way.`,
+      action,
+      rank: RANK.plan,
+    }];
+  }
+  const left = (end.getTime() - now.getTime()) / DAY_MS;
+  if (left <= 0) return [];
+  if (plan.trial && plan.autoRenewing && left <= TRIAL_REMIND_DAYS) {
+    const price = plan.cycle ? PRICES[plan.plan][plan.cycle] : null;
+    return [{
+      id: `trial-end:${key}`,
+      tone: 'warn',
+      icon: 'event',
+      title: `Your free month ends on ${day}`,
+      body: price !== null
+        ? `Google Play then charges ₹${price.toLocaleString('en-IN')} for ${name} ${plan.cycle}. To pay nothing, cancel in Google Play before then.`
+        : `Google Play then charges for ${name}. To pay nothing, cancel in Google Play before then.`,
+      action,
+      rank: RANK.plan,
+    }];
+  }
+  if (!plan.autoRenewing && left <= ENDING_DAYS) {
+    return [{
+      id: `plan-end:${key}`,
+      tone: 'info',
+      icon: 'event_busy',
+      title: `${plan.trial ? 'Your free month' : name} ends on ${day}`,
+      body: plan.trial
+        ? "It won't turn into a paid plan, so nothing is charged. Your records stay: you can read, export or delete them."
+        : "It won't renew. Your records stay: you can read, export or delete them, or restart in Your plan.",
+      action,
+      rank: RANK.plan,
+    }];
+  }
+  return [];
+}
+
 /** Every notification that applies now, most important first. */
 /**
  * Budgets nearly used or over this month, and today's spending over the
@@ -358,6 +433,7 @@ export const budgetAlerts = (input: Pick<NotificationInput, 'counted' | 'budgets
 export function buildNotifications(input: NotificationInput): AppNotification[] {
   return [
     ...securityNotes(input),
+    ...planNotes(input),
     ...budgetNotes(input),
     ...walletNotes(input),
     ...dueNotes(input),

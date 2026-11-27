@@ -3,6 +3,8 @@ import { AppScreen, TransactionType, CATEGORIES, type Category } from '../types'
 import { getSymbol, localeFor, niceAmount, toBase } from '../utils/currencyUtils';
 import { amountValue, entryFromForm, pressKey } from '../utils/entryAmount';
 import { useWallet } from '../context/WalletContext';
+import { useLimits } from '../services/plan';
+import { opens } from '../services/planRules';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { done } from '../utils/haptics';
@@ -56,7 +58,10 @@ const CAT_ICON = (cat: string): string => {
 const QUICK_AMOUNTS_INR = [100, 200, 500, 1000, 2000, 5000];
 
 const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
-  const { shownCurrency, shownRate, addTransaction, transactions, counted, flowOf, dailyLimit, formatAmount, formatWhole } = useWallet();
+  const { shownCurrency, shownRate, addTransaction, transactions, counted, flowOf, dailyLimit, formatAmount, formatWhole, accounts } = useWallet();
+  // Essential keeps 12 months: an entry can't be dated before them.
+  const limits = useLimits(accounts);
+  const earliest = opens(limits.access, 'full-history') ? undefined : limits.from;
   const quickAmounts = useMemo(
     () => [...new Set(QUICK_AMOUNTS_INR.map(q => (shownCurrency === 'INR' ? q : niceAmount(q * shownRate))))].filter(q => q > 0),
     [shownCurrency, shownRate],
@@ -341,7 +346,8 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                   type="date"
                   value={localDay(selectedDate)}
                   max={localDay()}
-                  onChange={(e) => { if (isDay(e.target.value)) setSelectedDate(parseDay(e.target.value)); }}
+                  min={earliest}
+                  onChange={(e) => { if (isDay(e.target.value) && !(earliest && e.target.value < earliest)) setSelectedDate(parseDay(e.target.value)); }}
                   className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal"
                   title="Custom date"
                   aria-label="Custom date"

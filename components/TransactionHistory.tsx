@@ -12,7 +12,10 @@ import DuplicateEntries from './DuplicateEntries';
 import WalletArriving from './WalletArriving';
 import { removed } from '../utils/haptics';
 import { useBackHandler } from '../utils/backStack';
-import { accountSummaries, entryAccount, legacyAccount } from '../services/accounts';
+import { accountSummaries, entryAccount, legacyAccount, OTHER_ENTRIES } from '../services/accounts';
+import { useLimits } from '../services/plan';
+import { editable } from '../services/planRules';
+import { openPlans } from '../services/planSheet';
 import { takeVaultAccount } from '../utils/vaultAccount';
 import { viaName } from '../services/paymentAlerts';
 import { bankReference } from '../services/statementImport';
@@ -65,6 +68,10 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     return all.length > 1 || accountFilter !== 'ALL' ? all : [];
   }, [transactions, accounts, unassignedOpening, accountFilter]);
   const legacy = useMemo(() => legacyAccount(accounts), [accounts]);
+  // Essential's limits: older than its 12 months, or in a second bank
+  // account, reads but doesn't change (services/planRules.ts).
+  const limits = useLimits(accounts);
+  const canEdit = (t: Transaction) => editable(limits, { date: t.date, account: entryAccount(t, legacy) }, OTHER_ENTRIES);
   const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
@@ -365,7 +372,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         amount: amount,
         category: editForm.category.trim() || 'Uncategorized',
         // The day as picked: no UTC round trip (audit H4)
-        date: isDay(editForm.date) ? editForm.date : editingTransaction.date,
+        // (and on Essential, not before its 12 months)
+        date: isDay(editForm.date) && !(limits.access === 'essential' && editForm.date < limits.from) ? editForm.date : editingTransaction.date,
         note: editForm.note.trim(),
         type: editForm.type,
         ...typedFields,
@@ -878,12 +886,23 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                         <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {canEdit(t) ? (
                                         <button
                                             onClick={(e) => openEditModal(t, e)}
                                             className="text-[12px] bg-white text-sage px-4 py-1.5 rounded-full font-semibold shadow-soft"
                                         >
                                             Edit
                                         </button>
+                                        ) : (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); openPlans(limits.access === 'none' ? 'add' : 'read-only'); }}
+                                            aria-label={limits.access === 'none' ? 'Read-only without a plan. See plans' : 'Read-only on Essential. See Plus'}
+                                            className="text-[12px] text-muted-taupe px-2 py-1.5 flex items-center gap-1 whitespace-nowrap"
+                                        >
+                                            <span className="material-symbols-outlined text-[15px]" aria-hidden="true">lock</span>
+                                            Read-only
+                                        </button>
+                                        )}
                                         <button
                                             onClick={(e) => requestDelete(t.id, e)}
                                             className="text-[12px] bg-white text-rose px-4 py-1.5 rounded-full font-semibold shadow-soft"
@@ -1084,6 +1103,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         <input
                             type="date"
                             value={editForm.date}
+                            min={limits.access === 'essential' ? limits.from : undefined}
                             onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
                             className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
                             title="Date"

@@ -25,7 +25,7 @@ const TABS: { screen: AppScreen; label: string; icon: string; owns: AppScreen[] 
   },
   {
     screen: AppScreen.SELF, label: 'Self', icon: 'account_circle',
-    owns: [AppScreen.SELF_ACCOUNT, AppScreen.SELF_ALERTS, AppScreen.SELF_DATA, AppScreen.SELF_APPEARANCE, AppScreen.SELF_ABOUT, AppScreen.MONEY_MOVED, AppScreen.BANK_ACCOUNTS, AppScreen.PAYMENT_APPS],
+    owns: [AppScreen.SELF_ACCOUNT, AppScreen.SELF_ALERTS, AppScreen.SELF_DATA, AppScreen.SELF_APPEARANCE, AppScreen.SELF_ABOUT, AppScreen.MONEY_MOVED, AppScreen.BANK_ACCOUNTS, AppScreen.PAYMENT_APPS, AppScreen.SELF_PLAN],
   },
 ];
 

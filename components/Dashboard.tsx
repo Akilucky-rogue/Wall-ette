@@ -140,6 +140,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     if (income === 0) return 0;
     return Math.max(0, Math.round(((income - expenses) / income) * 100));
   }, [income, expenses]);
+  // More went out than came in: said as that, never as "Kept 0%". Something
+  // kept that rounds to 0% reads "<1%".
+  const overspent = income > 0 && expenses > income;
+  const keptLabel = income > expenses && savingsRate === 0 ? '<1' : String(savingsRate);
 
   // --- Top Spend for the period: spending only (audit M7 — it used to add
   // up income too, so Transfer In topped the card) ---
@@ -499,19 +503,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           {/* Savings Rate */}
           {income > 0 && (
             <div className="bg-white rounded-3xl p-5 shadow-soft border border-black/[0.02] flex flex-col items-center gap-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">{showingThisMonth ? 'Kept so far' : 'Kept'}</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold self-start">{overspent ? 'More out than in' : showingThisMonth ? 'Kept so far' : 'Kept'}</p>
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="var(--sage-soft)" strokeWidth="4" />
                 <circle
-                  cx="18" cy="18" r="14" fill="none" stroke="var(--sage)" strokeWidth="4"
-                  strokeDasharray={`${(savingsRate / 100) * 88} 88`}
+                  cx="18" cy="18" r="14" fill="none" stroke={overspent ? 'var(--rose)' : 'var(--sage)'} strokeWidth="4"
+                  strokeDasharray={`${overspent ? 88 : (savingsRate / 100) * 88} 88`}
                   strokeLinecap="round"
                   className={styles.savingsGauge}
                 />
               </svg>
-              <p className="text-premium-charcoal text-xl font-semibold -mt-2 tabular-nums">{savingsRate}%</p>
+              {overspent
+                ? <p className="text-rose text-xl font-semibold -mt-2 tabular-nums">{formatAmountCompact(expenses - income)}</p>
+                : <p className="text-premium-charcoal text-xl font-semibold -mt-2 tabular-nums">{keptLabel}%</p>}
               <p className="text-[10px] text-muted-taupe text-center leading-snug">
-                {showingThisMonth ? "of this month's income" : showAllTime ? 'of all income' : `of ${monthLong}'s income`}
+                {overspent
+                  ? (showingThisMonth ? 'more spent than came in so far' : 'more spent than came in')
+                  : showingThisMonth ? "of this month's income" : showAllTime ? 'of all income' : `of ${monthLong}'s income`}
               </p>
             </div>
           )}

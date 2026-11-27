@@ -85,7 +85,7 @@ export function needsMinimum(availability: number, installStatus: number): boole
  *   Android Studio, or an APK), so Play can't update it.
  * - `unavailable`: Play couldn't be asked: offline, no Play Store, or no answer.
  */
-export type UpdateFinding = 'latest' | 'available' | 'downloading' | 'ready' | 'not-from-play' | 'unavailable';
+export type UpdateFinding = 'latest' | 'available' | 'downloading' | 'ready' | 'not-from-play' | 'not-allowed' | 'unavailable';
 
 export function findingOf(availability: number, installStatus: number): UpdateFinding {
   if (installStatus === INSTALL_DOWNLOADED) return 'ready';
@@ -98,10 +98,15 @@ export function findingOf(availability: number, installStatus: number): UpdateFi
 /**
  * A failed check, from Play's error message. Play refuses with
  * InstallErrorCode.ERROR_APP_NOT_OWNED (-10) when the app wasn't installed
- * from Play: "Install Error(-10): The app is not owned by any user on this device…".
+ * from Play: "Install Error(-10): The app is not owned by any user on this device…",
+ * and with ERROR_INSTALL_NOT_ALLOWED (-6) when the phone won't allow it just
+ * now: no Google account in Play, low storage or battery. Neither is the
+ * connection, which is what 'unavailable' says.
  */
 export function failureOf(message: string): UpdateFinding {
-  return /Install Error\(-10\)|ERROR_APP_NOT_OWNED|not owned by any user/i.test(message) ? 'not-from-play' : 'unavailable';
+  if (/Install Error\(-10\)|ERROR_APP_NOT_OWNED|not owned by any user/i.test(message)) return 'not-from-play';
+  if (/Install Error\(-6\)|ERROR_INSTALL_NOT_ALLOWED|not allowed, due to the current device state/i.test(message)) return 'not-allowed';
+  return 'unavailable';
 }
 
 export function planUpdate(f: UpdateFacts): UpdatePlan {

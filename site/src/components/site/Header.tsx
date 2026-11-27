@@ -95,6 +95,9 @@ export function MobileStickyCta() {
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
-  if (["/signup", "/signin", "/forgot-password", "/reset-password"].includes(pathname) || user) return null;
+  // Without a trailing slash: a host that keeps one ("/signin/") would show the
+  // bar in the browser but not in the prerendered page, and React's hydration fails (#418).
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (["/signup", "/signin", "/forgot-password", "/reset-password"].includes(path) || user) return null;
   return <div className={cn("fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl transition-transform sm:hidden", show ? "translate-y-0" : "translate-y-full")}><Button asChild variant="hero" size="xl" className="w-full"><Link to="/signup">Start your free month</Link></Button></div>;
 }

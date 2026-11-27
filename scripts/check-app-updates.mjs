@@ -136,6 +136,8 @@ eq('failed: no Play Store',
   failureOf(playError(-9, 'The Play Store app is either not installed or not the official version.', 'ERROR_PLAY_STORE_NOT_FOUND')), 'unavailable');
 eq('failed: API not available',
   failureOf(playError(-3, 'The API is not available on this device.', 'ERROR_API_NOT_AVAILABLE')), 'unavailable');
+eq('failed: error -6, the phone not allowing it', failureOf(playError(-6, 'The download/install is not allowed, due to the current device state (e.g. low battery, low disk space, ...).', 'ERROR_INSTALL_NOT_ALLOWED')), 'not-allowed');
+eq('failed: error -60 is not -6', failureOf(playError(-60, 'Something else.', 'ERROR_OTHER')), 'unavailable');
 eq('failed: error -100 is not -10', failureOf(playError(-100, 'Internal error.', 'ERROR_INTERNAL_ERROR')), 'unavailable');
 eq('failed: Play services missing', failureOf('GooglePlayServices are not available.'), 'unavailable');
 eq('failed: offline', failureOf('Failed to bind to the service.'), 'unavailable');

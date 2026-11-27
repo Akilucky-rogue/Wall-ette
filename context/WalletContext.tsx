@@ -248,6 +248,10 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] => {
   return results;
 };
 
+// A negative amount reads with a true minus, as the app writes it everywhere
+// (−₹1,234), not Intl's hyphen (-₹1,234).
+const withMinus = (s: string): string => (s.startsWith('-') ? `\u2212${s.slice(1)}` : s);
+
 // Rejects if `p` hasn't settled within `ms`; `p` itself carries on.
 const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('timeout')), ms);
@@ -360,24 +364,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Amounts in the shown currency, with its own decimal places. Cached
   // Intl.NumberFormat per currency (audit Phase 2.2).
   const formatAmount = useCallback((amountInBase: number): string =>
-      getCurrencyFormatter(shownCurrency).format(amountInBase * shownRate), [shownCurrency, shownRate]);
+      withMinus(getCurrencyFormatter(shownCurrency).format(amountInBase * shownRate)), [shownCurrency, shownRate]);
 
   // Whole units, for figures read at a glance: ₹1,23,457, $1,335.
   const formatWhole = useCallback((amountInBase: number): string =>
-      getWholeCurrencyFormatter(shownCurrency).format(Math.round(amountInBase * shownRate)), [shownCurrency, shownRate]);
+      withMinus(getWholeCurrencyFormatter(shownCurrency).format(Math.round(amountInBase * shownRate))), [shownCurrency, shownRate]);
 
   // Short form for chart axes: ₹85.7K instead of ₹85,707.00
   const formatEntry = useCallback((t: Pick<Transaction, 'amount' | 'typedAmount' | 'typedCurrency'>, whole = false): string => {
       const shown = t.typedCurrency === shownCurrency && typeof t.typedAmount === 'number' && Number.isFinite(t.typedAmount)
         ? t.typedAmount
         : t.amount * shownRate;
-      return whole
+      return withMinus(whole
         ? getWholeCurrencyFormatter(shownCurrency).format(Math.round(shown))
-        : getCurrencyFormatter(shownCurrency).format(shown);
+        : getCurrencyFormatter(shownCurrency).format(shown));
   }, [shownCurrency, shownRate]);
 
   const formatAmountCompact = useCallback((amountInBase: number): string =>
-      getCompactCurrencyFormatter(shownCurrency).format(amountInBase * shownRate), [shownCurrency, shownRate]);
+      withMinus(getCompactCurrencyFormatter(shownCurrency).format(amountInBase * shownRate)), [shownCurrency, shownRate]);
 
   // An amount typed in the shown currency, back to INR for storage.
   const convertToBase = useCallback((amount: number): number => amount / shownRate, [shownRate]);

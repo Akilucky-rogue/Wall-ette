@@ -96,6 +96,7 @@ const UPDATE_LINES: Record<UpdateFinding, string> = {
   downloading: "The update is downloading. You'll be asked to restart when it's ready.",
   ready: 'The update has downloaded. Restart to install it.',
   'not-from-play': "This copy wasn't installed from Google Play, so it can't update itself. Install Wall-ette from Google Play to get updates.",
+  'not-allowed': "Google Play can't update apps on this phone right now. Check you're signed in to Google Play and have some free space and battery, then try again.",
   unavailable: "Couldn't reach Google Play. Check your connection and try again.",
 };
 

@@ -6,7 +6,7 @@ import { Mascot } from './ui/Brand';
 import { pulseView, usePulseView } from './pulseView';
 import { tick } from '../utils/haptics';
 import { openAt, type ScreenSection } from '../utils/screenSection';
-import { analyzePulse, type Insight, type PulseResult } from '../services/pulseAnalysis';
+import { analyzePulse, keptShare, type Insight, type PulseResult } from '../services/pulseAnalysis';
 import { detectRecurringCharges, priceRises, prettyMerchant } from '../services/analyticsService';
 import UnsortedTransfers from './UnsortedTransfers';
 import PageHeader from './ui/PageHeader';
@@ -163,7 +163,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
           <Pocket
             label="Came in" icon="south_west"
             value={`+${formatAmountCompact(r.cameIn)}`}
-            note={r.cameIn > 0 ? (r.kept >= 0 ? `Kept ${formatAmountCompact(r.kept)}, ${r.keptPct}%` : `${formatAmountCompact(-r.kept)} more out`) : 'Nothing yet'}
+            note={r.cameIn > 0 ? (r.kept >= 0 ? `Kept ${formatAmountCompact(r.kept)}, ${keptShare(r.kept, r.cameIn)}` : `${formatAmountCompact(-r.kept)} more out`) : 'Nothing yet'}
           />
           {r.isCurrent ? (
             p.projected !== null ? (

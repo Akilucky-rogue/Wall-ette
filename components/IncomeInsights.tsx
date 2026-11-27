@@ -9,6 +9,9 @@ import { Mascot } from './ui/Brand';
 import BalanceTrend from './BalanceTrend';
 import { tick } from '../utils/haptics';
 
+// Categories Flow doesn't offer a budget for (services/review.ts TO_REVIEW).
+const NOT_BUDGETED = new Set(['Transfer Out', 'Transfer In', 'To review', 'Adjustment', 'Investment']);
+
 interface IncomeInsightsProps {
   onNavigate: (screen: AppScreen) => void;
 }
@@ -234,7 +237,9 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
     const saved = m ? m.inc - m.out : 0;
     const spent = (cat: string) => m?.cats.get(cat) ?? 0;
     const catNames = new Set<string>(Object.keys(budgets));
-    if (m) [...m.cats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).forEach(([c]) => catNames.add(c));
+    // Transfers and payments still to review aren't spending to cap: they
+    // show only if a budget was set for them before.
+    if (m) [...m.cats.entries()].filter(([c]) => !NOT_BUDGETED.has(c)).sort((a, b) => b[1] - a[1]).slice(0, 8).forEach(([c]) => catNames.add(c));
     const rows = [...catNames]
       .map(c => ({ cat: c, spent: spent(c), budget: budgets[c] ?? 0 }))
       .sort((a, b) => b.spent - a.spent);

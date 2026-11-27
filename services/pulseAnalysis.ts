@@ -179,6 +179,11 @@ const shortMonth = (key: string): string =>
 const longMonth = (key: string): string =>
   new Date(+key.slice(0, 4), +key.slice(5) - 1, 1).toLocaleDateString('en-GB', { month: 'long' });
 const pct = (part: number, whole: number): number => Math.round((part / whole) * 100);
+/** A share kept, as words: "12%", or "under 1%" for something that rounds to 0. */
+export const keptShare = (kept: number, cameIn: number): string => {
+  const p = pct(kept, cameIn);
+  return p === 0 && kept > 0 ? 'under 1%' : `${p}%`;
+};
 const daysBetween = (a: string, b: string): number => Math.round((parseDay(b).getTime() - parseDay(a).getTime()) / DAY_MS);
 
 /**
@@ -542,7 +547,7 @@ export function analyzePulse({ counted, month, now = new Date(), money, budgets 
       const tone: InsightTone = isCurrent ? 'info' : avg !== null ? (keptPct >= avg ? 'good' : 'info') : keptPct >= 20 ? 'good' : 'info';
       (tone === 'good' ? good : info).push({
         id: 'kept', icon: 'savings', tone, weight: kept,
-        title: isCurrent ? `You've kept ${keptPct}% of what came in so far` : `You kept ${keptPct}% of what came in`,
+        title: isCurrent ? `You've kept ${keptShare(kept, cameIn)} of what came in so far` : `You kept ${keptShare(kept, cameIn)} of what came in`,
         detail: `${money(kept)} of ${money(cameIn)}.`
           + (!isCurrent && avg !== null ? ` Your average over the ${history.length === 1 ? 'month' : `${history.length} months`} before is ${avg}%.` : ''),
         action: { screen: AppScreen.INCOME_INSIGHTS, label: 'See Flow' },

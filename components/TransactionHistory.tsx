@@ -516,7 +516,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                       </div>
                       <div>
                         <h3 className="font-display text-lg font-bold text-premium-charcoal">Filter and sort</h3>
-                        <p className="text-[10px] text-muted-taupe">{filteredTransactions.length} transactions match</p>
+                        <p className="text-[10px] text-muted-taupe">{filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'transaction matches' : 'transactions match'}</p>
                       </div>
                     </div>
                     <button 
@@ -701,7 +701,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         className="w-full bg-premium-charcoal text-white py-4 rounded-3xl text-lg font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px]">check</span>
-                        Show {filteredTransactions.length} Results
+                        Show {filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'Result' : 'Results'}
                     </button>
                 </div>
             </div>

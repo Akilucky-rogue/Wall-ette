@@ -3,10 +3,12 @@ import { AppScreen, PayeeKind, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { flowClassifier, matchText, MIN_MATCH, suggestPayees } from '../services/spend';
 import { parseDay } from '../utils/dates';
-import { FloatingLeaf, RangoliCorner, Paisley } from './SplashScreen';
+import ReviewPayees from './ReviewPayees';
 
 interface MoneyMovedProps {
   onNavigate: (screen: AppScreen) => void;
+  /** The screen it was opened from; Back returns there. */
+  backTo?: AppScreen;
 }
 
 // Static class strings: dynamic Tailwind names are purged at build time.
@@ -26,14 +28,23 @@ const RULE_KINDS: PayeeKind[] = ['mine', 'family', 'investment', 'ignore', 'coun
 
 const SHOW_FIRST = 6;
 
-const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
+// What Back names, by where it goes.
+const BACK_LABEL: Partial<Record<AppScreen, string>> = {
+  [AppScreen.DASHBOARD]: 'Back to Home',
+  [AppScreen.HISTORY]: 'Back to the Vault',
+  [AppScreen.ANALYSIS]: 'Back to Pulse',
+  [AppScreen.CATEGORY_SPLIT]: 'Back to Category split',
+  [AppScreen.SELF_DATA]: 'Back to Your data',
+};
+
+const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate, backTo = AppScreen.SELF_DATA }) => {
   const { transactions, payeeRules, flowOf, savePayeeRule, deletePayeeRule, formatAmountCompact } = useWallet();
   const [showAll, setShowAll] = useState(false);
   const [newMatch, setNewMatch] = useState('');
   const [newKind, setNewKind] = useState<PayeeKind>('family');
 
-  // Payees still counted as spending or income that look like transfers
-  const suggestions = useMemo(() => suggestPayees(transactions, flowOf), [transactions, flowOf]);
+  // Payees only money comes in from, still counted as income (money out is reviewed above them)
+  const incoming = useMemo(() => suggestPayees(transactions, flowOf).filter(s => s.out === 0), [transactions, flowOf]);
 
   // What each rule covers, and the total left out of spending and income
   const { perRule, movedOut, movedIn } = useMemo(() => {
@@ -76,32 +87,25 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
     setNewMatch('');
   };
 
-  const shown = showAll ? suggestions : suggestions.slice(0, SHOW_FIRST);
+  const shownIncoming = showAll ? incoming : incoming.slice(0, SHOW_FIRST);
   const dayLabel = (day: string) =>
     parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.5} />
-      <FloatingLeaf className="top-52 left-4 opacity-25" delay={1.8} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Paisley className="absolute bottom-40 left-6 opacity-25" flip />
-
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
-          onClick={() => onNavigate(AppScreen.SELF)}
-          className="text-muted-taupe flex size-10 shrink-0 items-center justify-start hover:text-sage transition-colors"
-          aria-label="Back to profile"
+          onClick={() => onNavigate(backTo)}
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label={BACK_LABEL[backTo] ?? 'Back'}
         >
-          <span className="material-symbols-outlined text-[24px]">arrow_back_ios</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Money Moved</h2>
-        <div className="w-10" />
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Money moved</h2>
       </div>
 
       <div className="px-6 pt-6 pb-4">
-        <h1 className="text-premium-charcoal font-serif text-[28px] leading-tight mb-3">Moved, not spent</h1>
+        <h1 className="text-premium-charcoal font-display font-bold text-[28px] leading-tight mb-3">Moved, not spent</h1>
         <p className="text-muted-taupe text-[14px] leading-relaxed">
           Money sent to your own accounts, family or investments isn't spending, and money coming back from them isn't income.
           Sort a payee once and every payment to or from it is left out of both. Your balance still counts it.
@@ -116,22 +120,28 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* To sort: transfers to and from payees no rule covers yet */}
-      {suggestions.length > 0 && (
-        <section className="px-6 pb-2">
-          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To sort</h3>
+      {/* To review: payments to payees no rule covers yet (services/review.ts) */}
+      <section className="px-6 pb-2">
+        <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">To review</h3>
+        <p className="text-muted-taupe text-[12px] mb-3 pl-1">
+          These payments count as spending until you say what they were.
+        </p>
+        <ReviewPayees />
+      </section>
+
+      {/* Money in from payees no rule covers yet, with nothing going out to them */}
+      {incoming.length > 0 && (
+        <section className="px-6 pt-4 pb-2">
+          <h3 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-1 pl-1">Money in to sort</h3>
           <p className="text-muted-taupe text-[12px] mb-3 pl-1">
-            These transfers count as spending or income until you sort them.
+            These transfers count as income until you sort them.
           </p>
           <div className="space-y-3">
-            {shown.map(s => (
+            {shownIncoming.map(s => (
               <div key={s.match} className="bg-white p-4 rounded-3xl border border-black/[0.02] shadow-soft">
-                <p className="text-premium-charcoal font-serif font-semibold text-[15px] truncate" title={s.name}>{s.name}</p>
+                <p className="text-premium-charcoal font-semibold text-[15px] truncate" title={s.name}>{s.name}</p>
                 <p className="text-muted-taupe text-[11px] mt-0.5">
-                  {s.out > 0 && <>{formatAmountCompact(s.out)} out</>}
-                  {s.out > 0 && s.in > 0 && ' · '}
-                  {s.in > 0 && <>{formatAmountCompact(s.in)} in</>}
-                  {' · '}{s.count} {s.count === 1 ? 'payment' : 'payments'} · last {dayLabel(s.last)}
+                  {formatAmountCompact(s.in)} in · {s.count} {s.count === 1 ? 'payment' : 'payments'} · last {dayLabel(s.last)}
                 </p>
                 <div className="grid grid-cols-4 gap-2 mt-3">
                   {SORT_KINDS.map(kind => (
@@ -145,21 +155,21 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                   ))}
                   <button
                     onClick={() => savePayeeRule(s.name, 'counts')}
-                    className="bg-gray-50 text-premium-charcoal border border-black/5 py-2 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
-                    title={s.out >= s.in ? 'Keep counting these as spending' : 'Keep counting these as income'}
+                    className="bg-gray-50 text-premium-charcoal border border-premium-charcoal/[0.08] py-2 rounded-xl text-[11px] font-bold active:scale-95 transition-transform"
+                    title="Keep counting these as income"
                   >
-                    {s.out >= s.in ? 'Spending' : 'Income'}
+                    Income
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          {suggestions.length > SHOW_FIRST && (
+          {incoming.length > SHOW_FIRST && (
             <button
               onClick={() => setShowAll(v => !v)}
               className="w-full mt-3 text-[11px] font-semibold text-sage uppercase tracking-wider py-2"
             >
-              {showAll ? 'Show fewer' : `Show ${suggestions.length - SHOW_FIRST} more`}
+              {showAll ? 'Show fewer' : `Show ${incoming.length - SHOW_FIRST} more`}
             </button>
           )}
         </section>
@@ -173,7 +183,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
             No rules yet. Sort a payee above, or add a word that appears in its payments below.
           </p>
         ) : (
-          <div className="bg-white rounded-3xl border border-black/[0.02] shadow-soft divide-y divide-black/5">
+          <div className="bg-white rounded-3xl border border-black/[0.02] shadow-soft divide-y divide-premium-charcoal/[0.06]">
             {rules.map(rule => {
               const info = KIND_INFO[rule.kind];
               const stats = perRule.get(rule.id);
@@ -183,15 +193,16 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[20px]">{info.icon}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate" title={rule.match}>{rule.match}</p>
+                    <p className="text-premium-charcoal font-semibold text-[14px] truncate" title={rule.match}>{rule.match}</p>
                     <p className="text-muted-taupe text-[10px]">
+                      {rule.kind === 'counts' && rule.category && <>Shown as {rule.category} · </>}
                       {stats ? `${stats.count} ${stats.count === 1 ? 'payment' : 'payments'} · ${formatAmountCompact(stats.total)}` : 'No payments match yet'}
                     </p>
                   </div>
                   <select
                     value={rule.kind}
-                    onChange={e => savePayeeRule(rule.match, e.target.value as PayeeKind)}
-                    className="text-[11px] font-semibold text-premium-charcoal bg-gray-50 border border-black/5 rounded-lg px-2 py-1.5"
+                    onChange={e => savePayeeRule(rule.match, e.target.value as PayeeKind, e.target.value === 'counts' ? rule.category : undefined)}
+                    className="text-[11px] font-semibold text-premium-charcoal bg-gray-50 border border-premium-charcoal/[0.08] rounded-lg px-2 py-1.5"
                     aria-label={`How payments matching ${rule.match} count`}
                   >
                     {RULE_KINDS.map(k => <option key={k} value={k}>{KIND_INFO[k].label}</option>)}
@@ -227,7 +238,7 @@ const MoneyMoved: React.FC<MoneyMovedProps> = ({ onNavigate }) => {
             <select
               value={newKind}
               onChange={e => setNewKind(e.target.value as PayeeKind)}
-              className="flex-1 text-[13px] font-semibold text-premium-charcoal bg-gray-50 border border-black/5 rounded-xl px-3 py-2.5"
+              className="flex-1 text-[13px] font-semibold text-premium-charcoal bg-gray-50 border border-premium-charcoal/[0.08] rounded-xl px-3 py-2.5"
               aria-label="How matching payments count"
             >
               {RULE_KINDS.map(k => <option key={k} value={k}>{KIND_INFO[k].label}</option>)}

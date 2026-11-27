@@ -3,7 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { checkForUpdate, closeBanner, getUpdateState, restartToUpdate, subscribe, updateNow } from '../services/appUpdates';
 import { markSeen, notesToShow, readSeenVersion, type ReleaseNote } from '../services/releaseNotes';
 import WhatsNewSheet from './WhatsNewSheet';
-import { FloatingLeaf, RangoliCorner, WallEEyes } from './SplashScreen';
+import { BrandIcon } from './ui/Brand';
+import { FloatingLeaf, RangoliCorner } from './ui/Decor';
 
 /** Lets the unlocked screen settle before Google's update dialog can appear. */
 const CHECK_DELAY_MS = 1500;
@@ -121,20 +122,18 @@ export const UpdateRequired: React.FC<UpdateRequiredProps> = ({ downloaded, busy
     className="fixed inset-0 z-[200] bg-zen-bg flex justify-center pt-[var(--sat)] pb-[var(--sab)]"
   >
     <div className="relative w-full max-w-[430px] flex flex-col items-center justify-center overflow-hidden px-8 text-center">
-      <FloatingLeaf className="top-16 right-8 opacity-40" delay={0} />
-      <FloatingLeaf className="bottom-24 left-6 opacity-30" delay={1} color="var(--sage-3)" />
+      <FloatingLeaf className="top-16 right-8 opacity-40" />
+      <FloatingLeaf className="bottom-24 left-6 opacity-30" color="var(--sage-3)" />
       <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
       <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
 
       <div className="relative inline-flex items-center justify-center mb-6">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg">
-          <WallEEyes size="md" />
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
-          <span className="material-symbols-outlined text-sage text-[16px]">system_update</span>
+        <BrandIcon size={80} className="drop-shadow-md" />
+        <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
+          <span className="material-symbols-outlined text-sage text-[16px]" aria-hidden="true">system_update</span>
         </div>
       </div>
-      <h1 id="update-required-title" className="text-premium-charcoal font-serif text-2xl font-semibold mb-2">Time to update</h1>
+      <h1 id="update-required-title" className="text-premium-charcoal font-display text-2xl font-bold mb-2">Time to update</h1>
       <p id="update-required-text" className="text-muted-taupe text-[14px] leading-relaxed max-w-[280px] mx-auto mb-8">
         {downloaded
           ? 'This version of Wall-ette is out of date, and the update has downloaded. Restart to finish installing it. Your data stays safe in your account.'
@@ -144,7 +143,7 @@ export const UpdateRequired: React.FC<UpdateRequiredProps> = ({ downloaded, busy
       <button
         onClick={onUpdate}
         disabled={busy}
-        className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {downloaded
           ? (busy ? 'Restarting…' : 'Restart to update')

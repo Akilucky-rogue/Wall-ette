@@ -3,15 +3,19 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type MultiF
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
+import { googleErrorMessage, isGoogleCancel, signInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
 import { isEmailLike, suggestEmail } from '../utils/emailHints';
 import { log } from '../utils/log';
 import { ACCOUNT_EMAIL_FROM, PRIVACY_URL, TERMS_URL } from '../utils/site';
-import { FloatingLeaf, RangoliCorner, LotusFlower, Paisley } from './SplashScreen';
+import { Mascot, TAGLINE, Wordmark } from './ui/Brand';
+import { GoogleButton } from './ui/GoogleButton';
+import { FloatingLeaf, Paisley, RangoliCorner } from './ui/Decor';
 
-// Bump when terms.html / privacy.html change materially — recorded with
-// each registration as the version the user agreed to.
-const TERMS_VERSION = '2026-06-11';
+// Bump when the website's terms or privacy policy change materially —
+// recorded with each registration as the version the user agreed to. The
+// website's sign-up records the same (site/src/lib/auth-rules.ts).
+const TERMS_VERSION = '2026-11-28';
 
 export type AuthType = 'login' | 'register';
 
@@ -69,6 +73,39 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  // Sign in with Google: an existing account signs in; a new one is created,
+  // with the consent the note beside the button asks for recorded the same
+  // way as an email sign-up's.
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const handleGoogle = async () => {
+    setError('');
+    setGoogleBusy(true);
+    try {
+      const { credential, isNewUser } = await signInWithGoogle();
+      if (isNewUser) {
+        setDoc(doc(db, 'users', credential.user.uid), {
+            termsAccepted: true,
+            termsVersion: TERMS_VERSION,
+            termsAcceptedAt: serverTimestamp(),
+            termsAcceptedVia: 'google',
+        }, { merge: true }).catch(() => log.warn('Consent record write failed'));
+        onAuthSuccess?.('register');
+      } else {
+        onAuthSuccess?.('login');
+      }
+    } catch (err: any) {
+      if (isMfaRequiredError(err)) {
+        setTotpResolver(mfaResolverFromError(err));
+        setError('');
+      } else if (!isGoogleCancel(err)) {
+        log.warn('Google sign-in failed:', err?.code ?? err?.message);
+        setError(googleErrorMessage(err));
+      }
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
+
   const getErrorMessage = (code: string, message: string) => {
       switch (code) {
           case 'auth/invalid-credential':
@@ -76,7 +113,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 ? "Incorrect email or password. If you haven't signed up, please create an account." 
                 : "Invalid credentials provided.";
           case 'auth/user-not-found':
-              return "No account found with this email. Please Sign Up.";
+              return "No account found with this email. Please sign up.";
           case 'auth/wrong-password':
               return "Incorrect password. Please try again.";
           case 'auth/email-already-in-use':
@@ -190,51 +227,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
       {/* Decorative eco & Indian elements */}
-      <FloatingLeaf className="top-16 left-6 opacity-60" delay={0} />
-      <FloatingLeaf className="top-24 right-8 opacity-40" delay={1.5} color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-32 left-10 opacity-50" delay={2.5} />
+      <FloatingLeaf className="top-16 left-6 opacity-60" />
+      <FloatingLeaf className="top-24 right-8 opacity-40" color="var(--sage-3)" />
+      <FloatingLeaf className="bottom-32 left-10 opacity-50" />
       <RangoliCorner className="absolute top-4 left-4 opacity-40" color="var(--sage-2)" />
       <RangoliCorner className="absolute top-4 right-4 opacity-40" color="var(--sage-2)" mirror />
       <Paisley className="absolute bottom-20 right-6 opacity-30" color="var(--gold-1)" />
       <Paisley className="absolute top-40 left-4 opacity-25" color="var(--sage-3)" flip />
-      
-      <div className="relative text-center mb-10">
-        {/* Small lotus above logo */}
-        <div className="flex justify-center mb-3">
-          <LotusFlower size="sm" color="var(--rose-2)" />
-        </div>
-        {/* Wall-ette Robot Logo with Wealth Context */}
-        <div className="relative inline-flex items-center justify-center mb-6">
-          {/* Outer glow */}
-          <div className="absolute inset-0 -m-2 rounded-full bg-sage/20 blur-lg animate-pulse" />
-          
-          {/* Main circle */}
-          <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 shadow-lg flex items-center justify-center">
-            {/* Inner highlight */}
-            <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
-            
-            {/* Robot eyes - Wall-ette inspired */}
-            <div className="flex items-center gap-1">
-              <div className="w-6 h-7 bg-premium-charcoal/90 rounded-md flex items-center justify-center shadow-inner relative overflow-hidden">
-                <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-white/40 rounded-full" />
-                <div className="w-3 h-3 bg-sage-light rounded-full flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-sage rounded-full" />
-                </div>
-              </div>
-              <div className="w-6 h-7 bg-premium-charcoal/90 rounded-md flex items-center justify-center shadow-inner relative overflow-hidden">
-                <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-white/40 rounded-full" />
-                <div className="w-3 h-3 bg-sage-light rounded-full flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-sage rounded-full" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <h1 className="text-premium-charcoal font-serif text-3xl font-semibold mb-2">
-          Wall<span className="text-sage">·</span>ette
-        </h1>
-        <p className="text-muted-taupe text-[15px]">Mindful Wealth Management</p>
+
+      <div className="relative flex flex-col items-center text-center mb-8">
+        <Mascot pose="welcome" height={128} />
+        <h1 className="mt-5"><Wordmark height={34} /></h1>
+        <p className="mt-2 text-muted-taupe text-[15px] font-medium">{TAGLINE}</p>
       </div>
 
       <div className="relative bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02] overflow-hidden">
@@ -243,9 +247,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         <RangoliCorner className="absolute -top-1 -right-1 opacity-30" color="var(--sage-2)" mirror />
         <RangoliCorner className="absolute -bottom-1 -left-1 opacity-20 rotate-180" color="var(--gold-1)" mirror />
         <RangoliCorner className="absolute -bottom-1 -right-1 opacity-20 rotate-180" color="var(--gold-1)" />
-        
-        <h2 className="relative text-xl font-serif font-semibold text-premium-charcoal mb-6 text-center">
-            {totpResolver ? 'Two-Factor Verification' : resetMode ? 'Reset Password' : isLogin ? 'Welcome Back' : 'Create Account'}
+
+        <h2 className="relative text-xl font-display font-bold text-premium-charcoal mb-6 text-center">
+            {totpResolver ? 'Two-factor verification' : resetMode ? 'Reset password' : isLogin ? 'Welcome back' : 'Create account'}
         </h2>
 
         {error && (
@@ -271,9 +275,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           <button
             type="submit"
             disabled={loading || totpCode.length < 6}
-            className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {loading ? 'Verifying...' : 'Verify & Sign In'}
+            {loading ? 'Verifying...' : 'Verify and sign in'}
           </button>
           <button
             type="button"
@@ -302,7 +306,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 type="button"
                 onClick={handleResetPassword}
                 disabled={cooldown > 0 || loading}
-                className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-[15px] font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl text-[15px] font-semibold shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {loading ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Email'}
               </button>
@@ -354,7 +358,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 type="button"
                 onClick={handleResetPassword}
                 disabled={loading || !email.includes('@')}
-                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {loading ? 'Sending…' : 'Send Reset Link'}
               </button>
@@ -365,10 +369,25 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             onClick={leaveReset}
             className="w-full text-muted-taupe py-1 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
           >
-            Back to Sign In
+            Back to sign in
           </button>
         </div>
         ) : (
+        <>
+        <div className="space-y-3 mb-5">
+          <GoogleButton label="Continue with Google" busy={googleBusy} disabled={loading} onClick={handleGoogle} />
+          <p className="text-[11px] text-muted-taupe leading-relaxed text-center px-1">
+            Continuing with Google signs you in, or creates your wallet the first time, and means you agree to the{' '}
+            <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline">Terms &amp; Conditions</a>{' '}
+            and{' '}
+            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline">Privacy policy</a>.
+          </p>
+          <div className="flex items-center gap-3 pt-1" aria-hidden="true">
+            <span className="h-px flex-1 bg-premium-charcoal/[0.08]" />
+            <span className="text-[10px] text-muted-taupe uppercase tracking-widest">or use email</span>
+            <span className="h-px flex-1 bg-premium-charcoal/[0.08]" />
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-muted-taupe uppercase tracking-wider mb-1.5 ml-2">Email</label>
@@ -411,7 +430,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 </a>{' '}
                 and{' '}
                 <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-sage font-semibold underline" onClick={e => e.stopPropagation()}>
-                  Privacy Policy
+                  Privacy policy
                 </a>.
               </span>
             </label>
@@ -419,12 +438,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
           <button
             type="submit"
-            disabled={loading || (!isLogin && !agreed)}
-            className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            disabled={loading || googleBusy || (!isLogin && !agreed)}
+            className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
+            {loading ? 'Processing...' : (isLogin ? 'Sign in' : 'Sign up')}
           </button>
         </form>
+        </>
         )}
 
         {!totpResolver && !resetMode && (
@@ -434,7 +454,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     onClick={() => { setResetMode(true); setResetSent(false); setNoAccountFor(null); setError(''); }}
                     className="text-[12px] text-muted-taupe hover:text-sage transition-colors"
                 >
-                    Forgot Password?
+                    Forgot password?
                 </button>
             )}
             
@@ -444,7 +464,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     onClick={() => { setIsLogin(!isLogin); setError(''); setAgreed(false); }}
                     className="text-[13px] font-semibold text-sage hover:underline"
                 >
-                    {isLogin ? "Create Account" : "Sign In"}
+                    {isLogin ? "Create account" : "Sign in"}
                 </button>
             </div>
         </div>

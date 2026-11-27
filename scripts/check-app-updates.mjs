@@ -50,6 +50,7 @@ await build({
 });
 const {
   planUpdate, needsMinimum, UpdateAvailability: A, INSTALL_DOWNLOADED, ASK_AGAIN_AFTER_MS,
+  findingOf, failureOf,
   RELEASE_NOTES, notesToShow, latestNotes,
 } = await import(pathToFileURL(bundle).href);
 rmSync(tmp, { recursive: true, force: true });
@@ -119,6 +120,27 @@ eq('minimum needed: update running', needsMinimum(A.IN_PROGRESS, 2), true);
 eq('minimum needed: downloaded', needsMinimum(A.AVAILABLE, INSTALL_DOWNLOADED), true);
 eq('minimum needed: downloaded, no update reported', needsMinimum(A.NOT_AVAILABLE, INSTALL_DOWNLOADED), true);
 eq('minimum needed: no update', needsMinimum(A.NOT_AVAILABLE, 0), false);
+
+// What a check found (Self → About, the bell).
+eq('found: nothing newer', findingOf(A.NOT_AVAILABLE, 0), 'latest');
+eq('found: an update', findingOf(A.AVAILABLE, 0), 'available');
+eq('found: a download running', findingOf(A.IN_PROGRESS, 2), 'downloading');
+eq('found: downloaded', findingOf(A.AVAILABLE, INSTALL_DOWNLOADED), 'ready');
+eq('found: downloaded, no update reported', findingOf(A.NOT_AVAILABLE, INSTALL_DOWNLOADED), 'ready');
+eq('found: Play unsure', findingOf(A.UNKNOWN, 0), 'unavailable');
+// Play's own messages, as the plugin passes them on (InstallException.getMessage()).
+const playError = (code, text, name) => `Install Error(${code}): ${text} (https://developer.android.com/reference/com/google/android/play/core/install/model/InstallErrorCode#${name})`;
+eq('failed: not installed from Play',
+  failureOf(playError(-10, 'The app is not owned by any user on this device. An app is "owned" if it has been acquired from Play.', 'ERROR_APP_NOT_OWNED')), 'not-from-play');
+eq('failed: no Play Store',
+  failureOf(playError(-9, 'The Play Store app is either not installed or not the official version.', 'ERROR_PLAY_STORE_NOT_FOUND')), 'unavailable');
+eq('failed: API not available',
+  failureOf(playError(-3, 'The API is not available on this device.', 'ERROR_API_NOT_AVAILABLE')), 'unavailable');
+eq('failed: error -6, the phone not allowing it', failureOf(playError(-6, 'The download/install is not allowed, due to the current device state (e.g. low battery, low disk space, ...).', 'ERROR_INSTALL_NOT_ALLOWED')), 'not-allowed');
+eq('failed: error -60 is not -6', failureOf(playError(-60, 'Something else.', 'ERROR_OTHER')), 'unavailable');
+eq('failed: error -100 is not -10', failureOf(playError(-100, 'Internal error.', 'ERROR_INTERNAL_ERROR')), 'unavailable');
+eq('failed: Play services missing', failureOf('GooglePlayServices are not available.'), 'unavailable');
+eq('failed: offline', failureOf('Failed to bind to the service.'), 'unavailable');
 
 // ── What's new ─────────────────────────────────────────────────────────────
 const note = (versionCode) => ({ versionCode, version: `1.${versionCode}.0`, items: [`Change ${versionCode}.`] });

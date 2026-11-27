@@ -16,12 +16,24 @@
     <meta property="og:image:height" content="500" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Fonts: preconnect cuts ~1 RTT off first text paint (audit Phase 4.2).
-         Material Symbols axis narrowed to the weights actually used (wght 200, FILL 0..1). -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Icons: Material Symbols from Google Fonts (axis narrowed to the
+         weights used: wght 200, FILL 0..1). The stylesheet no longer holds up
+         the first paint: on a slow or captive network the app stayed white
+         until the request gave up. Icons stay hidden until their font is
+         ready, so their names never flash as text; if it can't load, they
+         show as text. Inter and Manrope come with the app (index.tsx). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@200,0..1&display=block" rel="stylesheet" />
+    <script>
+        function walletteIcons(loaded) {
+            var ready = function () { document.documentElement.classList.add('icons-ready'); };
+            if (loaded && document.fonts) document.fonts.load("24px 'Material Symbols Outlined'").then(ready, ready);
+            else ready();
+        }
+        setTimeout(function () { document.documentElement.classList.add('icons-ready'); }, 8000);
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@200,0..1&display=block" rel="stylesheet" media="print" onload="this.media='all'; walletteIcons(true)" onerror="walletteIcons(false)" />
     <style>
         /* System bar insets (audit H6). The Android app draws edge to edge
            on every version; Capacitor's SystemBars sets --safe-area-inset-*
@@ -36,7 +48,7 @@
         body {
             /* Shows behind the status and navigation bars, so it follows the
                theme (theme.ts sets --c-bg). */
-            background-color: rgb(var(--c-bg, 250 249 246));
+            background-color: rgb(var(--c-bg, 249 243 237));
             min-height: 100vh;
             padding-top: var(--sat);
             padding-bottom: var(--sab);
@@ -52,7 +64,7 @@
             position: fixed;
             left: 0;
             right: 0;
-            background-color: rgb(var(--c-bg, 250 249 246));
+            background-color: rgb(var(--c-bg, 249 243 237));
             z-index: 45;
             pointer-events: none;
         }
@@ -66,6 +78,9 @@
         }
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+        }
+        html:not(.icons-ready) .material-symbols-outlined {
+            visibility: hidden;
         }
         /* Hide scrollbar for Chrome, Safari and Opera */
         .no-scrollbar::-webkit-scrollbar {

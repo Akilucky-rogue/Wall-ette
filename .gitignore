@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# wall-ette.com build (scripts/build-hosting.mjs)
+dist-web
+hosting
 *.local
 
 # Editor directories and files
@@ -61,3 +64,7 @@ private/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# Cloud Functions build output (npm --prefix functions run build)
+functions/lib/
+functions/node_modules/

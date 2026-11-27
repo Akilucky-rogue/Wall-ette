@@ -1,0 +1,20 @@
+{
+  "name": "wallette-functions",
+  "private": true,
+  "description": "Server side of Wall-ette's paid plans (Essential and Plus) and Spread: checks Google Play purchases and keeps entitlements/{uid}.",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "build": "tsc -p .",
+    "check": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@googleapis/androidpublisher": "^42.3.1",
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

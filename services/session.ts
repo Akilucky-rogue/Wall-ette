@@ -4,7 +4,8 @@
  *
  * The device holds a user's data twice: WalletContext's localStorage mirror
  * (keys ending in `_<uid>`, with the fingerprint flag) and Firestore's offline
- * cache in IndexedDB. Both go on sign-out and after account deletion. The
+ * cache in IndexedDB. Both go on sign-out and after account deletion, with
+ * any waiting or shown phone notifications (services/phoneNotifier.ts). The
  * cache also queues changes that haven't reached the cloud, so sign-out only
  * clears it once those have synced; offline, it stays, and they sync at this
  * user's next sign-in on the device.
@@ -15,7 +16,10 @@
 import { signOut } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { forgetGoogleAccount, signsInWithGoogle } from './googleSignIn';
+import { clearPhoneNotes } from './phoneNotifier';
 import { log } from '../utils/log';
+import { setReaderOn } from './paymentAlertsBridge';
 
 const QUIET_START_KEY = 'walletQuietStart';
 /** How long sign-out waits for unsynced changes to reach the cloud. */
@@ -71,9 +75,17 @@ function reloadQuietly(): void {
  */
 export async function signOutOfDevice(): Promise<void> {
   const uid = auth.currentUser?.uid ?? null;
+  const google = signsInWithGoogle(auth.currentUser);
   // Checked before signing out: the queue belongs to the signed-in user.
   const synced = uid ? await changesSynced() : true;
   await signOut(auth);
+  // The next Google sign-in on this phone asks which account again.
+  if (google) await forgetGoogleAccount();
+  // Bill reminders and alerts are this user's; none may show after sign-out.
+  await clearPhoneNotes();
+  // Payments from your apps stops, and forgets notifications not read yet:
+  // they'd go to whoever signs in next.
+  await setReaderOn(false).catch(() => {});
   if (uid) removeUserKeys(uid);
   if (synced) {
     await clearOfflineCache();
@@ -83,6 +95,8 @@ export async function signOutOfDevice(): Promise<void> {
 
 /** After the account is deleted: removes what's left of it on this device, then reloads. */
 export async function forgetDeletedAccount(uid: string): Promise<void> {
+  await clearPhoneNotes();
+  await setReaderOn(false).catch(() => {});
   removeUserKeys(uid);
   await clearOfflineCache();
   reloadQuietly();

@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-import { cloudflare } from "@cloudflare/vite-plugin";
-
 // The app's version comes from android/app/build.gradle, so the web code and
 // the Android build can't disagree. Profile and the splash screen show it;
 // "What's new" compares versionCodes. A build without it stops here rather
@@ -16,10 +14,13 @@ if (!versionName || !Number.isInteger(versionCode) || versionCode < 1) {
 }
 
 export default defineConfig({
-  plugins: [react(), cloudflare()],
+  plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(versionName),
     __APP_BUILD__: JSON.stringify(versionCode),
+    // The test build's web code (scripts/build-qa.mjs sets WALLETTE_QA=1):
+    // never for a release, which `npm run android` rebuilds without it.
+    __QA_BUILD__: JSON.stringify(process.env.WALLETTE_QA === '1'),
   },
   server: {
     host: '0.0.0.0',

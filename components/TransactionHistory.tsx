@@ -1,9 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { AppScreen, Transaction, TransactionType, categoryOptions } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { getSymbol, inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { addDays, byNewest, isDay, localDay, parseDay, toDay } from '../utils/dates';
 import { MOVED_LABELS } from '../services/spend';
-import { WallEMascot, WallEEyes, FloatingLeaf, VineDecoration, RangoliCorner, Paisley } from './SplashScreen';
+import { bankWords } from '../services/narration';
+import { Mascot } from './ui/Brand';
+import { prettyMerchant } from '../services/analyticsService';
+import { paymentRail } from '../utils/names';
+import DuplicateEntries from './DuplicateEntries';
+import WalletArriving from './WalletArriving';
+import { removed } from '../utils/haptics';
+import { useBackHandler } from '../utils/backStack';
+import { accountSummaries, entryAccount, legacyAccount, OTHER_ENTRIES } from '../services/accounts';
+import { useLimits } from '../services/plan';
+import { editable } from '../services/planRules';
+import { openPlans } from '../services/planSheet';
+import { takeVaultAccount } from '../utils/vaultAccount';
+import { viaName } from '../services/paymentAlerts';
+import { bankReference } from '../services/statementImport';
+
+// The list draws this many entries at a time, and the next lot on request:
+// thousands of rows at once made Vault slow to open and to scroll. The
+// totals, the count and the CSV export still cover every match.
+const PAGE = 100;
 
 interface TransactionHistoryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -17,7 +37,16 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline, accounts, unassignedOpening } = useWallet();
+  // A saved amount as the edit box and the amount filter see it: as typed
+  // when typed in the currency shown, else converted, to the decimals that
+  // currency can hold.
+  const shownOf = (t: Transaction): number =>
+    t.typedCurrency === shownCurrency && typeof t.typedAmount === 'number'
+      ? t.typedAmount
+      : toShown(t.amount, shownRate, inputDigits(shownCurrency, shownRate));
+  // Amounts typed here (filters, edits) are in the currency shown; saved amounts are rupees.
+  const symbol = getSymbol(shownCurrency);
   const [activeType, setActiveType] = useState<'ALL' | TransactionType>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -25,6 +54,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const [showFilters, setShowFilters] = useState(false);
   const [dateFilter, setDateFilter] = useState<'ALL' | '7_DAYS' | '30_DAYS' | '90_DAYS' | 'THIS_MONTH'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  // One bank account's entries (services/accounts.ts), or 'ALL'.
+  const [accountFilter, setAccountFilter] = useState<string>('ALL');
+  // Opened from Bank accounts: just that account's entries.
+  React.useEffect(() => {
+    const key = takeVaultAccount();
+    if (key) setAccountFilter(key);
+  }, []);
+  // The accounts to filter by, once there's more than one place entries are.
+  const accountChoices = useMemo(() => {
+    const { accounts: list, other } = accountSummaries(transactions, accounts, unassignedOpening);
+    const all = other ? [...list, other] : list;
+    return all.length > 1 || accountFilter !== 'ALL' ? all : [];
+  }, [transactions, accounts, unassignedOpening, accountFilter]);
+  const legacy = useMemo(() => legacyAccount(accounts), [accounts]);
+  // Essential's limits: older than its 12 months, or in a second bank
+  // account, reads but doesn't change (services/planRules.ts).
+  const limits = useLimits(accounts);
+  const canEdit = (t: Transaction) => editable(limits, { date: t.date, account: entryAccount(t, legacy) }, OTHER_ENTRIES);
   const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
@@ -77,7 +124,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         const inMerchant = (t.merchant || '').toLowerCase().includes(q);
         const inCategory = t.category.toLowerCase().includes(q);
         const inNote = (t.note || '').toLowerCase().includes(q);
-        const inAmount = String(t.amount).includes(q);
+        const inAmount = String(t.amount).includes(q) || String(shownOf(t)).includes(q);
         if (!inMerchant && !inCategory && !inNote && !inAmount) return false;
       }
       // Type Filter
@@ -85,6 +132,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       
       // Category Filter
       if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
+
+      // Account Filter
+      if (accountFilter !== 'ALL' && entryAccount(t, legacy) !== accountFilter) return false;
 
       // Date Filter: this month, or the last N days counting today
       if (dateFilter === 'THIS_MONTH') {
@@ -97,8 +147,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       // Amount Range Filter
       const minAmt = parseFloat(minAmount);
       const maxAmt = parseFloat(maxAmount);
-      if (!isNaN(minAmt) && t.amount < minAmt) return false;
-      if (!isNaN(maxAmt) && t.amount > maxAmt) return false;
+      const shown = shownOf(t);
+      if (!isNaN(minAmt) && shown < minAmt) return false;
+      if (!isNaN(maxAmt) && shown > maxAmt) return false;
 
       return true;
     });
@@ -106,25 +157,62 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     if (sortBy === 'AMOUNT_DESC') return filtered.sort((a, b) => b.amount - a.amount);
     if (sortBy === 'AMOUNT_ASC') return filtered.sort((a, b) => a.amount - b.amount);
     return filtered.sort(sortBy === 'DATE_ASC' ? (a, b) => byNewest(b, a) : byNewest);
-  }, [transactions, activeType, dateFilter, categoryFilter, sortBy, minAmount, maxAmount, searchQuery]);
+  }, [transactions, activeType, dateFilter, categoryFilter, accountFilter, legacy, sortBy, minAmount, maxAmount, searchQuery, shownRate]);
 
-  // Group by date (Today, Yesterday, Date String).
-  // Today/Yesterday computed once, not per transaction (audit Phase 2.4).
+  // One group per day, newest first, with the day's net; sorted by amount,
+  // one group in that order instead.
   const groupedTransactions = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
+    if (sortBy === 'AMOUNT_DESC' || sortBy === 'AMOUNT_ASC') {
+      return filteredTransactions.length
+        ? [{ key: 'amount', label: sortBy === 'AMOUNT_DESC' ? 'Largest first' : 'Smallest first', net: null as number | null, items: filteredTransactions }]
+        : [];
+    }
     const todayKey = localDay();
     const yesterdayKey = addDays(todayKey, -1);
-
-    filteredTransactions.forEach(t => {
-      let key = parseDay(t.date).toLocaleDateString('en-GB');
-      if (t.date === todayKey) key = 'Today';
-      else if (t.date === yesterdayKey) key = 'Yesterday';
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(t);
-    });
+    const thisYear = new Date().getFullYear();
+    const groups: { key: string; label: string; net: number | null; items: Transaction[] }[] = [];
+    const byDay = new Map<string, (typeof groups)[number]>();
+    for (const t of filteredTransactions) {
+      const key = isDay(t.date) ? t.date : localDay(parseDay(t.date));
+      let g = byDay.get(key);
+      if (!g) {
+        const d = parseDay(key);
+        const label = key === todayKey ? 'Today'
+          : key === yesterdayKey ? 'Yesterday'
+          : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', ...(d.getFullYear() === thisYear ? {} : { year: 'numeric' }) });
+        g = { key, label, net: 0, items: [] };
+        byDay.set(key, g);
+        groups.push(g);
+      }
+      g.items.push(t);
+      g.net = (g.net ?? 0) + (t.type === TransactionType.INCOME ? t.amount : -t.amount);
+    }
     return groups;
-  }, [filteredTransactions]);
+  }, [filteredTransactions, sortBy]);
+
+  // How far down the list is drawn. A new search, filter or order starts
+  // again from the first page.
+  const pageKey = [activeType, dateFilter, categoryFilter, accountFilter, sortBy, minAmount, maxAmount, searchQuery].join('|');
+  const [paging, setPaging] = useState({ key: pageKey, count: PAGE });
+  const shownCount = paging.key === pageKey ? paging.count : PAGE;
+  const showMore = () => setPaging({ key: pageKey, count: shownCount + PAGE });
+
+  // The first `shownCount` entries, in their groups. A day cut short keeps
+  // its whole day's net, and the rest of the day follows under it.
+  const shownGroups = useMemo(() => {
+    let left = shownCount;
+    const shown: typeof groupedTransactions = [];
+    for (const g of groupedTransactions) {
+      if (left <= 0) break;
+      shown.push(g.items.length <= left ? g : { ...g, items: g.items.slice(0, left) });
+      left -= g.items.length;
+    }
+    return shown;
+  }, [groupedTransactions, shownCount]);
+  const hiddenCount = Math.max(0, filteredTransactions.length - shownCount);
+
+  // Exact amounts in the ledger, without ".00".
+  const exact = (t: Transaction) => { const s = formatEntry(t); return s.endsWith('.00') ? s.slice(0, -3) : s; };
 
   // Totals for whatever is currently visible — the "do these filters tally?"
   // strip (single pass, only recomputed when the filtered list changes).
@@ -142,10 +230,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     let count = 0;
     if (dateFilter !== 'ALL') count++;
     if (categoryFilter !== 'ALL') count++;
+    if (accountFilter !== 'ALL') count++;
     if (minAmount || maxAmount) count++;
     if (sortBy !== 'DATE_DESC') count++;
     return count;
-  }, [dateFilter, categoryFilter, minAmount, maxAmount, sortBy]);
+  }, [dateFilter, categoryFilter, accountFilter, minAmount, maxAmount, sortBy]);
 
   // Debounce: update searchQuery 250ms after debouncedSearch changes
   React.useEffect(() => {
@@ -161,6 +250,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setActiveType('ALL');
     setDateFilter('ALL');
     setCategoryFilter('ALL');
+    setAccountFilter('ALL');
     setSortBy('DATE_DESC');
     setMinAmount('');
     setMaxAmount('');
@@ -177,8 +267,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   const confirmDelete = () => {
     if (deleteId) {
         deleteTransaction(deleteId);
+        removed();
         setDeleteId(null);
-        setToastMsg('Transaction deleted');
+        setToastMsg('Entry deleted');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
     }
@@ -231,7 +322,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     setEditingTransaction(transaction);
     setEditForm({
       merchant: transaction.merchant || '',
-      amount: transaction.amount.toString(),
+      amount: String(shownOf(transaction)),
       category: transaction.category || 'Uncategorized',
       date: toDay(transaction.date),
       note: transaction.note || '',
@@ -251,11 +342,28 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
     });
   };
 
+  // Back closes the filters and these dialogs first (utils/backStack.ts).
+  useBackHandler(showFilters, () => setShowFilters(false));
+  useBackHandler(!!deleteId, () => setDeleteId(null));
+  useBackHandler(showClearConfirm, () => { setShowClearConfirm(false); setClearInput(''); });
+  useBackHandler(!!editingTransaction, () => { if (!editSaving) closeEditModal(); });
+
   const handleEditSubmit = async () => {
     if (!editingTransaction) return;
     
-    const amount = parseFloat(editForm.amount);
-    if (isNaN(amount) || amount <= 0) return;
+    const typed = parseFloat(editForm.amount);
+    if (isNaN(typed) || typed <= 0) return;
+    // Unchanged, the saved rupees stay exactly as they were; changed, the
+    // amount typed in the currency shown is saved in rupees, and kept as
+    // typed when that isn't rupees.
+    const unchanged = editForm.amount === String(shownOf(editingTransaction));
+    const amount = unchanged ? editingTransaction.amount : toBase(typed, shownRate);
+    if (amount <= 0) return;
+    const typedFields: Pick<Transaction, 'typedAmount' | 'typedCurrency'> = unchanged
+      ? { typedAmount: editingTransaction.typedAmount, typedCurrency: editingTransaction.typedCurrency }
+      : shownCurrency === 'INR'
+        ? { typedAmount: undefined, typedCurrency: undefined }
+        : { typedAmount: Math.round(typed * 100) / 100, typedCurrency: shownCurrency };
     
     setEditSaving(true);
     try {
@@ -264,9 +372,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         amount: amount,
         category: editForm.category.trim() || 'Uncategorized',
         // The day as picked: no UTC round trip (audit H4)
-        date: isDay(editForm.date) ? editForm.date : editingTransaction.date,
+        // (and on Essential, not before its 12 months)
+        date: isDay(editForm.date) && !(limits.access === 'essential' && editForm.date < limits.from) ? editForm.date : editingTransaction.date,
         note: editForm.note.trim(),
-        type: editForm.type
+        type: editForm.type,
+        ...typedFields,
       };
       
       await editTransaction(editingTransaction.id, updates);
@@ -282,40 +392,30 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-28 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-28 right-4 opacity-35 z-10" delay={0.8} />
-      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2.2} color="var(--sage-3)" />
-      <VineDecoration className="absolute top-20 left-0 opacity-20" />
-      <RangoliCorner className="absolute top-16 right-0 opacity-15" color="var(--gold-1)" mirror />
-      <Paisley className="absolute bottom-36 right-4 opacity-20" />
-      
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
-        <div className="flex items-center justify-between mb-5">
-          <button
-            onClick={() => onNavigate(AppScreen.DASHBOARD)}
-            className="w-10 h-10 flex items-center justify-start text-premium-charcoal hover:text-sage transition-colors"
-          >
-            <span className="material-symbols-outlined text-[28px]">chevron_left</span>
-          </button>
-          <h1 className="font-serif text-xl font-semibold tracking-tight">History</h1>
-          <div className="flex items-center gap-0.5">
+        <div className="flex items-center justify-between mb-5 -mt-0.5">
+          <h1 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Vault</h1>
+          <div className="flex items-center gap-0.5 -mr-2">
              <button
                 onClick={() => setShowClearConfirm(true)}
                 className="w-10 h-10 flex items-center justify-center text-rose hover:bg-rose-light/20 rounded-full transition-colors"
-                title="Clear All History"
+                title="Clear all history"
+                aria-label="Clear all history"
              >
-                <span className="material-symbols-outlined text-[22px]">delete_sweep</span>
+                <span className="material-symbols-outlined text-[22px]" aria-hidden="true">delete_sweep</span>
              </button>
              <button
                 onClick={handleExportCSV}
-                className="w-10 h-10 flex items-center justify-center text-muted-taupe hover:text-sage transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-muted-taupe hover:text-sage transition-colors"
                 title="Export CSV"
+                aria-label="Export CSV"
              >
-                <span className="material-symbols-outlined text-[22px]">download</span>
+                <span className="material-symbols-outlined text-[22px]" aria-hidden="true">download</span>
              </button>
              <button 
+                aria-label="Filters"
                 onClick={() => setShowFilters(true)}
                 className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-colors ${activeFilterCount > 0 ? 'bg-sage text-white' : 'text-muted-taupe hover:text-sage hover:bg-sage-light/30'}`}
              >
@@ -333,21 +433,21 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           <button 
             onClick={() => setActiveType('ALL')}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === 'ALL' ? 'bg-sage text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === 'ALL' ? 'bg-sage text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">apps</span>
-            All Activity
+            All activity
           </button>
           <button 
             onClick={() => setActiveType(TransactionType.INCOME)}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.INCOME ? 'bg-sage text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.INCOME ? 'bg-sage text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
             Income
           </button>
           <button 
             onClick={() => setActiveType(TransactionType.EXPENSE)}
-            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.EXPENSE ? 'bg-rose/90 text-white shadow-sm' : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'}`}
+            className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${activeType === TransactionType.EXPENSE ? 'bg-rose/90 text-white shadow-sm' : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'}`}
           >
             <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
             Expenses
@@ -362,7 +462,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
             value={debouncedSearch}
             onChange={e => setDebouncedSearch(e.target.value)}
             placeholder="Search merchant, category, note..."
-            className="w-full pl-11 pr-10 py-2.5 bg-white border border-black/[0.06] rounded-2xl text-[13px] text-premium-charcoal placeholder:text-muted-taupe/60 focus:outline-none focus:ring-2 focus:ring-sage/30 shadow-sm"
+            className="w-full pl-11 pr-10 py-2.5 bg-white border border-black/[0.06] rounded-2xl text-[13px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30 shadow-sm"
           />
           {debouncedSearch && (
             <button
@@ -390,10 +490,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 {categoryFilter}
               </span>
             )}
+            {accountFilter !== 'ALL' && (
+              <span className="px-2 py-1 bg-sage/10 text-sage text-[10px] font-medium rounded-full flex items-center gap-1 max-w-[180px] truncate">
+                <span className="material-symbols-outlined text-[12px]">account_balance</span>
+                {accountChoices.find(a => a.key === accountFilter)?.label ?? 'One account'}
+              </span>
+            )}
             {(minAmount || maxAmount) && (
               <span className="px-2 py-1 bg-ocean/10 text-ocean text-[10px] font-medium rounded-full flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">payments</span>
-                {minAmount && maxAmount ? `₹${minAmount}-${maxAmount}` : minAmount ? `≥₹${minAmount}` : `≤₹${maxAmount}`}
+                {minAmount && maxAmount ? `${symbol}${minAmount}-${maxAmount}` : minAmount ? `≥${symbol}${minAmount}` : `≤${symbol}${maxAmount}`}
               </span>
             )}
             {sortBy !== 'DATE_DESC' && (
@@ -411,16 +517,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {showFilters && (
         <>
             <div className="fixed inset-0 bg-premium-charcoal/30 z-50 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] shadow-2xl max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
+            <div className="fixed bottom-0 left-0 right-0 lg:left-[240px] z-50 bg-white rounded-t-[32px] shadow-float max-w-[430px] mx-auto animate-slide-up max-h-[85vh] overflow-hidden flex flex-col pb-[var(--sab)]">
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 pb-4 border-b border-black/5">
+                <div className="flex justify-between items-center p-6 pb-4 border-b border-premium-charcoal/[0.08]">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-sage/10 flex items-center justify-center">
-                        <WallEEyes size="sm" />
+                      <div className="w-10 h-10 rounded-full bg-sage-light text-sage flex items-center justify-center" aria-hidden="true">
+                        <span className="material-symbols-outlined text-[20px]">tune</span>
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg font-semibold text-premium-charcoal">Filter & Sort</h3>
-                        <p className="text-[10px] text-muted-taupe">{filteredTransactions.length} transactions match</p>
+                        <h3 className="font-display text-lg font-bold text-premium-charcoal">Filter and sort</h3>
+                        <p className="text-[10px] text-muted-taupe">{filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'transaction matches' : 'transactions match'}</p>
                       </div>
                     </div>
                     <button 
@@ -442,11 +548,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             {[
-                              { value: 'ALL', label: 'All Time', icon: 'all_inclusive' },
-                              { value: 'THIS_MONTH', label: 'This Month', icon: 'today' },
-                              { value: '7_DAYS', label: '7 Days', icon: 'date_range' },
-                              { value: '30_DAYS', label: '30 Days', icon: 'calendar_view_month' },
-                              { value: '90_DAYS', label: '90 Days', icon: 'calendar_view_week' },
+                              { value: 'ALL', label: 'All time', icon: 'all_inclusive' },
+                              { value: 'THIS_MONTH', label: 'This month', icon: 'today' },
+                              { value: '7_DAYS', label: '7 days', icon: 'date_range' },
+                              { value: '30_DAYS', label: '30 days', icon: 'calendar_view_month' },
+                              { value: '90_DAYS', label: '90 days', icon: 'calendar_view_week' },
                             ].map((opt) => (
                                 <button
                                     key={opt.value}
@@ -472,10 +578,10 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
-                              { value: 'DATE_DESC', label: 'Newest First', icon: 'arrow_downward' },
-                              { value: 'DATE_ASC', label: 'Oldest First', icon: 'arrow_upward' },
-                              { value: 'AMOUNT_DESC', label: 'Highest Amount', icon: 'trending_up' },
-                              { value: 'AMOUNT_ASC', label: 'Lowest Amount', icon: 'trending_down' },
+                              { value: 'DATE_DESC', label: 'Newest first', icon: 'arrow_downward' },
+                              { value: 'DATE_ASC', label: 'Oldest first', icon: 'arrow_upward' },
+                              { value: 'AMOUNT_DESC', label: 'Highest amount', icon: 'trending_up' },
+                              { value: 'AMOUNT_ASC', label: 'Lowest amount', icon: 'trending_down' },
                             ].map((opt) => (
                                 <button
                                     key={opt.value}
@@ -501,9 +607,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         </div>
                         <div className="flex gap-3">
                             <div className="flex-1">
-                              <label className="text-[10px] text-muted-taupe mb-1 block">Min Amount</label>
+                              <label className="text-[10px] text-muted-taupe mb-1 block">Min amount</label>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">{symbol}</span>
                                 <input
                                     type="number"
                                     placeholder="0"
@@ -515,9 +621,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             </div>
                             <div className="flex items-end pb-3 text-muted-taupe">—</div>
                             <div className="flex-1">
-                              <label className="text-[10px] text-muted-taupe mb-1 block">Max Amount</label>
+                              <label className="text-[10px] text-muted-taupe mb-1 block">Max amount</label>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">₹</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-taupe text-sm">{symbol}</span>
                                 <input
                                     type="number"
                                     placeholder="∞"
@@ -529,6 +635,34 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             </div>
                         </div>
                     </div>
+
+                    {/* Account */}
+                    {accountChoices.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="material-symbols-outlined text-sage text-[18px]">account_balance</span>
+                          <p className="text-[11px] font-bold text-muted-taupe uppercase tracking-widest">Account</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {[{ key: 'ALL', label: 'All accounts', entries: transactions.length }, ...accountChoices].map(a => (
+                            <button
+                              key={a.key}
+                              onClick={() => setAccountFilter(a.key)}
+                              className={`px-3 py-2 rounded-2xl text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                                accountFilter === a.key
+                                  ? 'bg-sage text-white border-sage shadow-md'
+                                  : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-sage/30'
+                              }`}
+                            >
+                              <span>{a.label}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${accountFilter === a.key ? 'bg-white/20' : 'bg-black/5'}`}>
+                                {a.entries}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Category */}
                     <div>
@@ -555,7 +689,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                       {cat === 'ALL' ? (
                                         <span className="material-symbols-outlined text-[14px]">select_all</span>
                                       ) : null}
-                                      <span>{cat === 'ALL' ? 'All Categories' : cat}</span>
+                                      <span>{cat === 'ALL' ? 'All categories' : cat}</span>
                                       {cat !== 'ALL' && stats && (
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                                           categoryFilter === cat ? 'bg-white/20' : 'bg-black/5'
@@ -571,160 +705,234 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 pt-4 border-t border-black/5 bg-white">
+                <div className="p-6 pt-4 border-t border-premium-charcoal/[0.08] bg-white">
                     <button 
                         onClick={() => setShowFilters(false)}
-                        className="w-full bg-premium-charcoal text-white py-4 rounded-3xl font-serif text-lg font-medium active:scale-95 transition-transform flex items-center justify-center gap-2"
+                        className="w-full bg-premium-charcoal text-white py-4 rounded-3xl text-lg font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px]">check</span>
-                        Show {filteredTransactions.length} Results
+                        Show {filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'Result' : 'Results'}
                     </button>
                 </div>
             </div>
         </>
       )}
 
-      {/* List */}
-      <main className="px-6 space-y-6 mt-4">
-        {/* Results summary — visible totals for the current filters */}
+      {/* Entries imported twice: remove the extra copies (components/DuplicateEntries.tsx) */}
+      <DuplicateEntries className="px-6 mt-4" />
+
+      {/* List: one card per day, slim rows; tap a row for details */}
+      <main className="px-6 space-y-5 mt-4">
+        {/* Totals for the current filters */}
         {filteredTransactions.length > 0 && (
-          <div className="bg-white rounded-3xl shadow-soft border border-black/[0.02] px-4 py-3 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[10px] text-muted-taupe uppercase tracking-widest font-bold">
-                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'entry' : 'entries'}
-              </p>
-              <p className={`text-[13px] font-serif font-bold whitespace-nowrap ${filteredTotals.net >= 0 ? 'text-sage' : 'text-rose'}`}>
+          <div className="flex items-center justify-between gap-3 px-1 text-[12px]">
+            <p className="text-muted-taupe">
+              {filteredTransactions.length.toLocaleString('en-IN')} {filteredTransactions.length === 1 ? 'entry' : 'entries'}
+            </p>
+            <p className="flex items-center gap-3 tabular-nums font-semibold">
+              <span className="text-sage">+{formatAmountCompact(filteredTotals.inc)}</span>
+              <span className="text-rose">−{formatAmountCompact(filteredTotals.exp)}</span>
+              <span className={filteredTotals.net >= 0 ? 'text-premium-charcoal' : 'text-rose'}>
                 Net {filteredTotals.net >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(filteredTotals.net))}
-              </p>
-            </div>
-            <div className="flex items-center gap-4 shrink-0 text-right">
-              <div>
-                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">In</p>
-                <p className="text-[12px] font-semibold text-sage whitespace-nowrap tabular-nums">+{formatAmountCompact(filteredTotals.inc)}</p>
-              </div>
-              <div>
-                <p className="text-[9px] text-muted-taupe uppercase tracking-wider">Out</p>
-                <p className="text-[12px] font-semibold text-rose whitespace-nowrap tabular-nums">−{formatAmountCompact(filteredTotals.exp)}</p>
-              </div>
-            </div>
+              </span>
+            </p>
           </div>
         )}
-        {Object.entries(groupedTransactions).length === 0 ? (
+        {groupedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-                <WallEMascot 
-                  mood="thinking" 
-                  message="Nothing here yet..."
-                  size="md"
-                />
-                <p className="mt-4 text-muted-taupe text-sm">No transactions match your filters</p>
-                <button 
-                  onClick={clearFilters}
-                  className="mt-3 text-sage text-xs font-semibold hover:underline"
-                >
-                  Clear all filters
-                </button>
+                {transactions.length === 0 && !walletLoaded ? (
+                  <WalletArriving isOnline={isOnline} />
+                ) : transactions.length === 0 ? (
+                  <>
+                    <Mascot pose="welcome" height={120} />
+                    <p className="mt-4 font-display text-lg font-bold text-premium-charcoal">No entries yet</p>
+                    <p className="mt-1 text-muted-taupe text-sm text-center max-w-[280px] leading-relaxed">
+                      Every entry you add or import shows up here, newest first.
+                    </p>
+                    <div className="flex gap-2.5 mt-5">
+                      <button
+                        onClick={() => onNavigate(AppScreen.IMPORT)}
+                        className="px-4 py-2.5 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+                      >
+                        Import a statement
+                      </button>
+                      <button
+                        onClick={() => onNavigate(AppScreen.NEW_ENTRY)}
+                        className="px-4 py-2.5 rounded-full bg-white border border-sage/30 text-sage text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+                      >
+                        Add an entry
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Mascot pose="think" height={104} />
+                    <p className="mt-4 text-premium-charcoal text-sm font-semibold">
+                      {searchQuery ? `Nothing matches “${searchQuery}”` : 'No entries match these filters'}
+                    </p>
+                    <p className="mt-1 text-muted-taupe text-[13px]">
+                      {transactions.length.toLocaleString('en-IN')} {transactions.length === 1 ? 'entry is' : 'entries are'} in your wallet.
+                    </p>
+                    <button
+                      onClick={clearFilters}
+                      className="mt-3 text-sage text-xs font-semibold hover:underline"
+                    >
+                      {searchQuery ? 'Clear the search and filters' : 'Clear all filters'}
+                    </button>
+                  </>
+                )}
             </div>
         ) : (
-            Object.entries(groupedTransactions).map(([dateLabel, groupTxs]: [string, Transaction[]]) => (
-            <section key={dateLabel}>
-                <h3 className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-4 pl-1">{dateLabel}</h3>
-                <div className="space-y-3">
-                {groupTxs.map(t => (
-                    <div 
-                        key={t.id} 
-                        onClick={() => toggleExpand(t.id)}
-                        className={`bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden transition-all duration-300 ${expandedId === t.id ? 'ring-1 ring-sage/30' : 'active:scale-[0.98]'}`}
-                    >
-                        {/* Main Row */}
-                        <div className="p-4 flex items-center justify-between gap-3 cursor-pointer">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className={`shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center ${t.type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
-                                <span className="material-symbols-outlined text-[22px]">
-                                    {getIconForCategory(t.category)}
+            shownGroups.map(group => (
+            <section key={group.key} aria-label={group.label}>
+                <div className="flex items-baseline justify-between px-1 mb-2">
+                  <h3 className="text-[12px] font-semibold text-muted-taupe">{group.label}</h3>
+                  {group.net !== null && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${group.net >= 0 ? 'text-sage' : 'text-muted-taupe'}`}>
+                      {group.net >= 0 ? '+' : '−'}{formatAmountCompact(Math.abs(group.net))}
+                    </span>
+                  )}
+                </div>
+                <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
+                {group.items.map(t => {
+                    const expanded = expandedId === t.id;
+                    const isExpense = t.type === TransactionType.EXPENSE;
+                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : null;
+                    const sub = [
+                      paymentRail(t.merchant),
+                      t.category && t.category.trim() ? t.category : 'Uncategorized',
+                      t.via ? viaName(t.via) : null,
+                      group.net === null ? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : null,
+                    ].filter(Boolean).join(' · ');
+                    return (
+                    <li key={t.id}>
+                        <button
+                            type="button"
+                            onClick={() => toggleExpand(t.id)}
+                            aria-expanded={expanded}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${expanded ? 'bg-zen-cream' : 'active:bg-zen-cream'}`}
+                        >
+                            <span className={`shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center ${isExpense ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
+                                <span className="material-symbols-outlined icon-fill text-[18px]" aria-hidden="true">{getIconForCategory(t.category)}</span>
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[14px] font-semibold text-premium-charcoal truncate" title={t.merchant || undefined}>
+                                    {name ?? <span className="italic text-muted-taupe font-normal">Unknown payee</span>}
                                 </span>
-                                </div>
-                                <div className="min-w-0">
-                                  <p
-                                    className="font-serif font-semibold text-[15px] text-premium-charcoal truncate"
-                                    title={t.merchant || "Unknown Merchant"}
-                                  >
-                                    {t.merchant && t.merchant.trim().length > 0 ? t.merchant : <span className="italic text-muted-taupe">Unknown Merchant</span>}
-                                  </p>
-                                  <p
-                                    className="text-[11px] text-muted-taupe uppercase tracking-wider truncate"
-                                    title={t.category && t.category.trim().length > 0 ? t.category : 'Uncategorized'}
-                                  >
-                                    {t.category && t.category.trim().length > 0 ? t.category : <span className="italic text-muted-taupe">Uncategorized</span>}
-                                  </p>
-                                  {t.note && t.note.trim().length > 0 && (
-                                    <p
-                                      className="text-[10px] text-muted-taupe truncate mt-0.5"
-                                      title={t.note}
-                                    >
-                                      {t.note}
-                                    </p>
-                                  )}
-                                </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                                <p className={`font-serif font-bold text-[15px] whitespace-nowrap tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
-                                {t.type === TransactionType.EXPENSE ? '-' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : formatAmount(t.amount)}
-                                </p>
-                            </div>
-                        </div>
+                                <span className="block text-[11px] text-muted-taupe truncate">{sub}</span>
+                            </span>
+                            <span className={`shrink-0 text-[14px] font-semibold tabular-nums whitespace-nowrap ${isExpense ? 'text-premium-charcoal' : 'text-sage'}`}>
+                                {isExpense ? '−' : '+'}{t.amount >= 100000 ? formatAmountCompact(t.amount) : exact(t)}
+                            </span>
+                        </button>
 
-                        {/* Expanded Details */}
-                        {expandedId === t.id && (
-                            <div className="px-4 pb-4 pt-0 bg-white">
-                                <div className="pt-4 border-t border-dashed border-gray-100 space-y-3">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">Note</p>
-                                            <p className="text-[13px] text-premium-charcoal font-serif italic">{t.note || "No notes added."}</p>
-                                        </div>
+                        {/* Details */}
+                        {expanded && (
+                            <div className="px-4 pb-4 pt-1 bg-zen-cream space-y-3">
+                                {(() => {
+                                    // The bank's narration in full, and the entry's own note (services/narration.ts).
+                                    const { narration, note } = bankWords(t.merchant, t.note);
+                                    return (
+                                        <>
+                                            {t.via ? (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">Added by Wall-ette</p>
+                                                    <p className="text-[12px] text-premium-charcoal leading-snug">
+                                                        {t.via === 'share' ? 'From text you shared' : `From ${viaName(t.via) ?? 'an app'}'s notification`}
+                                                        {(() => { const ref = bankReference(t.merchant); return ref ? ` · reference ${ref.slice(4)}` : ''; })()}.
+                                                        {' '}A statement with this payment takes its place when you import it.
+                                                    </p>
+                                                </div>
+                                            ) : narration && narration !== name && (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">From the bank</p>
+                                                    <p className="text-[12px] text-premium-charcoal break-all leading-snug">{narration}</p>
+                                                </div>
+                                            )}
+                                            {note && (
+                                                <div>
+                                                    <p className="text-[11px] text-muted-taupe mb-0.5">Note</p>
+                                                    <p className="text-[13px] text-premium-charcoal">{note}</p>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                                {(() => {
+                                    // Money moved isn't spending or income (audit H3): say why
+                                    const info = flowOf(t);
+                                    if (info.flow !== 'moved' || !info.moved) return null;
+                                    if (info.moved === 'reversal') return (
+                                        <p className="flex items-center gap-1.5 text-[12px] text-lavender font-semibold">
+                                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">undo</span>
+                                            {t.type === TransactionType.INCOME
+                                              ? 'The bank sent back a payment of the same amount: both are left out of spending and income'
+                                              : 'Reversed by the bank: this and the money that came back are left out of spending and income'}
+                                        </p>
+                                    );
+                                    return (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
+                                            className="flex items-center gap-1.5 text-[12px] text-lavender font-semibold"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">swap_horiz</span>
+                                            Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
+                                        </button>
+                                    );
+                                })()}
+                                <div className="flex justify-between items-end gap-3">
+                                    <div>
+                                        <p className="text-[11px] text-muted-taupe mb-0.5">{entryTime(t) ? 'Time' : 'Date'}</p>
+                                        <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                     </div>
-                                    {(() => {
-                                        // Money moved isn't spending or income (audit H3): say why
-                                        const info = flowOf(t);
-                                        if (info.flow !== 'moved' || !info.moved) return null;
-                                        return (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onNavigate(AppScreen.MONEY_MOVED); }}
-                                                className="flex items-center gap-1.5 text-[11px] text-lavender font-semibold"
-                                            >
-                                                <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-                                                Money moved · {MOVED_LABELS[info.moved]} · not counted as {t.type === TransactionType.INCOME ? 'income' : 'spending'}
-                                            </button>
-                                        );
-                                    })()}
-                                    <div className="flex justify-between items-center pt-1">
-                                         <div>
-                                            <p className="text-[10px] text-muted-taupe font-bold uppercase tracking-wider mb-1">{entryTime(t) ? 'Time' : 'Date'}</p>
-                                            <p className="text-[13px] text-premium-charcoal">{entryTime(t) ?? parseDay(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={(e) => openEditModal(t, e)}
-                                                className="text-[10px] bg-sage-light text-sage px-3 py-1.5 rounded-full font-bold uppercase tracking-wider hover:bg-sage/20 transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button 
-                                                onClick={(e) => requestDelete(t.id, e)}
-                                                className="text-[10px] bg-rose-light text-rose px-3 py-1.5 rounded-full font-bold uppercase tracking-wider hover:bg-rose/20 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
+                                    <div className="flex items-center gap-2">
+                                        {canEdit(t) ? (
+                                        <button
+                                            onClick={(e) => openEditModal(t, e)}
+                                            className="text-[12px] bg-white text-sage px-4 py-1.5 rounded-full font-semibold shadow-soft"
+                                        >
+                                            Edit
+                                        </button>
+                                        ) : (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); openPlans(limits.access === 'none' ? 'add' : 'read-only'); }}
+                                            aria-label={limits.access === 'none' ? 'Read-only without a plan. See plans' : 'Read-only on Essential. See Plus'}
+                                            className="text-[12px] text-muted-taupe px-2 py-1.5 flex items-center gap-1 whitespace-nowrap"
+                                        >
+                                            <span className="material-symbols-outlined text-[15px]" aria-hidden="true">lock</span>
+                                            Read-only
+                                        </button>
+                                        )}
+                                        <button
+                                            onClick={(e) => requestDelete(t.id, e)}
+                                            className="text-[12px] bg-white text-rose px-4 py-1.5 rounded-full font-semibold shadow-soft"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         )}
-                    </div>
-                ))}
-                </div>
+                    </li>
+                    );
+                })}
+                </ul>
             </section>
             ))
+        )}
+        {hiddenCount > 0 && (
+          <div className="flex flex-col items-center gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={showMore}
+              className="px-5 py-2.5 rounded-full bg-white border border-sage/30 text-sage text-[13px] font-semibold shadow-soft active:scale-95 transition-transform"
+            >
+              Show {Math.min(PAGE, hiddenCount).toLocaleString('en-IN')} more
+            </button>
+            <p className="text-[11px] text-muted-taupe tabular-nums">
+              {shownCount.toLocaleString('en-IN')} of {filteredTransactions.length.toLocaleString('en-IN')} shown
+            </p>
+          </div>
         )}
       </main>
 
@@ -736,14 +944,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-12 h-12 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4">
                         <span className="material-symbols-outlined text-[24px]">delete</span>
                     </div>
-                    <h3 className="text-premium-charcoal font-serif text-xl font-semibold mb-2">Delete Transaction?</h3>
+                    <h3 className="text-premium-charcoal font-display text-xl font-bold mb-2">Delete this entry?</h3>
                     <p className="text-muted-taupe text-xs mb-6 leading-relaxed">
                         This action cannot be undone. The transaction will be permanently removed.
                     </p>
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => setDeleteId(null)}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -767,7 +975,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="w-14 h-14 bg-rose-light text-rose rounded-full flex items-center justify-center mb-4 animate-pulse">
                         <span className="material-symbols-outlined text-[32px]">warning</span>
                     </div>
-                    <h3 className="text-rose font-serif text-xl font-bold mb-2">Clear All History?</h3>
+                    <h3 className="text-rose font-display text-xl font-bold mb-2">Clear all history?</h3>
                     <p className="text-premium-charcoal text-xs mb-4 leading-relaxed font-medium">
                         This will permanently delete <span className="underline decoration-rose">ALL</span> transactions. This action is irreversible.
                     </p>
@@ -784,7 +992,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => { setShowClearConfirm(false); setClearInput(''); }}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -793,7 +1001,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             disabled={clearInput.toUpperCase() !== 'DELETE'}
                             className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-rose text-white shadow-soft hover:bg-rose/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Clear All
+                            Clear all
                         </button>
                     </div>
                 </div>
@@ -811,7 +1019,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             <div className="w-12 h-12 bg-sage-light text-sage rounded-full flex items-center justify-center">
                                 <span className="material-symbols-outlined text-[24px]">edit</span>
                             </div>
-                            <h3 className="text-premium-charcoal font-serif text-xl font-semibold">Edit Transaction</h3>
+                            <h3 className="text-premium-charcoal font-display text-xl font-bold">Edit entry</h3>
                         </div>
                         <button onClick={closeEditModal} className="text-muted-taupe hover:text-premium-charcoal">
                             <span className="material-symbols-outlined">close</span>
@@ -828,7 +1036,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                 className={`flex-1 py-3 rounded-2xl text-[13px] font-semibold transition-all ${
                                     editForm.type === TransactionType.EXPENSE 
                                         ? 'bg-rose text-white' 
-                                        : 'bg-white border border-black/5 text-muted-taupe hover:bg-gray-50'
+                                        : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-gray-50'
                                 }`}
                             >
                                 Expense
@@ -839,7 +1047,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                                 className={`flex-1 py-3 rounded-2xl text-[13px] font-semibold transition-all ${
                                     editForm.type === TransactionType.INCOME 
                                         ? 'bg-sage text-white' 
-                                        : 'bg-white border border-black/5 text-muted-taupe hover:bg-gray-50'
+                                        : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-gray-50'
                                 }`}
                             >
                                 Income
@@ -855,13 +1063,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.merchant}
                             onChange={(e) => setEditForm(prev => ({ ...prev, merchant: e.target.value }))}
                             placeholder="Enter merchant name"
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
                     {/* Amount */}
                     <div className="mb-4">
-                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Amount</label>
+                        <label className="text-[11px] text-muted-taupe font-bold uppercase tracking-wider mb-2 block">Amount, {shownCurrency}</label>
                         <input
                             type="number"
                             step="0.01"
@@ -869,7 +1077,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             value={editForm.amount}
                             onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
                             placeholder="0.00"
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30"
                         />
                     </div>
 
@@ -879,7 +1087,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         <select
                             value={editForm.category}
                             onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30 appearance-none cursor-pointer"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30 appearance-none cursor-pointer"
                             title="Category"
                             aria-label="Category"
                           >
@@ -895,8 +1103,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                         <input
                             type="date"
                             value={editForm.date}
+                            min={limits.access === 'essential' ? limits.from : undefined}
                             onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal focus:outline-none focus:ring-2 focus:ring-sage/30"
                             title="Date"
                             aria-label="Date"
                           />
@@ -910,7 +1119,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                             onChange={(e) => setEditForm(prev => ({ ...prev, note: e.target.value }))}
                             placeholder="Add a note (optional)"
                             rows={2}
-                            className="w-full px-4 py-3 rounded-2xl border border-black/5 bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe/50 focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
+                            className="w-full px-4 py-3 rounded-2xl border border-premium-charcoal/[0.08] bg-white text-[14px] text-premium-charcoal placeholder:text-muted-taupe focus:outline-none focus:ring-2 focus:ring-sage/30 resize-none"
                         />
                     </div>
 
@@ -918,7 +1127,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                     <div className="flex gap-3">
                         <button 
                             onClick={closeEditModal}
-                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-black/5 text-premium-charcoal hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3 rounded-2xl text-[13px] font-semibold bg-white border border-premium-charcoal/[0.08] text-premium-charcoal hover:bg-gray-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -946,7 +1155,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
       {showToast && (
           <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 animate-slide-up flex items-center gap-2">
               <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
-              <span className="text-[13px] font-medium font-serif">{toastMsg}</span>
+              <span className="text-[13px] font-medium">{toastMsg}</span>
           </div>
       )}
     </div>

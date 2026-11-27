@@ -5,8 +5,11 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
+import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
-import { WallEEyes, FloatingLeaf, RangoliCorner, LotusFlower, MandalaDots, Diya } from './SplashScreen';
+import { BrandIcon } from './ui/Brand';
+import { GoogleButton } from './ui/GoogleButton';
+import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
 
 interface SecurityLockProps {
   onUnlock: () => void;
@@ -18,6 +21,11 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  // How this account signs in: a password, Google, or both. An account made
+  // with Google has no password to type here.
+  const google = signsInWithGoogle(auth.currentUser);
+  const withPassword = hasPassword(auth.currentUser) || !google;
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   // Real TOTP second factor: set when reauth reports the account has 2FA
   const [totpResolver, setTotpResolver] = useState<MultiFactorResolver | null>(null);
@@ -59,7 +67,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  const logAttempt = async (success: boolean, method: 'PASSWORD' | 'MFA' | 'BIOMETRIC') => {
+  const logAttempt = async (success: boolean, method: 'PASSWORD' | 'MFA' | 'BIOMETRIC' | 'GOOGLE') => {
       if (!auth.currentUser) return;
       try {
           await addDoc(collection(db, `users/${auth.currentUser.uid}/security_logs`), {
@@ -93,12 +101,46 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             setTotpResolver(mfaResolverFromError(err));
             setError('');
         } else {
-            void logAttempt(false, 'PASSWORD');
-            setError("Incorrect password.");
-            setPassword('');
+            const code = err?.code;
+            if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+                // Only a wrong password counts as a failed unlock (and can
+                // raise the bell's "failed unlock attempts" note).
+                void logAttempt(false, 'PASSWORD');
+                setError("Incorrect password.");
+                setPassword('');
+            } else if (code === 'auth/network-request-failed') {
+                setError("You're offline. Connect to the internet and try again.");
+            } else if (code === 'auth/too-many-requests') {
+                setError('Too many attempts. Wait a few minutes, or reset your password.');
+            } else {
+                setError("Couldn't check your password. Try again.");
+            }
         }
     } finally {
         setLoading(false);
+    }
+  };
+
+  const handleGoogleUnlock = async () => {
+    if (!auth.currentUser) return;
+    setGoogleBusy(true);
+    setError('');
+    setInfo('');
+    try {
+        await reauthenticateWithGoogle(auth.currentUser);
+        onUnlock();
+        void logAttempt(true, 'GOOGLE');
+    } catch (err: any) {
+        if (isMfaRequiredError(err)) {
+            setTotpResolver(mfaResolverFromError(err));
+        } else if (!isGoogleCancel(err)) {
+            // Another person's Google account is a failed unlock; being
+            // offline or Google not answering is not.
+            if (err?.code === 'auth/user-mismatch') void logAttempt(false, 'GOOGLE');
+            setError(googleErrorMessage(err));
+        }
+    } finally {
+        setGoogleBusy(false);
     }
   };
 
@@ -142,9 +184,9 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   return (
     <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
       {/* Eco & Indian decorative elements - guardians of wealth */}
-      <FloatingLeaf className="top-16 right-8 opacity-40" delay={0} />
-      <FloatingLeaf className="top-32 left-6 opacity-30" delay={1.5} color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-24 right-6 opacity-35" delay={2.5} />
+      <FloatingLeaf className="top-16 right-8 opacity-40" />
+      <FloatingLeaf className="top-32 left-6 opacity-30" color="var(--sage-3)" />
+      <FloatingLeaf className="bottom-24 right-6 opacity-35" />
       <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
       <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
       <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="var(--gold-1)" mirror />
@@ -153,23 +195,19 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
       <MandalaDots className="absolute bottom-32 left-8 opacity-15" />
       <LotusFlower className="absolute top-28 left-8 opacity-30" size="sm" />
       <Diya className="absolute bottom-24 left-12 opacity-40" />
-      
+
       <div className="relative text-center mb-8">
-        {/* Wall-ette Guard Mode */}
         <div className="relative inline-flex items-center justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center shadow-lg animate-pulse">
-            <WallEEyes size="md" expression="sleepy" />
-          </div>
+          <BrandIcon size={80} className="drop-shadow-md" />
           {/* Lock badge */}
-          <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
-            <span className="material-symbols-outlined text-sage text-[16px]">lock</span>
+          <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border-2 border-sage-light">
+            <span className="material-symbols-outlined text-sage text-[16px]" aria-hidden="true">lock</span>
           </div>
         </div>
-        <h1 className="text-premium-charcoal font-serif text-2xl font-semibold mb-2">Session Locked</h1>
+        <h1 className="text-premium-charcoal font-display text-2xl font-bold mb-2">Session locked</h1>
         <p className="text-muted-taupe text-[14px] leading-relaxed max-w-[280px] mx-auto">
           For your security, please verify your identity to continue.
         </p>
-        <p className="text-[10px] text-muted-taupe/50 mt-2 italic">"I'm guarding your finances!"</p>
       </div>
 
       <div className="w-full bg-white rounded-[32px] p-8 shadow-soft border border-black/[0.02]">
@@ -195,16 +233,16 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             <button
                 type="submit"
                 disabled={loading || totpCode.length < 6}
-                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
             >
-                {loading ? 'Verifying...' : 'Verify Code'}
+                {loading ? 'Verifying...' : 'Verify code'}
             </button>
             <button
                 type="button"
                 onClick={() => { setTotpResolver(null); setTotpCode(''); setError(''); setPassword(''); }}
                 className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal"
             >
-                Back to Password
+                Back
             </button>
         </form>
         ) : (
@@ -212,30 +250,47 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
             {error && <div className="mb-4 text-center text-rose text-xs font-medium">{error}</div>}
             {info && <div className="mb-4 text-center text-sage text-xs font-medium">{info}</div>}
 
+            {withPassword && (
+            <>
             <div className="mb-4">
                 <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full text-center bg-zen-bg rounded-2xl px-5 py-4 text-premium-charcoal text-lg tracking-widest outline-none focus:ring-1 focus:ring-sage border border-transparent focus:border-sage/30 transition-all placeholder:tracking-normal placeholder:text-base"
-                    placeholder="Enter Password"
+                    placeholder="Enter password"
                     autoFocus
                 />
             </div>
 
             <div className="flex justify-end mb-6">
                 <button type="button" onClick={handleForgotPassword} disabled={resetBusy} className="text-[11px] text-muted-taupe hover:text-sage font-medium tracking-wide disabled:opacity-50">
-                    {resetBusy ? 'Sending…' : 'Forgot Password?'}
+                    {resetBusy ? 'Sending…' : 'Forgot password?'}
                 </button>
             </div>
 
             <button
                 type="submit"
-                disabled={loading || password.length === 0}
-                className="w-full bg-sage text-white py-4 rounded-2xl font-serif text-lg font-medium shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || googleBusy || password.length === 0}
+                className="w-full bg-sage text-white py-4 rounded-2xl text-lg font-semibold shadow-soft hover:bg-sage/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                {loading ? 'Verifying...' : 'Unlock Wallet'}
+                {loading ? 'Verifying...' : 'Unlock wallet'}
             </button>
+            </>
+            )}
+
+            {google && (
+                <>
+                    {withPassword && (
+                        <div className="relative flex items-center gap-2 py-4">
+                            <div className="h-px bg-black/5 flex-1"></div>
+                            <span className="text-[10px] text-muted-taupe uppercase tracking-widest">Or</span>
+                            <div className="h-px bg-black/5 flex-1"></div>
+                        </div>
+                    )}
+                    <GoogleButton label="Unlock with Google" busyLabel="Checking with Google…" busy={googleBusy} disabled={loading} onClick={handleGoogleUnlock} />
+                </>
+            )}
 
             {bioReady && (
                 <>
@@ -247,29 +302,29 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
                     <button
                         type="button"
                         onClick={tryBiometric}
-                        className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl font-serif text-base font-medium shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-white border border-sage-border text-premium-charcoal py-3 rounded-2xl text-base font-semibold shadow-sm hover:bg-sage-light/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[20px] text-sage">fingerprint</span>
-                        Unlock with Biometrics
+                        Unlock with biometrics
                     </button>
                 </>
             )}
         </form>
         )}
 
-        <div className="mt-6 text-center border-t border-black/5 pt-4">
+        <div className="mt-6 text-center border-t border-premium-charcoal/[0.08] pt-4">
             <button
                 onClick={() => { setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false)); }}
                 disabled={signingOut}
                 className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
-                {signingOut ? 'Signing out…' : 'Sign Out'}
+                {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
         </div>
       </div>
       
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe/60 font-medium">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-taupe font-medium">
           Wall-ette Secured
         </p>
       </div>

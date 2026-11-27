@@ -1,6 +1,16 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, browserSessionPersistence, indexedDBLocalPersistence } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  indexedDBLocalPersistence,
+  type Auth,
+} from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { log } from '../utils/log';
 
 // Configuration provided for the Wall-ette app
 const firebaseConfig = {
@@ -14,19 +24,25 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
 
-// Set session persistence based on platform:
-// - native (Capacitor): local persistence, session survives backgrounding
-// - web: session persistence, cleared when the tab closes
-import { Capacitor } from '@capacitor/core';
-import { log } from '../utils/log';
 const isNativePlatform = Capacitor.isNativePlatform && Capacitor.isNativePlatform();
-if (isNativePlatform) {
-  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
-    log.warn('Failed to set local persistence');
-  });
-} else {
+
+// Native (Capacitor): the session stays on the device (IndexedDB, with
+// localStorage as a fallback), so it survives backgrounding and restarts.
+// Started with initializeAuth and no popup/redirect helper: the app signs in
+// with email and password (plus an authenticator code), never a Google popup
+// or redirect. getAuth() would add that helper, and on Android it loads
+// apis.google.com/js/api.js and an auth iframe before the signed-in user is
+// known, so a slow or broken connection held start-up on the spinner (60 s
+// per stalled request on the emulator).
+//
+// Web: getAuth() as before, with session persistence (cleared when the tab
+// closes).
+export const auth: Auth = isNativePlatform
+  ? initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] })
+  : getAuth(app);
+
+if (!isNativePlatform) {
   setPersistence(auth, browserSessionPersistence).catch(() => {
     log.warn('Failed to set session persistence');
   });
@@ -36,5 +52,12 @@ if (isNativePlatform) {
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache()
 });
+
+/**
+ * Firestore's REST API, for the one-time move to month storage
+ * (services/monthStore.ts); undefined means Firestore's own address. The
+ * browser checks point it at the emulator.
+ */
+export const firestoreRestBase: string | undefined = undefined;
 
 export default app;

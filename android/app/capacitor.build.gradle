@@ -13,8 +13,12 @@ dependencies {
     implementation project(':capacitor-firebase-crashlytics')
     implementation project(':capacitor-app')
     implementation project(':capacitor-filesystem')
+    implementation project(':capacitor-haptics')
+    implementation project(':capacitor-local-notifications')
     implementation project(':capacitor-share')
     implementation project(':capawesome-capacitor-app-update')
+    implementation project(':capgo-capacitor-social-login')
+    implementation project(':capgo-native-purchases')
 
 }
 

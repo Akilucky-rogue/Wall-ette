@@ -14,7 +14,7 @@
  *   - import ids are the same for a row in every statement and in either
  *     format, identical rows get different ids, and 20,000 different rows get
  *     20,000 ids
- *   - Fee Hunter's duplicate key groups a PDF and an Excel copy of a row, and
+ *   - the duplicate cleaner's key groups a PDF and an Excel copy of a row, and
  *     leaves typed entries alone
  *
  * Given a folder of real statements, it also replays the audit's tests on
@@ -23,7 +23,7 @@
  *   - re-importing each statement into a wallet holding every other row (L1)
  *   - importing each statement into a wallet holding another that overlaps
  *     it, in the same or the other format
- *   - Fee Hunter's cleaner after importing both formats with "Include Anyway" (L3)
+ *   - the duplicate cleaner after importing both formats with "Include Anyway" (L3)
  *   - id collisions, and how many rows keep their id in the other format (L2)
  *
  * Usage (after `npm ci`):
@@ -155,13 +155,15 @@ eq('ids: shape', ids.every(id => /^import-[0-9a-f]{32}$/.test(id)), true);
 eq('ids: same again', (await toTransactions(statement)).map(t => t.id), ids);
 eq('ids: same in the Excel export', (await toTransactions(asExcel)).map(t => t.id), ids);
 eq('ids: same in a later statement that has the rows', (await toTransactions([pdfRow('2026-03-07', 120, 'EXPENSE', 'UPI/DR/631245780001/TEA STALL/YESB/tea@yesb/UPI'), ...statement])).map(t => t.id).slice(1), ids);
-eq('ids: invalid rows dropped', (await toTransactions([
+// Rows without a real day, a side or an amount can't be imported; a row
+// without a narration can (as "Unknown"), so no money goes missing.
+eq('ids: rows with no day, side or amount dropped; no narration kept', (await toTransactions([
   { date: '2026-03-08', amount: 0, type: 'EXPENSE', merchant: 'x' },
   { date: '08-03-2026', amount: 10, type: 'EXPENSE', merchant: 'x' },
   { date: '2026-03-08', amount: 10, type: 'DEBIT', merchant: 'x' },
   { date: '2026-03-08', amount: 10, type: 'EXPENSE' },
   pdfRow('2026-03-08', 10, 'EXPENSE', 'SMS CHARGES'),
-])).length, 1);
+])).map(t => t.merchant), ['Unknown', 'SMS CHARGES']);
 {
   const many = [];
   for (let i = 0; i < 20000; i++) {
@@ -178,6 +180,11 @@ const flagged = findDuplicates(incoming, wallet);
 eq('dupes: only the rows the wallet has', incoming.map(t => flagged.has(t.id)), [true, false, true, false, true, false]);
 eq('dupes: Swami Stores is not taken for Swiggy (L1)', flagged.has(incoming[1].id), false);
 eq('dupes: second identical charge stays new', flagged.has(incoming[3].id), false);
+// The wallet holds the second of two identical lines (its id numbered #2): it
+// is that line that's flagged, so the first is imported and none goes missing.
+eq('dupes: identical lines, the wallet holding the second: the second is flagged',
+  [...findDuplicates(incoming, [incoming[3]])], [incoming[3].id]);
+eq('dupes: a line the wallet has under its own id, edited since', findDuplicates([incoming[5]], [{ ...incoming[5], amount: 85000.5, merchant: 'Salary' }]).size, 1);
 eq('dupes: the Excel export against a wallet of PDF rows',
   [...findDuplicates(await toTransactions(asExcel), incoming)].length, statement.length);
 {
@@ -190,18 +197,18 @@ eq('dupes: the Excel export against a wallet of PDF rows',
   eq('dupes: same payee, other reference stays new', findDuplicates([otherSwiggy], [swiggy]).size, 0);
 }
 
-// Fee Hunter's cleaner (components/FeeHunter.tsx)
+// Vault's duplicate cleaner (components/DuplicateEntries.tsx)
 const surplus = (list) => walletCopies(list).copies.length;
 // Ids as 1.5.3 and earlier gave them: decimal, and never stable.
 const older = (list, tag) => list.map((t, i) => ({ ...t, id: `import-${tag}${1000 + i}` }));
 {
   const current = await toTransactions(statement);
   const currentExcel = await toTransactions(asExcel);
-  eq('fee hunter: older PDF and Excel copies of each row', surplus([...older(current, 1), ...older(currentExcel, 2)]), statement.length + 1); // + the repeated SMS charge
-  eq('fee hunter: an older copy next to a current row', walletCopies([...current, ...older(current.slice(0, 2), 3)]).copies.map(t => t.id), ['import-31000', 'import-31001']);
-  eq('fee hunter: one current import flags nothing', surplus(current), 0); // the two SMS charges are both real
-  eq('fee hunter: groups counted', walletCopies([...older(current, 1), ...older(currentExcel, 2)]).groups, statement.length - 1);
-  eq('fee hunter: typed entries are left alone', surplus([typed('txn-a', '2026-03-08', 20, 'Tea'), typed('txn-b', '2026-03-08', 20, 'Tea')]), 0);
+  eq('cleaner: older PDF and Excel copies of each row', surplus([...older(current, 1), ...older(currentExcel, 2)]), statement.length + 1); // + the repeated SMS charge
+  eq('cleaner: an older copy next to a current row', walletCopies([...current, ...older(current.slice(0, 2), 3)]).copies.map(t => t.id), ['import-31000', 'import-31001']);
+  eq('cleaner: one current import flags nothing', surplus(current), 0); // the two SMS charges are both real
+  eq('cleaner: groups counted', walletCopies([...older(current, 1), ...older(currentExcel, 2)]).groups, statement.length - 1);
+  eq('cleaner: typed entries are left alone', surplus([typed('txn-a', '2026-03-08', 20, 'Tea'), typed('txn-b', '2026-03-08', 20, 'Tea')]), 0);
 }
 
 console.log(`${checks - failures}/${checks} made-up checks pass`);
@@ -224,7 +231,7 @@ async function replay(dir) {
     try { return await fn(); } finally { console.log = log; }
   }
 
-  // Before this change (components/ImportStatement.tsx and FeeHunter.tsx in 1.5.3)
+  // Before this change (components/ImportStatement.tsx and the cleaner in 1.5.3)
   const legacyNorm = (m) => m.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\d+/g, '').trim();
   const legacyMatch = (a, b) => {
     if (a.length > 3 && b.length > 3) {
@@ -390,7 +397,7 @@ async function replay(dir) {
     `${cross.miss} copies missed (was ${cross.lfp} and ${cross.lmiss})`);
   if (cross.formatRows) {
     console.log(`  across formats: ${cross.sameId} of ${cross.formatRows} shared rows keep their id (was ${cross.legacySameId})`);
-    console.log(`  Fee Hunter after importing both formats: ${fee.found} flagged for ${fee.copies} copies ` +
+    console.log(`  Duplicate cleaner after importing both formats: ${fee.found} flagged for ${fee.copies} copies ` +
       `(was ${fee.legacyFound}); identical rows within one statement: ${fee.repeats} flagged with older ids, ` +
       `${fee.currentRepeats} with current ids`);
     if (fee.found < fee.copies || fee.currentRepeats) failures++;

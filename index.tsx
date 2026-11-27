@@ -2,6 +2,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// The brand's type, bundled with the app so it shows offline and never
+// holds up the first paint (brand kit: Manrope headings, Inter text).
+import '@fontsource-variable/inter';
+import '@fontsource-variable/manrope';
 import './styles.css';
 import { initTheme } from './utils/theme';
 import { initCrashReports, reportProblem } from './services/crashReports';

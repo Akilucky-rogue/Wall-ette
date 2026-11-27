@@ -8,7 +8,9 @@
 
 import { Transaction, TransactionType } from '../types';
 import { parseDay } from '../utils/dates';
-import { payeeName } from './spend';
+import { BANK_CODES, GATEWAYS, payeeName } from './spend';
+import { payeeFields } from './narration';
+import { tidyName } from '../utils/names';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -21,32 +23,86 @@ const RAIL_TOKENS = new Set([
 ]);
 
 /**
- * Human-readable payee from a raw bank narration.
- * "NEFT/IN226.../CHOICE EQUITY BROKING PVT LTD/ICIC0099999/…" → "CHOICE EQUITY BROKING PVT LTD"
- * "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"            → "ZOMATO L"
- * Keep the raw string in `title=` tooltips; this is display-only.
+ * The payee as the screens show it, from a raw bank narration. Display only:
+ * keep the raw string for search, export, edit and `title=` tooltips.
+ *   "UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI"             → "Zomato L"
+ *   "NEFT/IN226…/CHOICE EQUITY BROKING PVT LTD/ICIC0099999/…"   → "Choice Equity Broking Pvt Ltd"
+ *   "UPI-ZOMATO LTD-zomato@axis-UTIB0…-6152…-NOTE" (HDFC)       → "Zomato Ltd"
+ *   "UPI/DR/62…/NETFLIX COM/ICIC/netflix@icici/UPI"             → "Netflix.com"
+ *   "NACH/DR/MF SIP/BLUECHIP FUND"                              → "Bluechip Fund"
+ * The bank writes the payee in the first field after the payment rail
+ * (services/spend.ts payeeName); a field of short codes only ("MF SIP")
+ * gives way to a fuller name after it, and a UPI handle ("x@bank") is never
+ * the name while there's another. Capitals become a name (utils/names.ts).
  */
 export function prettyMerchant(raw: string | undefined | null): string {
   if (!raw) return 'Unknown';
-  const segs = raw.split(/[\/\\|]+/).map(s => s.trim()).filter(Boolean);
-  if (segs.length <= 1) return raw.length > 32 ? raw.slice(0, 31) + '…' : raw;
+  const clip = (s: string) => (s.length > 32 ? s.slice(0, 31) + '…' : s);
+  const fields = payeeFields(raw);
+  if (fields.length <= 1) return clip(tidyName(raw));
 
   const isRef = (s: string) =>
     /^\d{4,}$/.test(s) ||                       // numeric reference
     /^[A-Z]{2,6}\d{4,}/i.test(s) ||             // AXNH2536…, IN226…
     (/^[A-Z0-9]{9,}$/i.test(s) && /\d{2,}/.test(s)); // mixed long refs
   const isRail = (s: string) =>
-    RAIL_TOKENS.has(s.toUpperCase()) ||
+    RAIL_TOKENS.has(s.toUpperCase()) || BANK_CODES.has(s.toUpperCase()) ||
     /^[A-Z]{4}0[A-Z0-9]{5,}$/i.test(s);         // IFSC codes
-
+  const isHandle = (s: string) => s.includes('@');
+  const hasLongWord = (s: string) => s.split(' ').some(w => w.replace(/[^A-Za-z]/g, '').length > 3);
   const score = (s: string) => (s.match(/[A-Za-z ]/g) || []).length;
-  const candidates = segs.filter(s => !isRail(s) && !isRef(s) && score(s) >= 3);
-  if (candidates.length === 0) return raw.slice(0, 28);
 
-  let best = candidates[0];
-  for (const c of candidates) if (score(c) > score(best)) best = c;
-  best = best.replace(/\s{2,}/g, ' ').trim();
-  return best.length > 32 ? best.slice(0, 31) + '…' : best;
+  const candidates = fields.slice(1).filter(s => !isRail(s) && !isRef(s) && !isHandle(s) && score(s) >= 3);
+  const named = payeeName(raw);
+  let best = named && !isHandle(named) ? named : null;
+  if (best && !hasLongWord(best)) best = candidates.find(hasLongWord) ?? best;
+  if (!best && candidates.length) best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
+  if (!best) {
+    const handle = fields.find(isHandle);
+    if (handle) return clip(tidyName(handle.split('@')[0]));
+    // Nothing but the rail and numbers ("UPI/DR/…/98765432/BARB/…"): say the rail.
+    return RAIL_TOKENS.has(fields[0].toUpperCase()) ? `${fields[0].toUpperCase()} payment` : clip(raw);
+  }
+  // A gateway with no shop named after it: say whose gateway, not its code.
+  const gateway = GATEWAYS[best.toUpperCase()];
+  return gateway ? `${gateway} payment` : clip(tidyName(best));
+}
+
+/**
+ * Amounts keyed by the name a screen shows (`label`), so one name is one
+ * entry: a payee's narration differs from payment to payment
+ * ("NEFT/…/BSE CLEARING LIMITED/…", "RTGS/…/BSE CLEARING LIMITED/…").
+ */
+export function byLabel(amounts: Map<string, number>, label: (name: string) => string): Map<string, number> {
+  const merged = new Map<string, number>();
+  for (const [name, v] of amounts) {
+    const shown = label(name);
+    merged.set(shown, (merged.get(shown) ?? 0) + v);
+  }
+  return merged;
+}
+
+/** The pool of smaller streams in a Money Flow column. */
+export const FLOW_OTHER = 'Other';
+
+/**
+ * One column of the Money Flow diagram (Flow → Story): the streams worth a
+ * slot of their own (at least 4% of the column, at most `maxN`), largest
+ * first, then everything smaller pooled as "Other", so tiny flows can't
+ * shred the diagram. A stream already called Other (the category) joins
+ * the pool, so the column never names Other twice.
+ */
+export function flowColumn(amounts: Map<string, number>, total: number, maxN: number): [string, number][] {
+  const sorted = [...amounts.entries()].filter(([name]) => name !== FLOW_OTHER).sort((a, b) => b[1] - a[1]);
+  const top: [string, number][] = [];
+  let rest = amounts.get(FLOW_OTHER) ?? 0;
+  for (const [name, v] of sorted) {
+    if (top.length < maxN && total > 0 && v / total >= 0.04) top.push([name, v]);
+    else rest += v;
+  }
+  if (top.length === 0 && sorted.length > 0) { top.push(sorted[0]); rest -= sorted[0][1]; }
+  if (rest > 0.005) top.push([FLOW_OTHER, rest]);
+  return top;
 }
 
 /** Normalize a merchant string for grouping (same rules as import dedup). */
@@ -112,7 +168,9 @@ const CADENCES: CadenceRule[] = [
  */
 export const detectRecurringCharges = (
   transactions: Transaction[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** How many to return, largest monthly cost first (8 for lists; Infinity for totals). */
+  limit = 8,
 ): RecurringCharge[] => {
   const groups = new Map<string, { tx: Transaction; ts: number }[]>();
 
@@ -169,7 +227,7 @@ export const detectRecurringCharges = (
     });
   }
 
-  return results.sort((a, b) => b.monthlyCost - a.monthlyCost).slice(0, 8);
+  return results.sort((a, b) => b.monthlyCost - a.monthlyCost).slice(0, limit);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -513,72 +571,31 @@ export const spendingPace = (
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fee & Subscription Hunter — finds money quietly leaking out:
-//   1. bank fees / charges / penalties hiding in the history
-//   2. possible double-charges (same day, amount, merchant)
-//   3. subscription creep (recurring charges that got more expensive)
+// Price rises: monthly subscriptions and bills that now cost more than they
+// used to (Pulse → Recurring, and the bell on Home).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface FeeItem { merchant: string; total: number; count: number; lastDate: string }
-export interface DoubleCharge { merchant: string; date: string; amount: number; copies: number }
-export interface CreepItem { name: string; from: number; to: number; pct: number; annualExtra: number }
-
-export interface HuntResult {
-  fees: { total: number; count: number; items: FeeItem[] };
-  doubles: { total: number; count: number; pairs: DoubleCharge[] };
-  creep: { annualExtra: number; items: CreepItem[] };
-  /** Fees + double-charge overpayment + one year of subscription creep. */
-  totalFound: number;
+export interface PriceRise {
+  /** normalizeMerchant of the payee, for ids. */
+  key: string;
+  name: string;
+  from: number;
+  to: number;
+  pct: number;
+  annualExtra: number;
+  /** The latest charge, 'YYYY-MM-DD'. */
+  lastDay: string;
 }
 
-// Bank-charge rows never arrive via a payment rail — a "UPI/.../charger"
-// purchase or "math fees" payment must not count as a bank fee.
-const RAIL_RX = /^(upi|imps|neft|rtgs|ift|pos|atm)[\s\/\-]/i;
-const FEE_RX = /(\bfees?\b|\bcharges?\b|\bchgs?\b|penal|\bamc\b|annual maint|sms alert|min(imum)? ?bal|non.?maint|atm decl|service charge|debit card a|gst on|consolidated charg|chq return|ecs return|cheque bounce|late payment)/i;
-// Transfers/cash/person-to-person — excluded from double-charge analysis,
-// repeats there are almost always intentional.
+// Transfers to people repeat by design; they're not subscriptions.
 const TRANSFER_RX = /^(ift|imps|neft|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]|mandate/i;
 
-export const huntSavings = (transactions: Transaction[]): HuntResult => {
-  // ── 1. Bank fees & charges ──
-  const feeMap = new Map<string, FeeItem>();
-  for (const t of transactions) {
-    if (t.type !== TransactionType.EXPENSE) continue;
-    const merchant = t.merchant || '';
-    if (RAIL_RX.test(merchant)) continue; // user payment, not a bank charge
-    const text = `${merchant} ${t.note || ''}`;
-    if (!FEE_RX.test(text)) continue;
-    const key = normalizeMerchant(t.merchant || t.category) || 'bankcharges';
-    const e = feeMap.get(key) ?? { merchant: t.merchant || 'Bank charges', total: 0, count: 0, lastDate: t.date };
-    e.total += t.amount;
-    e.count++;
-    if (t.date > e.lastDate) e.lastDate = t.date;
-    feeMap.set(key, e);
-  }
-  const feeItems = [...feeMap.values()].sort((a, b) => b.total - a.total);
-  const feeTotal = feeItems.reduce((s, i) => s + i.total, 0);
-  const feeCount = feeItems.reduce((s, i) => s + i.count, 0);
-
-  // ── 2. Possible double charges (review list — repeats can be intentional,
-  //       so these do NOT count toward the headline total) ──
-  const counts = new Map<string, { merchant: string; date: string; amount: number; copies: number }>();
-  for (const t of transactions) {
-    if (t.type !== TransactionType.EXPENSE) continue;
-    if (t.amount < 20) continue; // ignore trivia
-    if (TRANSFER_RX.test(t.merchant || '')) continue; // transfers/ATM/pay-requests repeat by design
-    const key = `${t.date.slice(0, 10)}|${t.amount.toFixed(2)}|${normalizeMerchant(t.merchant || '')}`;
-    const e = counts.get(key);
-    if (e) e.copies++;
-    else counts.set(key, { merchant: t.merchant || 'Unknown', date: t.date.slice(0, 10), amount: t.amount, copies: 1 });
-  }
-  const dblAll = [...counts.values()].filter(d => d.copies > 1);
-  const pairs = dblAll
-    .sort((a, b) => (b.copies - 1) * b.amount - (a.copies - 1) * a.amount)
-    .slice(0, 12);
-  const dblTotal = dblAll.reduce((s, d) => s + (d.copies - 1) * d.amount, 0);
-  const dblCount = dblAll.reduce((s, d) => s + (d.copies - 1), 0);
-
-  // ── 3. Subscription creep ──
+/**
+ * Payees charged a fixed amount about monthly for four months or more whose
+ * price went up by 5% and ₹10 or more: the median of the latest third of the
+ * charges against the earliest third. Biggest yearly difference first.
+ */
+export const priceRises = (transactions: Transaction[]): PriceRise[] => {
   const groups = new Map<string, { name: string; events: { date: string; amount: number }[] }>();
   for (const t of transactions) {
     if (t.type !== TransactionType.EXPENSE) continue;
@@ -588,10 +605,10 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
     if (!g) { g = { name: t.merchant || '', events: [] }; groups.set(key, g); }
     g.events.push({ date: t.date.slice(0, 10), amount: t.amount });
   }
-  const creepItems: CreepItem[] = [];
-  for (const g of groups.values()) {
+  const rises: PriceRise[] = [];
+  for (const [key, g] of groups) {
     if (g.events.length < 4) continue;
-    if (TRANSFER_RX.test(g.name)) continue; // transfers aren't subscriptions
+    if (TRANSFER_RX.test(g.name)) continue;
     g.events.sort((a, b) => (a.date < b.date ? -1 : 1));
     const spanDays = (Date.parse(g.events[g.events.length - 1].date) - Date.parse(g.events[0].date)) / 86400000;
     if (spanDays < 120) continue;
@@ -601,7 +618,7 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
     }
     gaps.sort((a, b) => a - b);
     const medGap = gaps[Math.floor(gaps.length / 2)];
-    if (medGap < 20 || medGap > 45) continue; // monthly-ish subscriptions only
+    if (medGap < 20 || medGap > 45) continue; // monthly-ish only
 
     const slice = Math.max(2, Math.floor(g.events.length / 3));
     const median = (arr: { amount: number }[]) => {
@@ -617,30 +634,19 @@ export const huntSavings = (transactions: Transaction[]): HuntResult => {
     };
     const firstSlice = g.events.slice(0, slice);
     const lastSlice = g.events.slice(-slice);
-    // A real subscription bills a FIXED price in each era — variable-amount
-    // payees (ticket sites, aggregators, people) are spending, not creep.
+    // A real subscription bills a fixed price in each era; payees with
+    // varying amounts (ticket sites, aggregators, people) are spending.
     if (cv(firstSlice) > 0.15 || cv(lastSlice) > 0.15) continue;
     const from = median(firstSlice);
     const to = median(lastSlice);
     if (to > from * 1.05 && to - from >= 10) {
-      creepItems.push({
-        name: g.name,
-        from,
-        to,
+      rises.push({
+        key, name: g.name, from, to,
         pct: Math.round(((to - from) / from) * 100),
         annualExtra: (to - from) * 12,
+        lastDay: g.events[g.events.length - 1].date,
       });
     }
   }
-  creepItems.sort((a, b) => b.annualExtra - a.annualExtra);
-  const creepAnnual = creepItems.reduce((s, c) => s + c.annualExtra, 0);
-
-  return {
-    fees: { total: feeTotal, count: feeCount, items: feeItems.slice(0, 10) },
-    doubles: { total: dblTotal, count: dblCount, pairs },
-    creep: { annualExtra: creepAnnual, items: creepItems.slice(0, 8) },
-    // Doubles are review-only (often intentional) — only verified leak
-    // classes count toward the headline.
-    totalFound: feeTotal + creepAnnual,
-  };
+  return rises.sort((a, b) => b.annualExtra - a.annualExtra);
 };

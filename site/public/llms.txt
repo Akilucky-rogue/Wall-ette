@@ -1,0 +1,49 @@
+# Wall·ette
+
+> Wall·ette is a personal money-tracking and budgeting tool for Indian bank statements and UPI activity. Descriptor: Money Tracking & Budgeting. Built and run by Akshat Vora, an independent developer in Mumbai, and backed by SERNET. It helps users organise recorded transactions and manage their own budgets. It does not recommend investments or provide personalised investment advice, and it is not a bank, investment adviser or research analyst. SERNET has no access to users' accounts or financial records.
+
+Wall·ette reads supported statement files on the user's device. Original statements are not uploaded during extraction. Extracted transactions saved to an account are private. Statement passwords are not stored. Users review categories before saving.
+
+## Plans
+
+- Essential: ₹49/month or ₹449/year after the first 30 days at ₹0. Core tracking, 1 bank account and 12 months of history.
+- Plus: ₹99/month or ₹899/year after the first 30 days at ₹0. Unlimited bank accounts, full history, Money flow/Rewind, recurring tracking and priority support.
+- Paid plans haven't started: until they do, Wall·ette is free and no card is asked for. When they start, card or bank details will be required for the 30-day trial, the first charge will be on day 31 at the full chosen price, and there will be no permanent free plan.
+- Monthly/yearly switches mid-term apply immediately with the price difference charged. After a downgrade nothing is deleted; extra accounts and older history become read-only. Records are kept when a plan ends unless the user deletes them; export and deletion stay available.
+- Left to spend is an estimate from recorded entries for a stated period, not a live bank balance.
+- Upgrade to Plus anytime; downgrade to Essential only after the first year. A paused/stopped subscription restarts as a paid month one — the free month is for new memberships only.
+- Privacy, accuracy checks, no ads and data export/deletion are the same on both plans.
+- Referrals (open with paid plans): after the friend’s first paid month, each person receives one month of their own current Essential or Plus plan; no extra trial month and no self-referrals.
+- Students (open with paid plans): verified students aged 18+ receive Essential until their verified course end date, with eligibility checks every 12 months and no card during approved access. Institution-issued email, single-use institution codes and assisted review are supported application routes; approval is not automatic.
+- Gifts (open with paid plans): prepaid annual Essential or Plus; 5% off 1–4 gifts, 10% off 5–19 and 15% off 20+, before applicable taxes. Requests are not purchases until final price, payment and delivery are confirmed.
+
+## Main pages
+
+- [Home](https://wall-ette.com/): Product overview and supported banks.
+- [Features](https://wall-ette.com/features): Statement imports, expense tracking, money flow and left-to-spend planning.
+- [Pricing](https://wall-ette.com/pricing): Essential and Plus prices, trial and comparison.
+- [Compare money apps](https://wall-ette.com/compare): Wall·ette plus two selected peers from 21 researched names; official sources for pricing, tracking methods, country support, storage and needs-based fit. Mint is historical and discontinued; unverified details are explicitly labelled. Research checked 26 November 2026. Prices are regional, in their original currencies, not converted estimates.
+- [Resources](https://wall-ette.com/resources): Free browser calculators, statement guides, glossaries and a CSV budget sheet.
+- [Blog](https://wall-ette.com/blog): Ten plain-language guides about statements, cash flow, budgeting and money tracking in India.
+- [Spread](https://wall-ette.com/spread): Referral codes, verified-student Essential access, institution partnerships and annual gift subscriptions.
+- [Status](https://wall-ette.com/status): Team-published technical service reports and incident history.
+- [Roadmap](https://wall-ette.com/roadmap): Web is live; Android is coming soon; iPhone is planned.
+- [About](https://wall-ette.com/about): Company and product principles.
+- [Contact](https://wall-ette.com/contact): Support and bank requests.
+- [FAQ](https://wall-ette.com/faq): Product, privacy and pricing answers.
+
+## Legal and company
+
+- [Privacy](https://wall-ette.com/privacy)
+- [Terms](https://wall-ette.com/terms)
+- [Disclaimer](https://wall-ette.com/disclaimer)
+- [Data deletion](https://wall-ette.com/data-deletion)
+- [Refunds and cancellation](https://wall-ette.com/refund-policy)
+- [Grievance](https://wall-ette.com/grievance)
+- [Cookies](https://wall-ette.com/cookies)
+
+Akshat Vora, Mumbai, Maharashtra, India. Backed by SERNET.
+Support: akshatbvora@gmail.com
+Grievance Officer: Akshat Vora
+
+Content and calculators are educational and illustrative, not personalised financial, tax or investment advice. Verify important figures against bank records and consult a qualified professional when needed.

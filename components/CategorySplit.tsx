@@ -2,10 +2,12 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { parseDay } from '../utils/dates';
+import { useBackHandler } from '../utils/backStack';
 import { MOVED_LABELS } from '../services/spend';
 import UnsortedTransfers from './UnsortedTransfers';
 import { prettyMerchant } from '../services/analyticsService';
-import { WallEMascot, FloatingLeaf, MandalaDots, RangoliCorner, Paisley } from './SplashScreen';
+import { Mascot } from './ui/Brand';
+import { FloatingLeaf, MandalaDots, Paisley, RangoliCorner } from './ui/Decor';
 
 interface CategorySplitProps {
   onNavigate: (screen: AppScreen) => void;
@@ -36,7 +38,7 @@ const pct = (share: number): string => {
 };
 
 const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, formatAmount, formatAmountCompact } = useWallet();
+  const { transactions, flowOf, formatAmount, formatWhole, formatAmountCompact } = useWallet();
   const [timeRange, setTimeRange] = useState<TimeRange>('MONTH');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [view, setView] = useState<View>('SPEND');
@@ -56,6 +58,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
 
   const [selectedDate, setSelectedDate] = useState(latestTxDate);
   useEffect(() => { setSelectedDate(latestTxDate); }, [latestTxDate]);
+  useBackHandler(showDatePicker, () => setShowDatePicker(false));
   useEffect(() => { setSelCat(null); setExpanded(null); }, [timeRange, selectedDate, view]);
 
   // Filter expenses for the period
@@ -175,36 +178,37 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
     : String(selectedDate.getFullYear());
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-3xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      <FloatingLeaf className="top-24 right-5 opacity-35" delay={0.7} />
-      <FloatingLeaf className="top-60 left-3 opacity-25" delay={2} color="var(--sage-3)" />
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <FloatingLeaf className="top-24 right-5 opacity-35" />
+      <FloatingLeaf className="top-60 left-3 opacity-25" color="var(--sage-3)" />
       <MandalaDots className="absolute top-36 left-4 opacity-20" />
       <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
       <Paisley className="absolute bottom-36 left-6 opacity-25" flip />
 
       {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
-          onClick={() => onNavigate(AppScreen.ANALYSIS)}
-          className="text-muted-taupe flex size-10 shrink-0 items-center justify-start hover:text-sage transition-colors"
+          onClick={() => onNavigate(AppScreen.PULSE_CATEGORIES)}
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+          aria-label="Back to Categories"
         >
-          <span className="material-symbols-outlined text-[24px]">chevron_left</span>
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
         </button>
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Category Split</h2>
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight flex-1 truncate">Category split</h2>
         <div className="flex w-10 items-center justify-end text-muted-taupe relative">
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
-            className={`flex items-center justify-center rounded-full h-10 w-10 border border-black/5 transition-colors ${showDatePicker ? 'bg-sage text-white' : 'bg-white/50 hover:bg-white'}`}
+            className={`flex items-center justify-center rounded-full h-10 w-10 border border-premium-charcoal/[0.08] transition-colors ${showDatePicker ? 'bg-sage text-white' : 'bg-white/50 hover:bg-white'}`}
           >
             <span className="material-symbols-outlined text-[20px]">calendar_today</span>
           </button>
           {showDatePicker && (
-            <div className="absolute top-12 right-0 bg-white rounded-2xl shadow-xl border border-black/5 p-4 z-[60] animate-slide-up w-52">
+            <div className="absolute top-12 right-0 bg-white rounded-2xl shadow-xl border border-premium-charcoal/[0.08] p-4 z-[60] animate-slide-up w-52">
               <div className="flex items-center justify-between mb-2">
                 <button onClick={() => handleMonthChange(-1)} className="p-1 text-muted-taupe hover:text-sage">
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
-                <span className="font-serif font-bold text-premium-charcoal text-sm">{periodLabel}</span>
+                <span className="font-semibold text-premium-charcoal text-sm">{periodLabel}</span>
                 <button onClick={() => handleMonthChange(1)} className="p-1 text-muted-taupe hover:text-sage">
                   <span className="material-symbols-outlined">chevron_right</span>
                 </button>
@@ -213,7 +217,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
                 onClick={() => { setSelectedDate(latestTxDate); setShowDatePicker(false); }}
                 className="w-full mt-2 text-[10px] uppercase tracking-widest font-bold text-sage py-2 hover:bg-sage-light/30 rounded-lg"
               >
-                Latest Data
+                Latest month
               </button>
             </div>
           )}
@@ -244,7 +248,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             {selected ? (
               <>
                 <span className="text-muted-taupe text-[9px] font-medium uppercase tracking-[0.15em] truncate max-w-full">{selected.name}</span>
-                <span className="text-premium-charcoal font-serif text-2xl font-bold">{formatAmount(selected.val).split('.')[0]}</span>
+                <span className="text-premium-charcoal text-2xl font-semibold tabular-nums">{formatWhole(selected.val)}</span>
                 <span className="text-[10px] font-semibold mt-0.5" style={{ color: selected.color }}>
                   {pct(selected.share)} · {selected.txCount} txn{selected.txCount === 1 ? '' : 's'}
                 </span>
@@ -252,7 +256,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             ) : (
               <>
                 <span className="text-muted-taupe text-[9px] font-medium uppercase tracking-[0.15em]">{view === 'SPEND' ? 'Spent' : 'Moved'}</span>
-                <span className="text-premium-charcoal font-serif text-2xl font-bold">{formatAmount(activeTotal).split('.')[0]}</span>
+                <span className="text-premium-charcoal text-2xl font-semibold tabular-nums">{formatWhole(activeTotal)}</span>
                 <span className={`text-[10px] font-semibold mt-0.5 ${view === 'SPEND' ? 'text-rose' : 'text-muted-taupe'}`}>{periodLabel}</span>
               </>
             )}
@@ -266,7 +270,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
       {/* Spending vs Moved switch — transfers/investments analyzed separately */}
       {data.movedTotal > 0 && (
         <div className="flex justify-center px-6 mb-4">
-          <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-black/5 w-full max-w-[360px]">
+          <div className="bg-white rounded-2xl p-1 flex shadow-sm border border-premium-charcoal/[0.08] w-full max-w-[360px]">
             <button
               onClick={() => setView('SPEND')}
               className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${view === 'SPEND' ? 'bg-rose/10 text-rose shadow-sm' : 'text-muted-taupe'}`}
@@ -295,10 +299,10 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             className={`px-4 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider transition-all ${
               timeRange === range
                 ? 'bg-sage text-white shadow-soft'
-                : 'bg-white border border-black/5 text-muted-taupe hover:bg-white/80'
+                : 'bg-white border border-premium-charcoal/[0.08] text-muted-taupe hover:bg-white/80'
             }`}
           >
-            {range}
+            {range === 'WEEK' ? 'Week' : range === 'MONTH' ? 'Month' : 'Year'}
           </button>
         ))}
       </div>
@@ -306,7 +310,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
       {/* Categories List — tap a row to see where it went */}
       <div className="px-6 space-y-3 pb-8 lg:columns-2 lg:gap-x-5">
         <div className="flex justify-between items-center mb-4 break-inside-avoid">
-          <h3 className="text-premium-charcoal text-[15px] font-serif font-semibold tracking-tight">
+          <h3 className="text-premium-charcoal text-[15px] font-display font-bold tracking-tight">
             {view === 'SPEND' ? 'Where it went' : 'Where it moved'}
           </h3>
           <span className="text-[10px] text-muted-taupe">{activeCats.length} categor{activeCats.length === 1 ? 'y' : 'ies'}</span>
@@ -318,7 +322,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
             <div
               key={item.name}
               onClick={() => { setExpanded(isOpen ? null : item.name); setSelCat(item.name === selCat && isOpen ? null : item.name); }}
-              className={`bg-white p-4 rounded-3xl border shadow-soft break-inside-avoid cursor-pointer transition-all ${selCat === item.name ? 'border-black/10 ring-1' : 'border-black/[0.02] active:scale-[0.99]'}`}
+              className={`bg-white p-4 rounded-3xl border shadow-soft break-inside-avoid cursor-pointer transition-all ${selCat === item.name ? 'border-premium-charcoal/[0.12] ring-1' : 'border-black/[0.02] active:scale-[0.99]'}`}
               style={selCat === item.name ? { boxShadow: `0 0 0 1.5px ${item.color}` } : undefined}
             >
               <div className="flex items-center justify-between gap-3">
@@ -330,15 +334,15 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
                     <span className="material-symbols-outlined text-[20px]">{getIcon(item.name)}</span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-premium-charcoal font-serif font-semibold text-[14px] truncate">{item.name}</p>
+                    <p className="text-premium-charcoal font-semibold text-[14px] truncate">{item.name}</p>
                     <p className="text-muted-taupe text-[10px] font-medium">
                       {item.txCount} txn{item.txCount !== 1 ? 's' : ''} · {pct(item.share)} · avg {formatAmountCompact(item.val / item.txCount)}
                     </p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-premium-charcoal font-serif font-bold text-[15px] whitespace-nowrap tabular-nums">
-                    {item.val >= 100000 ? formatAmountCompact(item.val) : formatAmount(item.val).split('.')[0]}
+                  <p className="text-premium-charcoal font-semibold text-[15px] whitespace-nowrap tabular-nums">
+                    {item.val >= 100000 ? formatAmountCompact(item.val) : formatWhole(item.val)}
                   </p>
                   <span className={`material-symbols-outlined text-[16px] text-muted-taupe/50 transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </div>
@@ -351,7 +355,7 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
 
               {/* Drill-down: top merchants inside this category */}
               {isOpen && item.merchants.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
+                <div className="mt-3 pt-3 border-t border-premium-charcoal/[0.08] space-y-2">
                   {item.merchants.map(([mer, amt]) => (
                     <div key={mer} className="flex items-center gap-2 min-w-0">
                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
@@ -366,9 +370,9 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
           );
         }) : (
           <div className="flex flex-col items-center py-12 break-inside-avoid">
-            <WallEMascot mood="sad" message={view === 'SPEND' ? 'No spending here...' : 'Nothing moved...'} size="md" />
+            <Mascot pose="think" height={104} />
             <p className="text-muted-taupe text-sm mt-4">No {view === 'SPEND' ? 'expenses' : 'transfers'} for this period</p>
-            <p className="text-muted-taupe/70 text-xs mt-1">Try a different time range{data.movedTotal > 0 || data.spendTotal > 0 ? ' or switch the view above' : ''}</p>
+            <p className="text-muted-taupe text-xs mt-1">Try a different time range{data.movedTotal > 0 || data.spendTotal > 0 ? ' or switch the view above' : ''}</p>
           </div>
         )}
       </div>

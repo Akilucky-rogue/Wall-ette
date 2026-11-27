@@ -16,6 +16,12 @@
  * 4. Any other update → Google's dialog; it downloads in the background while
  *    the app stays usable. "No thanks" keeps that version quiet for 3 days.
  *
+ * Every check also records what it found (`finding`): the bell lists an
+ * update Play has even after "No thanks", and Self → About shows the answer
+ * of its "Check for updates" button, which asks Play again and skips the
+ * 3-day quiet. Play only answers for a copy it installed; a build from
+ * Android Studio or an APK gets `not-from-play`.
+ *
  * The state lives here rather than in React: the main screen unmounts each
  * time the app locks, but a download, or a required update the user backed
  * out of, carries on.
@@ -25,7 +31,9 @@ import { AppUpdate, AppUpdateResultCode, FlexibleUpdateInstallStatus } from '@ca
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { log } from '../utils/log';
-import { needsMinimum, planUpdate, UpdateAvailability, type DeclinedUpdate } from './appUpdatePolicy';
+import {
+  failureOf, findingOf, needsMinimum, planUpdate, UpdateAvailability, type DeclinedUpdate, type UpdateFinding,
+} from './appUpdatePolicy';
 
 export type UpdatePhase = 'idle' | 'downloading' | 'ready' | 'installing' | 'required';
 
@@ -41,6 +49,12 @@ export interface UpdateState {
   error: string | null;
   /** The "Restart" banner was closed; it comes back at the next start-up. */
   bannerClosed: boolean;
+  /** What the last check found; null until one has run. */
+  finding: UpdateFinding | null;
+  /** The versionCode Play offers, when it offers one. */
+  availableVersionCode: number;
+  /** A check is running (shown by Self → About's button). */
+  checking: boolean;
 }
 
 let state: UpdateState = {
@@ -49,6 +63,9 @@ let state: UpdateState = {
   busy: false,
   error: null,
   bannerClosed: false,
+  finding: null,
+  availableVersionCode: 0,
+  checking: false,
 };
 const subscribers = new Set<() => void>();
 
@@ -79,17 +96,29 @@ let listening = false;
 let leftRequiredUpdate = false;
 let minimumCache: { value: number; at: number } | null = null;
 
-export function checkForUpdate(): Promise<void> {
+/**
+ * Asks Play and acts on the answer. `force` (Self → About's "Check for
+ * updates") offers a version even if "No thanks" was tapped for it lately.
+ */
+export function checkForUpdate(force = false): Promise<void> {
   if (!updatesSupported()) return Promise.resolve();
-  if (!running) running = check().finally(() => { running = null; });
+  if (!running) {
+    set({ checking: true });
+    running = check(force).finally(() => {
+      running = null;
+      set({ checking: false });
+    });
+  }
   return running;
 }
 
-async function check(): Promise<void> {
+async function check(force: boolean): Promise<void> {
   let info;
   try {
     info = await AppUpdate.getAppUpdateInfo();
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    set({ finding: failureOf(message), availableVersionCode: 0 });
     log.debug('Play update info unavailable', e);
     return;
   }
@@ -97,6 +126,7 @@ async function check(): Promise<void> {
   const availability = info.updateAvailability;
   const installStatus = info.installStatus ?? FlexibleUpdateInstallStatus.UNKNOWN;
   const availableVersionCode = Number(info.availableVersionCode) || 0;
+  set({ finding: findingOf(availability, installStatus), availableVersionCode });
   const plan = planUpdate({
     availability,
     installStatus,
@@ -106,7 +136,7 @@ async function check(): Promise<void> {
     flexibleAllowed: info.flexibleUpdateAllowed === true,
     priority: info.updatePriority ?? 0,
     minVersionCode: needsMinimum(availability, installStatus) ? await minimumVersionCode() : 0,
-    declined: readDeclined(),
+    declined: force ? null : readDeclined(),
     now: Date.now(),
   });
 
@@ -184,6 +214,35 @@ export async function updateNow(): Promise<void> {
   }
 }
 
+/**
+ * "Update" on the bell's note or in Self → About: Google's dialog when Play
+ * allows it, else its full-screen update, else the store page.
+ */
+export async function installUpdate(): Promise<void> {
+  if (!updatesSupported()) return;
+  try {
+    // The plugin needs fresh info before every update flow.
+    const info = await AppUpdate.getAppUpdateInfo();
+    if (info.updateAvailability === UpdateAvailability.AVAILABLE) {
+      if (info.flexibleUpdateAllowed) {
+        await offerUpdate(Number(info.availableVersionCode) || 0);
+        return;
+      }
+      if (info.immediateUpdateAllowed) {
+        await AppUpdate.performImmediateUpdate();
+        return;
+      }
+    }
+  } catch (e) {
+    log.warn('Play update info unavailable', e);
+  }
+  try {
+    await AppUpdate.openAppStore();
+  } catch (e) {
+    log.warn('Could not open Google Play', e);
+  }
+}
+
 /** Google's flexible dialog: "Update" downloads in the background. */
 async function offerUpdate(availableVersionCode: number): Promise<void> {
   await listenForDownload();
@@ -207,15 +266,16 @@ async function listenForDownload(): Promise<void> {
       switch (installStatus) {
         case FlexibleUpdateInstallStatus.DOWNLOADING:
           if (state.phase === 'idle') set({ phase: 'downloading' });
+          set({ finding: 'downloading' });
           break;
         case FlexibleUpdateInstallStatus.DOWNLOADED:
           // Became required while downloading: keep blocking, now with a restart.
-          if (state.phase === 'required') set({ requiredVia: 'restart' });
-          else set({ phase: 'ready', bannerClosed: false });
+          if (state.phase === 'required') set({ requiredVia: 'restart', finding: 'ready' });
+          else set({ phase: 'ready', bannerClosed: false, finding: 'ready' });
           break;
         case FlexibleUpdateInstallStatus.FAILED:
         case FlexibleUpdateInstallStatus.CANCELED:
-          set({ phase: 'idle' });
+          set({ phase: 'idle', finding: 'available' });
           break;
       }
     });

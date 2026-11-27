@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import QRCode from 'qrcode';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, type MultiFactorResolver } from 'firebase/auth';
 import { collection, doc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { AppScreen } from '../types';
 import { useWallet } from '../context/WalletContext';
+import { inputDigits, toBase, toShown } from '../utils/currencyUtils';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import {
@@ -14,41 +15,130 @@ import {
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateBiometric, isNative } from '../utils/biometric';
 import { log } from '../utils/log';
 import { PRIVACY_URL, TERMS_URL } from '../utils/site';
-import { WallEEyes, FloatingLeaf, LotusFlower, MandalaDots, PottedPlant, RangoliCorner } from './SplashScreen';
+import { BrandIcon, TAGLINE, Wordmark } from './ui/Brand';
 import CurrencySelector from './CurrencySelector';
 import WhatsNewSheet from './WhatsNewSheet';
 import { latestNotes } from '../services/releaseNotes';
+import {
+  checkForUpdate, getUpdateState, installUpdate, restartToUpdate, subscribe as subscribeUpdates, updatesSupported,
+} from '../services/appUpdates';
+import type { UpdateFinding } from '../services/appUpdatePolicy';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
+import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
+import { openAt } from '../utils/screenSection';
+import { PREVIEWS, setPreview, usePlan, type Preview } from '../services/plan';
+import { opens } from '../services/planRules';
+import { billingSupported, manageSubscription } from '../services/billing';
+import { useBackHandler } from '../utils/backStack';
+import {
+  currentAlerts, loadShown, markShown, phoneNotificationsOn, saveShown, setPhoneNotificationsOn, subscribePhoneSwitch,
+} from '../services/phoneNotifications';
+import { askPhonePermission, clearPhoneNotes, phonePermission } from '../services/phoneNotifier';
+import { hapticsOn, setHapticsOn, tick } from '../utils/haptics';
+import { readerSupported } from '../services/paymentAlertsBridge';
+import { getInbox, subscribeInbox } from '../services/paymentInbox';
+
+/** Self is a hub (who you are, and links) and a page for each group of settings. */
+export type SelfPage = 'hub' | 'account' | 'alerts' | 'data' | 'appearance' | 'about';
+
+const PAGE_TITLE: Record<SelfPage, string> = {
+  hub: 'Self',
+  account: 'Account and security',
+  alerts: 'Alerts and limits',
+  data: 'Your data',
+  appearance: 'Appearance',
+  about: 'About',
+};
 
 interface ProfileProps {
   onNavigate: (screen: AppScreen) => void;
   onLogout?: () => void;
+  page?: SelfPage;
 }
 
+/** A setting: icon, name, what it does, and its control. Tappable when it opens something. */
 const Row: React.FC<{ icon: string; iconCls: string; title: string; sub: string; children?: React.ReactNode; onClick?: () => void }> =
-  ({ icon, iconCls, title, sub, children, onClick }) => (
-  <div className={`flex items-center justify-between gap-3 ${onClick ? 'cursor-pointer group' : ''}`} onClick={onClick}>
-    <div className="flex items-center gap-3 min-w-0">
-      <div className={`p-2 rounded-xl shrink-0 ${iconCls}`}>
-        <span className="material-symbols-outlined text-[20px]">{icon}</span>
-      </div>
-      <div className="min-w-0">
-        <p className={`text-premium-charcoal font-serif font-medium text-[15px] ${onClick ? 'group-hover:text-sage transition-colors' : ''}`}>{title}</p>
-        <p className="text-muted-taupe text-[10px] leading-relaxed">{sub}</p>
-      </div>
-    </div>
-    <div className="shrink-0">{children}</div>
+  ({ icon, iconCls, title, sub, children, onClick }) => {
+  const inner = (
+    <>
+      <span className="flex items-center gap-3 min-w-0">
+        <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${iconCls}`}>
+          <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">{icon}</span>
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[14px] font-semibold text-premium-charcoal">{title}</span>
+          <span className="block text-[12px] text-muted-taupe leading-snug">{sub}</span>
+        </span>
+      </span>
+      <span className="shrink-0">{children}</span>
+    </>
+  );
+  return onClick
+    ? <button onClick={onClick} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-zen-cream transition-colors">{inner}</button>
+    : <div className="flex items-center justify-between gap-3 px-4 py-3.5">{inner}</div>;
+};
+
+/** Rows on one card, with hairlines between them. */
+const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
+    {children}
   </div>
 );
 
 const Toggle: React.FC<{ checked: boolean; onChange: () => void; label: string }> = ({ checked, onChange, label }) => (
   <label className="relative inline-flex items-center cursor-pointer">
-    <input type="checkbox" className="sr-only peer" checked={checked} onChange={onChange} aria-label={label} />
+    <input type="checkbox" className="sr-only peer" checked={checked} onChange={() => { tick(); onChange(); }} aria-label={label} />
     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sage"></div>
   </label>
 );
+
+/** What Self → About says after a check (services/appUpdates.ts). */
+const UPDATE_LINES: Record<UpdateFinding, string> = {
+  latest: 'You have the latest version.',
+  available: 'A newer version is on Google Play.',
+  downloading: "The update is downloading. You'll be asked to restart when it's ready.",
+  ready: 'The update has downloaded. Restart to install it.',
+  'not-from-play': "This copy wasn't installed from Google Play, so it can't update itself. Install Wall-ette from Google Play to get updates.",
+  'not-allowed': "Google Play can't update apps on this phone right now. Check you're signed in to Google Play and have some free space and battery, then try again.",
+  unavailable: "Couldn't reach Google Play. Check your connection and try again.",
+};
+
+/** Asks Google Play again, even for a version turned down with "No thanks". */
+const UpdateCheckButton: React.FC = () => {
+  const { checking } = useSyncExternalStore(subscribeUpdates, getUpdateState);
+  return (
+    <button
+      onClick={() => { void checkForUpdate(true); }}
+      disabled={checking}
+      className="px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft disabled:opacity-60"
+    >
+      {checking ? 'Checking…' : 'Check for updates'}
+    </button>
+  );
+};
+
+/** Play's answer to the last check, and what can be done about it. */
+const UpdateCheckResult: React.FC = () => {
+  const { finding, checking, phase } = useSyncExternalStore(subscribeUpdates, getUpdateState);
+  if (!finding || checking) return null;
+  return (
+    <div className="mt-3 flex flex-col items-center gap-2.5">
+      <p role="status" className="text-[12px] text-muted-taupe leading-relaxed max-w-[280px]">{UPDATE_LINES[finding]}</p>
+      {finding === 'available' && phase === 'idle' && (
+        <button onClick={() => { void installUpdate(); }} className="px-5 py-2 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft">
+          Update
+        </button>
+      )}
+      {finding === 'ready' && phase === 'ready' && (
+        <button onClick={() => { void restartToUpdate(); }} className="px-5 py-2 rounded-full bg-sage text-white text-[13px] font-semibold shadow-soft">
+          Restart to update
+        </button>
+      )}
+    </div>
+  );
+};
 
 // Same strength rules as sign-up (Auth.tsx) — keep in sync.
 const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
@@ -59,22 +149,63 @@ const PW_RULES: { label: string; test: (s: string) => boolean }[] = [
   { label: 'Special (@$!%*?&)', test: s => /[@$!%*?&]/.test(s) },
 ];
 
-const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
+const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' }) => {
   const { user } = useAuth();
-  const { dailyLimit, setDailyLimit, formatAmount, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense, clearAllTransactions } = useWallet();
+  const {
+    dailyLimit, setDailyLimit, formatAmount, formatWhole, lastLoginTime, transactions, getMonthlyIncome, getMonthlyExpense,
+    clearAllTransactions, currency, counted, budgets, shownRate, shownCurrency, accounts,
+  } = useWallet();
+  const accountCount = Object.keys(accounts).length;
+  const toCheckCount = useSyncExternalStore(subscribeInbox, getInbox).toCheck.length;
 
   const [notesOpen, setNotesOpen] = useState(false);
 
-  // ── Daily limit (unchanged behavior) ──
-  const [limitInput, setLimitInput] = useState(dailyLimit > 0 ? dailyLimit.toString() : '');
+  // ── Daily limit: typed in the currency shown, saved in rupees ──
+  const shownLimit = dailyLimit > 0 ? String(toShown(dailyLimit, shownRate, inputDigits(shownCurrency, shownRate))) : '';
+  const [limitInput, setLimitInput] = useState(shownLimit);
   const [limitSaved, setLimitSaved] = useState(false);
-  useEffect(() => { setLimitInput(dailyLimit > 0 ? dailyLimit.toString() : ''); }, [dailyLimit]);
+  useEffect(() => { setLimitInput(shownLimit); }, [shownLimit]);
   const handleSaveLimit = () => {
-    let val = parseFloat(limitInput);
-    if (limitInput.trim() === '' || isNaN(val)) { setDailyLimit(0); setLimitInput(''); }
-    else { if (val < 0) val = 0; setDailyLimit(val); setLimitInput(val === 0 ? '' : val.toString()); }
+    const val = parseFloat(limitInput);
+    if (limitInput.trim() === '' || isNaN(val) || val <= 0) { setDailyLimit(0); setLimitInput(''); }
+    else if (limitInput !== shownLimit) setDailyLimit(toBase(val, shownRate));
     setLimitSaved(true);
     setTimeout(() => setLimitSaved(false), 1200);
+  };
+
+  // ── Phone notifications (Android, this device; services/phoneNotifications.ts) ──
+  const uid = user?.uid ?? null;
+  const phoneOn = useSyncExternalStore(subscribePhoneSwitch, () => (uid ? phoneNotificationsOn(uid) : false));
+  const [phoneMsg, setPhoneMsg] = useState('');
+  useEffect(() => {
+    // Switched on here, but Android's permission was taken away since.
+    if (!phoneOn) return;
+    let live = true;
+    phonePermission().then(p => {
+      if (live) setPhoneMsg(p === 'granted' || p === 'unavailable' ? '' : "Android isn't letting Wall-ette show notifications. Allow them for Wall-ette in your phone's settings.");
+    });
+    return () => { live = false; };
+  }, [phoneOn]);
+  const togglePhone = async () => {
+    if (!uid) return;
+    if (phoneOn) {
+      setPhoneNotificationsOn(uid, false);
+      setPhoneMsg('');
+      void clearPhoneNotes();
+      return;
+    }
+    if (!(await askPhonePermission())) {
+      setPhoneMsg("Android didn't allow notifications. Allow them for Wall-ette in your phone's settings, then switch this on.");
+      return;
+    }
+    // Budgets and limits already past count as shown, so switching on
+    // doesn't bring a burst of old news; new ones come from now on.
+    const now = new Date();
+    const money = formatWhole;
+    const already = currentAlerts({ counted, budgets, dailyLimit, now, money }).map(a => a.key);
+    saveShown(uid, markShown(loadShown(uid), already, now.getTime()));
+    setPhoneMsg('');
+    setPhoneNotificationsOn(uid, true);
   };
 
   // ── Change password (reauthenticate, then update) ──
@@ -162,6 +293,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       if (ok) { setBiometricEnabled(user.uid, true); setBioOn(true); }
     }
   };
+
+  // ── Vibration on taps (Android, this device) ──
+  const [buzz, setBuzz] = useState(hapticsOn);
+  const toggleBuzz = () => { setHapticsOn(!buzz); setBuzz(!buzz); };
 
   // ── Crash reports (Android, device-local) ──
   const [crashOn, setCrashOn] = useState(crashReportsOn);
@@ -253,6 +388,10 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     try { await deleteDoc(doc(db, 'users', uid)); } catch { /* best-effort */ }
   };
 
+  // An account made with Google has no password: deleting it is confirmed
+  // with Google instead.
+  const delWithPassword = hasPassword(user) || !signsInWithGoogle(user);
+
   const handleDeleteAccount = async () => {
     if (!user || !user.email || delConfirm.toUpperCase() !== 'DELETE') return;
     setDelBusy(true); setDelError('');
@@ -261,9 +400,15 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
         await resolveTotpSignIn(delResolver, delTotp);
       } else {
         try {
-          await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, delPassword));
+          if (delWithPassword) await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, delPassword));
+          else await reauthenticateWithGoogle(user);
         } catch (e: any) {
           if (isMfaRequiredError(e)) { setDelResolver(mfaResolverFromError(e)); setDelBusy(false); return; }
+          if (!delWithPassword) {
+            if (!isGoogleCancel(e)) setDelError(googleErrorMessage(e));
+            setDelBusy(false);
+            return;
+          }
           throw e;
         }
       }
@@ -290,219 +435,355 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
     ? new Date(user.metadata.creationTime).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
     : '—';
   const monthlyNet = getMonthlyIncome() - getMonthlyExpense();
+  const money = formatWhole;
+  const lastSignIn = lastLoginTime
+    ? `${lastLoginTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${lastLoginTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'just now';
+  const themeName = themeMode === 'auto'
+    ? 'Matches your phone'
+    : `${themeSwatches().find(s => s.id === themeMode)?.name ?? 'Sage'} theme`;
+  const plan = usePlan();
+  const chevron = <span className="material-symbols-outlined text-muted-taupe/60 text-[20px]" aria-hidden="true">chevron_right</span>;
+  const external = <span className="material-symbols-outlined text-muted-taupe/60 text-[18px]" aria-hidden="true">open_in_new</span>;
+
+  const planLabel = plan.entitlement?.plan
+    ? `${plan.entitlement.plan === 'plus' ? 'Plus' : 'Essential'}${plan.entitlement.trial ? ', free month' : ''}`
+    : 'Essential or Plus, invites, codes and students';
+  const pages: { screen: AppScreen; title: string; icon: string; tint: string; preview: string }[] = [
+    ...(plan.live ? [{ screen: AppScreen.SELF_PLAN, title: 'Your plan', icon: 'workspace_premium', tint: 'bg-sand-light text-sand-ink', preview: planLabel }] : []),
+    {
+      screen: AppScreen.SELF_ACCOUNT, title: PAGE_TITLE.account, icon: 'shield_person', tint: 'bg-sage-light text-sage',
+      preview: isNative() && bioOn ? 'Biometric unlock is on' : 'Password, unlock and sign-in',
+    },
+    {
+      screen: AppScreen.SELF_ALERTS, title: PAGE_TITLE.alerts, icon: 'notifications', tint: 'bg-rose-light text-rose',
+      preview: isNative()
+        ? `Notifications ${phoneOn ? 'on' : 'off'}, ${dailyLimit > 0 ? `daily limit ${money(dailyLimit)}` : 'no daily limit'}`
+        : dailyLimit > 0 ? `Daily limit ${money(dailyLimit)}` : 'No daily limit set',
+    },
+    {
+      screen: AppScreen.SELF_DATA, title: PAGE_TITLE.data, icon: 'folder_open', tint: 'bg-lavender-light text-lavender',
+      preview: 'Import, export and money moved',
+    },
+    {
+      screen: AppScreen.SELF_APPEARANCE, title: PAGE_TITLE.appearance, icon: 'palette', tint: 'bg-ocean-light text-ocean',
+      preview: `${themeName}, amounts in ${currency}`,
+    },
+    {
+      screen: AppScreen.SELF_ABOUT, title: PAGE_TITLE.about, icon: 'info', tint: 'bg-sand-light text-sand-ink',
+      preview: `Version ${__APP_VERSION__}`,
+    },
+  ];
+
+  // Back closes these dialogs first, unless they're busy (utils/backStack.ts).
+  useBackHandler(mfaModal, () => { if (!mfaBusy) setMfaModal(false); });
+  useBackHandler(pwModal, () => { if (!pwBusy) setPwModal(false); });
+  useBackHandler(delOpen, () => { if (!delBusy) setDelOpen(false); });
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 bg-zen-bg">
-      {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" delay={0.5} />
-      <FloatingLeaf className="top-56 left-4 opacity-30" delay={1.6} color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="var(--sage-2)" />
-      <LotusFlower className="absolute top-44 right-3 opacity-30" size="sm" color="var(--gold-2)" />
-      <MandalaDots className="absolute bottom-52 left-6 opacity-20" />
-      <PottedPlant className="absolute bottom-40 right-6 opacity-35" />
-
-      {/* Header */}
-      <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 pb-2 justify-between sticky top-0 z-30">
-        <div className="w-10" />
-        <h2 className="text-premium-charcoal text-xl font-serif font-semibold tracking-tight flex-1 text-center">Self</h2>
-        <div className="w-10" />
-      </div>
-
-      {/* Hero */}
-      <div className="flex flex-col items-center pt-6 pb-4 relative">
-        <div className="relative">
-          <div className="absolute -top-2 -left-6 rotate-45"><LotusFlower size="sm" color="var(--rose-2)" className="opacity-50" /></div>
-          <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-sage to-sage/80 flex items-center justify-center border-4 border-white shadow-lg">
-            <WallEEyes size="lg" />
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-400 flex items-center justify-center border-2 border-white shadow-md">
-              <span className="text-amber-700 text-xs font-bold">₹</span>
-            </div>
-          </div>
-        </div>
-        <h3 className="text-premium-charcoal font-serif text-xl font-semibold mt-4">{user?.email?.split('@')[0]}</h3>
-        <p className="text-muted-taupe text-xs">{user?.email}</p>
-
-        {/* Quick stats */}
-        <div className="mt-5 grid grid-cols-3 gap-2 px-6 w-full">
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">Entries</span>
-            <span className="text-sm font-serif font-bold text-premium-charcoal mt-0.5">{transactions.length}</span>
-          </div>
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">This Month</span>
-            <span className={`text-sm font-serif font-bold mt-0.5 ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
-              {monthlyNet >= 0 ? '+' : '−'}{formatAmount(Math.abs(monthlyNet)).split('.')[0]}
-            </span>
-          </div>
-          <div className="bg-white px-3 py-3 rounded-2xl border border-black/5 shadow-sm flex flex-col items-center">
-            <span className="text-[9px] text-muted-taupe uppercase tracking-wider">Member Since</span>
-            <span className="text-sm font-serif font-bold text-premium-charcoal mt-0.5">{memberSince}</span>
-          </div>
-        </div>
-        <p className="text-[10px] text-muted-taupe mt-3">
-          Last login: {lastLoginTime ? lastLoginTime.toLocaleDateString('en-GB') + ' ' + lastLoginTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-        </p>
-      </div>
-
-      <div className="px-6 space-y-6 md:columns-2 md:gap-x-5 md:space-y-0">
-          {/* Security */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Security</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  {isNative() && (
-                    <Row icon="fingerprint" iconCls="bg-sage-light text-sage" title="Biometric Unlock"
-                         sub={bioSupported ? 'Use fingerprint/face to unlock the session' : 'No biometrics enrolled on this device'}>
-                      {bioSupported && <Toggle checked={bioOn} onChange={toggleBiometric} label="Biometric unlock" />}
-                    </Row>
-                  )}
-
-                  <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-Factor Auth"
-                       sub="Authenticator-app sign-in — on the roadmap">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-gray-100 text-muted-taupe">
-                        Coming Soon
-                      </span>
-                  </Row>
-
-                  <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change Password"
-                       sub="Re-verify your current password to set a new one" onClick={openPwModal}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-
-                  <Row icon="remove_circle" iconCls="bg-rose-light text-rose" title="Daily Spend Limit" sub="Caps manual entries · tracked live in Pulse's Today card">
-                      <div className="relative flex items-center">
-                        <input
-                          id="daily-limit-input"
-                          type="number"
-                          min="0"
-                          value={limitInput}
-                          onChange={e => { const val = e.target.value; if (/^\d*$/.test(val) || val === '') setLimitInput(val); setLimitSaved(false); }}
-                          onBlur={handleSaveLimit}
-                          placeholder="No Limit"
-                          title="Daily spend limit"
-                          aria-label="Daily spend limit"
-                          className="w-24 text-right bg-zen-bg border-none rounded-lg py-1.5 px-2 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage transition-colors"
-                        />
-                        {limitSaved && <span className="absolute -left-4 text-sage text-xs" aria-live="polite" title="Saved">✔</span>}
-                      </div>
-                  </Row>
-              </div>
-          </section>
-
-          {/* Preferences */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Preferences</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="currency_exchange" iconCls="bg-sand-light text-sand" title="Display Currency" sub="Live exchange rates, INR base">
-                      <CurrencySelector />
-                  </Row>
-                  {isNative() && (
-                    <Row icon="bug_report" iconCls="bg-blue-zen-light text-blue-zen" title="Crash Reports"
-                         sub="Errors go to Firebase Crashlytics, never your transactions">
-                      <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
-                    </Row>
-                  )}
-              </div>
-          </section>
-
-          {/* Appearance */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Appearance</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-5">
-                  <Row icon="brightness_auto" iconCls="bg-ocean-light text-ocean" title="Match System" sub="Follows your phone's light / dark setting">
-                      <Toggle checked={themeMode === 'auto'} onChange={() => pickTheme(themeMode === 'auto' ? 'sage' : 'auto')} label="Match system theme" />
-                  </Row>
-                  <div className={themeMode === 'auto' ? 'opacity-40 pointer-events-none' : ''}>
-                      <div className="grid grid-cols-3 gap-2.5">
-                          {themeSwatches().map(s => (
-                              <button
-                                key={s.id}
-                                onClick={() => pickTheme(s.id)}
-                                className={`rounded-2xl p-2.5 border text-left transition-all ${themeMode === s.id ? 'border-sage ring-2 ring-sage/40' : 'border-black/[0.08]'}`}
-                                style={{ background: s.bg }}
-                              >
-                                  <div className="flex items-center gap-1 mb-1.5">
-                                      <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: s.accent }} />
-                                      <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
-                                  </div>
-                                  <p className="text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</p>
-                              </button>
-                          ))}
-                      </div>
-                      {themeMode === 'custom' && (
-                          <div className="mt-4 flex items-center justify-between gap-3">
-                              <label className="flex items-center gap-2.5 cursor-pointer">
-                                  <input
-                                    type="color"
-                                    value={customTheme.accent}
-                                    onChange={e => updateCustom({ accent: e.target.value })}
-                                    className="w-9 h-9 rounded-xl border border-black/10 bg-transparent cursor-pointer p-0.5"
-                                    aria-label="Custom accent color"
-                                  />
-                                  <span className="text-[12px] text-muted-taupe">Accent color</span>
-                              </label>
-                              <div className="flex rounded-xl overflow-hidden border border-black/[0.08] text-[11px] font-semibold">
-                                  <button onClick={() => updateCustom({ dark: false })} className={`px-3 py-1.5 transition-colors ${!customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Light</button>
-                                  <button onClick={() => updateCustom({ dark: true })} className={`px-3 py-1.5 transition-colors ${customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Dark</button>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-              </div>
-          </section>
-
-          {/* Data */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Data & Privacy</h4>
-              <div className="bg-white p-5 rounded-3xl border border-black/[0.02] shadow-soft space-y-6">
-                  <Row icon="download" iconCls="bg-sage-light text-sage" title="Import Statement" sub="Bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="upload" iconCls="bg-blue-zen-light text-blue-zen" title="Export & Reports" sub="Statement, CSV, full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money Moved" sub="Your accounts, family, investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">chevron_right</span>
-                  </Row>
-                  <Row icon="policy" iconCls="bg-sand-light text-sand" title="Privacy Policy" sub="How your data is handled"
-                       onClick={() => window.open(PRIVACY_URL, '_blank')}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
-                  </Row>
-                  <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms & Conditions" sub="The agreement you accepted"
-                       onClick={() => window.open(TERMS_URL, '_blank')}>
-                      <span className="material-symbols-outlined text-muted-taupe text-[20px]">open_in_new</span>
-                  </Row>
-              </div>
-          </section>
-
-          {/* Account */}
-          <section className="break-inside-avoid md:mb-5">
-              <h4 className="text-muted-taupe text-[11px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Account</h4>
-              <div className="space-y-3">
-                  <button
-                    onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
-                    className="w-full bg-white border border-rose/20 text-rose py-4 rounded-3xl font-serif font-medium shadow-sm hover:bg-rose-light/20 transition-all flex items-center justify-center gap-2"
-                  >
-                      <span className="material-symbols-outlined">logout</span>
-                      Sign Out
-                  </button>
-                  <button
-                    onClick={() => { setDelOpen(true); setDelConfirm(''); setDelPassword(''); setDelTotp(''); setDelResolver(null); setDelError(''); }}
-                    className="w-full text-muted-taupe/70 py-2 text-[11px] font-medium uppercase tracking-wider hover:text-rose transition-colors"
-                  >
-                      Delete account & all data
-                  </button>
-              </div>
-          </section>
-      </div>
-
-      <div className="mt-10 text-center">
-        <p className="text-[10px] text-muted-taupe uppercase tracking-widest opacity-50">Wall-ette v{__APP_VERSION__} ({__APP_BUILD__})</p>
-        {isNative() && (
-          <button onClick={() => setNotesOpen(true)} className="mt-2 px-3 py-1 text-[11px] font-medium text-sage hover:text-sage/80 transition-colors">
-            What's new
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      {/* Header: Self, or the page's title with a way back */}
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+        {page !== 'hub' && (
+          <button
+            onClick={() => onNavigate(AppScreen.SELF)}
+            className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+            aria-label="Back to Self"
+          >
+            <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
           </button>
         )}
+        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight truncate">{PAGE_TITLE[page]}</h2>
       </div>
+
+      {page === 'hub' && (
+        <div className="px-6 pt-2 space-y-4">
+          {/* You */}
+          <div className="bg-white rounded-[28px] p-5 shadow-raised border border-black/[0.02]">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-sage-light text-sage flex items-center justify-center shadow-soft shrink-0" aria-hidden="true">
+                <span className="font-display text-[26px] font-bold uppercase">{(user?.email ?? '?').charAt(0)}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-display text-[20px] font-bold text-premium-charcoal truncate">{user?.email?.split('@')[0]}</p>
+                <p className="text-[12px] text-muted-taupe truncate">{user?.email}</p>
+              </div>
+            </div>
+            <dl className="mt-5 grid grid-cols-3 divide-x divide-premium-charcoal/[0.08] rounded-2xl bg-zen-bg/70 shadow-pressed py-3">
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">Entries</dt>
+                <dd className="text-[17px] font-semibold text-premium-charcoal tabular-nums">{transactions.length.toLocaleString('en-IN')}</dd>
+              </div>
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">This month</dt>
+                <dd className={`text-[17px] font-semibold tabular-nums truncate ${monthlyNet >= 0 ? 'text-sage' : 'text-rose'}`}>
+                  {monthlyNet >= 0 ? '+' : '−'}{money(Math.abs(monthlyNet))}
+                </dd>
+              </div>
+              <div className="text-center px-2 min-w-0">
+                <dt className="text-[11px] text-muted-taupe">Member since</dt>
+                <dd className="text-[17px] font-semibold text-premium-charcoal">{memberSince}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-[11px] text-muted-taupe text-center">Last signed in {lastSignIn}</p>
+          </div>
+
+          {/* Pages */}
+          <nav aria-label="Settings">
+            <ul className="bg-white rounded-3xl shadow-soft border border-black/[0.02] overflow-hidden divide-y divide-premium-charcoal/[0.06]">
+              {pages.map(row => (
+                <li key={row.screen}>
+                  <button
+                    onClick={() => onNavigate(row.screen)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-zen-cream transition-colors"
+                  >
+                    <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${row.tint}`}>
+                      <span className="material-symbols-outlined icon-fill text-[20px]" aria-hidden="true">{row.icon}</span>
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[14px] font-semibold text-premium-charcoal">{row.title}</span>
+                      <span className="block text-[12px] text-muted-taupe truncate">{row.preview}</span>
+                    </span>
+                    {chevron}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <button
+            onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
+            className="w-full bg-white text-rose py-3.5 rounded-3xl font-semibold text-[14px] shadow-soft border border-rose/15 flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">logout</span>
+            Sign out
+          </button>
+        </div>
+      )}
+
+      {page === 'account' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            {isNative() && (
+              <Row icon="fingerprint" iconCls="bg-sage-light text-sage" title="Biometric unlock"
+                   sub={bioSupported ? 'Use your fingerprint or face to unlock Wall-ette' : 'No fingerprint or face is set up on this phone'}>
+                {bioSupported && <Toggle checked={bioOn} onChange={toggleBiometric} label="Biometric unlock" />}
+              </Row>
+            )}
+            {hasPassword(user) && (
+              <Row icon="password" iconCls="bg-lavender-light text-lavender" title="Change password"
+                   sub="Enter your current password, then a new one" onClick={openPwModal}>
+                {chevron}
+              </Row>
+            )}
+            <Row icon="shield_lock" iconCls="bg-blue-zen-light text-blue-zen" title="Two-factor sign-in"
+                 sub="A code from an authenticator app">
+              <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-zen-bg text-muted-taupe shadow-pressed">Coming soon</span>
+            </Row>
+          </Card>
+          <p className="text-[12px] text-muted-taupe px-1">
+            Signed in as {user?.email}{signsInWithGoogle(user) ? (hasPassword(user) ? ', with Google or your password' : ' with Google') : ''}. Last signed in {lastSignIn}.
+          </p>
+
+          <div className="pt-4">
+            <button
+              onClick={() => { setDelOpen(true); setDelConfirm(''); setDelPassword(''); setDelTotp(''); setDelResolver(null); setDelError(''); }}
+              className="w-full rounded-3xl border border-rose/25 px-5 py-4 text-left hover:bg-rose-light/30 transition-colors"
+            >
+              <span className="block text-[14px] font-semibold text-rose">Delete account and all data</span>
+              <span className="block text-[12px] text-muted-taupe mt-0.5 leading-snug">
+                Erases your entries, settings and sign-in history from the cloud and this phone, then deletes the account.
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {page === 'alerts' && (
+        <div className="px-6 pt-2 space-y-4">
+          {isNative() && (
+            <Card>
+              <Row icon="notifications_active" iconCls="bg-ocean-light text-ocean" title="Phone notifications"
+                   sub={`${opens(plan.access, 'recurring') ? 'Bills due tomorrow, budgets' : 'Budgets'} and your daily limit. Made on this phone; nothing is sent.`}>
+                <Toggle checked={phoneOn} onChange={() => { void togglePhone(); }} label="Phone notifications" />
+              </Row>
+              {phoneMsg && <p className="px-4 py-3 text-[12px] text-rose leading-snug" role="status">{phoneMsg}</p>}
+            </Card>
+          )}
+          <Card>
+            <Row icon="speed" iconCls="bg-rose-light text-rose" title="Daily spend limit"
+                 sub="The bell warns you when today's spending goes past it">
+              <div className="relative flex items-center">
+                <input
+                  id="daily-limit-input"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={limitInput}
+                  onChange={e => { const val = e.target.value; if (/^\d*\.?\d{0,2}$/.test(val)) setLimitInput(val); setLimitSaved(false); }}
+                  onBlur={handleSaveLimit}
+                  placeholder="No limit"
+                  title="Daily spend limit"
+                  aria-label="Daily spend limit"
+                  className="w-24 text-right bg-zen-bg shadow-pressed border-none rounded-xl py-2 px-3 text-sm font-semibold text-premium-charcoal outline-none focus:ring-1 focus:ring-sage transition-colors"
+                />
+                {limitSaved && <span className="absolute -left-5 text-sage text-xs" aria-live="polite" title="Saved">✔</span>}
+              </div>
+            </Row>
+            <Row icon="donut_large" iconCls="bg-sage-light text-sage" title="Budgets and savings goal"
+                 sub="Set in Flow. The bell tells you when a budget is nearly used up."
+                 onClick={() => { openAt('goals'); onNavigate(AppScreen.INCOME_INSIGHTS); }}>
+              {chevron}
+            </Row>
+          </Card>
+        </div>
+      )}
+
+      {page === 'data' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            <Row icon="upload_file" iconCls="bg-sage-light text-sage" title="Import a statement" sub="A bank statement, PDF or Excel" onClick={() => onNavigate(AppScreen.IMPORT)}>
+              {chevron}
+            </Row>
+            <Row icon="description" iconCls="bg-blue-zen-light text-blue-zen" title="Export and reports" sub="Statements, CSV and a full backup" onClick={() => onNavigate(AppScreen.EXPORT)}>
+              {chevron}
+            </Row>
+            <Row icon="account_balance" iconCls="bg-sage-light text-sage" title="Bank accounts"
+                 sub={accountCount > 0 ? `${accountCount} ${accountCount === 1 ? 'account' : 'accounts'}, each with its balance` : 'Each account from your statements, with its balance'}
+                 onClick={() => onNavigate(AppScreen.BANK_ACCOUNTS)}>
+              {chevron}
+            </Row>
+            <Row icon="swap_horiz" iconCls="bg-lavender-light text-lavender" title="Money moved" sub="Your own accounts, family and investments" onClick={() => onNavigate(AppScreen.MONEY_MOVED)}>
+              {chevron}
+            </Row>
+            {readerSupported() && (
+              <Row icon="bolt" iconCls="bg-ocean-light text-ocean" title="Payments from your apps"
+                   sub={toCheckCount > 0
+                     ? `${toCheckCount} ${toCheckCount === 1 ? 'payment' : 'payments'} to check`
+                     : 'Adds payments from Google Pay, PhonePe, Paytm and bank apps'}
+                   onClick={() => onNavigate(AppScreen.PAYMENT_APPS)}>
+                {chevron}
+              </Row>
+            )}
+          </Card>
+          {isNative() && (
+            <Card>
+              <Row icon="bug_report" iconCls="bg-sand-light text-sand-ink" title="Crash reports"
+                   sub="Errors go to Firebase Crashlytics, never your transactions">
+                <Toggle checked={crashOn} onChange={toggleCrashReports} label="Send crash reports" />
+              </Row>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {page === 'appearance' && (
+        <div className="px-6 pt-2 space-y-4">
+          <Card>
+            <Row icon="brightness_auto" iconCls="bg-ocean-light text-ocean" title="Match your phone" sub="Light or dark, as your phone is set">
+              <Toggle checked={themeMode === 'auto'} onChange={() => pickTheme(themeMode === 'auto' ? 'sage' : 'auto')} label="Match system theme" />
+            </Row>
+            <div className={`px-4 py-4 ${themeMode === 'auto' ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-3 gap-2.5">
+                {themeSwatches().map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => pickTheme(s.id)}
+                    aria-pressed={themeMode === s.id}
+                    className={`rounded-2xl p-2.5 border text-left transition-all shadow-soft ${themeMode === s.id ? 'border-sage ring-2 ring-sage/40' : 'border-black/[0.08]'}`}
+                    style={{ background: s.bg }}
+                  >
+                    <span className="flex items-center gap-1 mb-1.5">
+                      <span className="w-4 h-4 rounded-full border border-premium-charcoal/[0.12]" style={{ background: s.accent }} />
+                      <span className="w-2.5 h-2.5 rounded-full opacity-60" style={{ background: s.ink }} />
+                    </span>
+                    <span className="block text-[11px] font-semibold" style={{ color: s.ink }}>{s.name}</span>
+                  </button>
+                ))}
+              </div>
+              {themeMode === 'custom' && (
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="color"
+                      value={customTheme.accent}
+                      onChange={e => updateCustom({ accent: e.target.value })}
+                      className="w-9 h-9 rounded-xl border border-premium-charcoal/[0.12] bg-transparent cursor-pointer p-0.5"
+                      aria-label="Custom accent color"
+                    />
+                    <span className="text-[12px] text-muted-taupe">Accent color</span>
+                  </label>
+                  <div className="flex rounded-xl overflow-hidden border border-black/[0.08] text-[11px] font-semibold">
+                    <button onClick={() => updateCustom({ dark: false })} className={`px-3 py-1.5 transition-colors ${!customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Light</button>
+                    <button onClick={() => updateCustom({ dark: true })} className={`px-3 py-1.5 transition-colors ${customTheme.dark ? 'bg-sage text-white' : 'text-muted-taupe'}`}>Dark</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+          <Card>
+            <Row icon="currency_exchange" iconCls="bg-sand-light text-sand-ink" title="Show amounts in" sub="Converted at live exchange rates; saved in INR">
+              <CurrencySelector />
+            </Row>
+            {isNative() && (
+              <Row icon="vibration" iconCls="bg-lavender-light text-lavender" title="Vibration" sub="A light tap when you switch tabs, save or remove">
+                <Toggle checked={buzz} onChange={toggleBuzz} label="Vibration" />
+              </Row>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {page === 'about' && (
+        <div className="px-6 pt-2 space-y-4">
+          <div className="bg-white rounded-[28px] p-6 shadow-raised border border-black/[0.02] flex flex-col items-center text-center">
+            <BrandIcon size={64} className="drop-shadow-sm" />
+            <h3 className="mt-4"><Wordmark height={26} /></h3>
+            <p className="mt-1.5 text-[13px] font-medium text-muted-taupe">{TAGLINE}</p>
+            <p className="mt-1 text-[12px] text-muted-taupe tabular-nums">Version {__APP_VERSION__} ({__APP_BUILD__})</p>
+            {isNative() && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button onClick={() => setNotesOpen(true)} className="px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] font-semibold shadow-soft">
+                  What's new
+                </button>
+                {updatesSupported() && <UpdateCheckButton />}
+              </div>
+            )}
+            {isNative() && updatesSupported() && <UpdateCheckResult />}
+          </div>
+          {__QA_BUILD__ && (
+            <Card>
+              <div className="px-4 py-3.5">
+                <p className="text-[14px] font-semibold text-premium-charcoal">Preview a plan</p>
+                <p className="text-[12px] text-muted-taupe leading-snug">Test build only: pretend paid plans are on, without the server or Google Play.</p>
+                <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Preview a plan">
+                  {([null, ...PREVIEWS] as (Preview | null)[]).map(p => (
+                    <button
+                      key={p ?? 'off'}
+                      role="radio"
+                      aria-checked={plan.preview === p}
+                      onClick={() => setPreview(p)}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${plan.preview === p ? 'bg-sage text-white border-sage' : 'border-black/[0.1] text-muted-taupe'}`}
+                    >
+                      {p === null ? 'Off' : p === 'none' ? 'No plan' : p === 'essential-after-plus' ? 'Essential after Plus' : p === 'plus' ? 'Plus' : p === 'free-month' ? 'Free month ending' : 'Essential'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+          <Card>
+            <Row icon="policy" iconCls="bg-sand-light text-sand-ink" title="Privacy policy" sub="How your data is handled"
+                 onClick={() => window.open(PRIVACY_URL, '_blank')}>
+              {external}
+            </Row>
+            <Row icon="gavel" iconCls="bg-sage-light text-sage" title="Terms and conditions" sub="The agreement you accepted"
+                 onClick={() => window.open(TERMS_URL, '_blank')}>
+              {external}
+            </Row>
+          </Card>
+        </div>
+      )}
 
       {notesOpen && <WhatsNewSheet notes={latestNotes(__APP_BUILD__)} onClose={() => setNotesOpen(false)} />}
 
@@ -511,7 +792,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !mfaBusy && setMfaModal(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Two-Factor Auth</h3>
+              <h3 className="text-lg font-display font-bold text-premium-charcoal">Two-factor authentication</h3>
               <button onClick={() => setMfaModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={mfaBusy}>
                 <span className="material-symbols-outlined text-muted-taupe">close</span>
               </button>
@@ -525,13 +806,13 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   Your account requires an authenticator code at every sign-in. Disabling removes this protection.
                 </p>
                 <button onClick={disableMfa} disabled={mfaBusy}
-                        className="w-full bg-rose text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
-                  {mfaBusy ? 'Removing…' : 'Disable Two-Factor Auth'}
+                        className="w-full bg-rose text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
+                  {mfaBusy ? 'Removing…' : 'Turn off two-factor authentication'}
                 </button>
               </>
             ) : mfaBusy && !enrollment ? (
               <div className="flex justify-center py-10">
-                <div className="size-8 rounded-full border-4 border-sage/20 border-t-sage animate-spin" />
+                <div className="h-8 w-8 rounded-full border-4 border-sage/20 border-t-sage animate-spin" />
               </div>
             ) : enrollment ? (
               <>
@@ -540,7 +821,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                 </p>
                 {qrDataUrl && (
                   <div className="flex justify-center mb-4">
-                    <img src={qrDataUrl} alt="2FA QR code" className="rounded-xl border border-black/5" width={200} height={200} />
+                    <img src={qrDataUrl} alt="2FA QR code" className="rounded-xl border border-premium-charcoal/[0.08]" width={200} height={200} />
                   </div>
                 )}
                 <div className="bg-zen-bg rounded-xl px-4 py-3 mb-5">
@@ -555,7 +836,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                   placeholder="000000"
                 />
                 <button onClick={confirmMfaEnroll} disabled={mfaBusy || mfaCode.length < 6}
-                        className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
+                        className="w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50">
                   {mfaBusy ? 'Verifying…' : 'Activate'}
                 </button>
               </>
@@ -569,7 +850,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !pwBusy && setPwModal(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-serif font-semibold text-premium-charcoal">Change Password</h3>
+              <h3 className="text-lg font-display font-bold text-premium-charcoal">Change password</h3>
               <button onClick={() => setPwModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" disabled={pwBusy} aria-label="Close">
                 <span className="material-symbols-outlined text-muted-taupe">close</span>
               </button>
@@ -578,7 +859,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
             {pwDone ? (
               <div className="p-5 bg-sage-light/40 border border-sage/20 rounded-2xl text-center">
                 <span className="material-symbols-outlined text-sage text-[36px] mb-1">check_circle</span>
-                <p className="text-[14px] font-serif font-semibold text-premium-charcoal">Password changed</p>
+                <p className="text-[14px] font-semibold text-premium-charcoal">Password changed</p>
                 <p className="text-[12px] text-muted-taupe mt-1">Use the new password from your next sign-in.</p>
               </div>
             ) : (
@@ -630,7 +911,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                 <button
                   onClick={changePassword}
                   disabled={pwBusy || !pwValid}
-                  className="w-full bg-sage text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   {pwBusy ? 'Updating…' : 'Update Password'}
                 </button>
@@ -647,11 +928,21 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
       {delOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => !delBusy && setDelOpen(false)}>
           <div className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-serif font-semibold text-rose mb-2">Delete Account</h3>
+            <h3 className="text-lg font-display font-bold text-rose mb-2">Delete account</h3>
             <p className="text-[12px] text-muted-taupe leading-relaxed mb-4">
               This permanently erases your account and every transaction from the cloud. There is no undo.
               Consider exporting a backup first.
             </p>
+            {plan.entitlement?.source === 'play' && (
+              <div className="mb-4 p-3 bg-sand-light/70 rounded-xl text-[12px] text-premium-charcoal leading-relaxed">
+                Deleting your account doesn't cancel your plan. It keeps renewing in Google Play until you cancel it there.
+                {billingSupported() && (
+                  <button onClick={() => { void manageSubscription(); }} className="block mt-1.5 font-semibold text-sage">
+                    Open Google Play subscriptions
+                  </button>
+                )}
+              </div>
+            )}
             {delError && <div className="mb-4 p-3 bg-rose-light/40 border border-rose/20 rounded-xl text-rose text-xs font-medium leading-relaxed">{delError}</div>}
 
             {delResolver ? (
@@ -667,16 +958,20 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout }) => {
                 <input type="text" value={delConfirm} onChange={e => setDelConfirm(e.target.value)}
                        className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-3"
                        placeholder='Type "DELETE" to confirm' />
-                <input type="password" value={delPassword} onChange={e => setDelPassword(e.target.value)}
-                       className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-4"
-                       placeholder="Your password" />
+                {delWithPassword ? (
+                  <input type="password" value={delPassword} onChange={e => setDelPassword(e.target.value)}
+                         className="w-full bg-zen-bg rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-rose mb-4"
+                         placeholder="Your password" />
+                ) : (
+                  <p className="text-[12px] text-muted-taupe mb-4">Google will ask you to confirm it's you.</p>
+                )}
               </>
             )}
 
             <button
               onClick={handleDeleteAccount}
-              disabled={delBusy || (delResolver ? delTotp.length < 6 : (delConfirm.toUpperCase() !== 'DELETE' || delPassword.length === 0))}
-              className="w-full bg-rose text-white py-3.5 rounded-2xl font-serif font-medium shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 mb-2"
+              disabled={delBusy || (delResolver ? delTotp.length < 6 : (delConfirm.toUpperCase() !== 'DELETE' || (delWithPassword && delPassword.length === 0)))}
+              className="w-full bg-rose text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-50 mb-2"
             >
               {delBusy ? 'Deleting…' : 'Permanently Delete Everything'}
             </button>

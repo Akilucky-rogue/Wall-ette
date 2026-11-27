@@ -1,3 +1,10 @@
 {
-  "indexes": []
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "months",
+      "fieldPath": "entries",
+      "indexes": []
+    }
+  ]
 }

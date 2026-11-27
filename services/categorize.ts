@@ -40,6 +40,9 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
   if (type === 'income') {
     if (desc.match(/\bsal\b|salary|payroll|stipend|ctc/)) return 'Salary';
     if (desc.match(/bonus|incentive|reward|cashback|\bcb\b/)) return 'Bonus';
+    // Units sold back to a fund: your own money returning, not income (the
+    // audits found redemptions filed as Investment Returns).
+    if (desc.match(/redemption|redeem|\brdm\b|\bredm\b/)) return 'Redemption proceeds';
     // ACH credits from companies (HDFC "ACH C-", Saraswat "ACH Credit:") are dividends.
     if (desc.match(/dividend|mutual.?fund|\bmf\b|sip.?return|nav|\bach ?c-|ach.?credit/)) return 'Investment Returns';
     if (desc.match(/interest|fd.?int|recurring.?dep|int.?cr|\bint\.? ?pd\b|\bint\.? ?paid/)) return 'Interest Income';
@@ -167,7 +170,8 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
 
   // ── EXPENSE: Transfers (classify last — very broad) ──────────────────────
   // UPIAR/UPIAB: Union Bank's UPI debits and credits.
-  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bift\b|\bupi(ar|ab)?\b|\btrf\b|\btfr\b/))
+  // "IMP P2A": Equitas's IMPS transfers.
+  if (desc.match(/\bneft\b|\brtgs\b|\bimps\b|\bimp p2[ap]\b|\bift\b|\bupi(ar|ab)?\b|\btrf\b|\btfr\b/))
     return 'Transfer Out';
 
   return 'Other';

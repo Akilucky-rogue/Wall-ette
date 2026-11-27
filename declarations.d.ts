@@ -12,6 +12,11 @@ declare module '*.module.css' {
 declare const __APP_VERSION__: string;
 /** The Android versionCode. */
 declare const __APP_BUILD__: number;
+/**
+ * True only in the test build ("Wall-ette Test", scripts/build-qa.mjs): it
+ * opens without the app lock, so it can be tried with a made-up account.
+ */
+declare const __QA_BUILD__: boolean;
 
 // Vite `?url` asset imports (used for the bundled pdf.js worker)
 declare module '*?url' {

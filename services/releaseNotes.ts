@@ -19,6 +19,54 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    // 1.5.9 (versionCode 17) never went to Play: its changes ship here.
+    versionCode: 18,
+    version: '1.6.0',
+    items: [
+      "A new look: Wall·ette's own icon, logo and mascot, clearer type and a Teal theme.",
+      'Sign in with Google.',
+      'Payments from Google Pay, PhonePe, Paytm and bank apps are added for you. Turn it on in Self → Your data.',
+      'Share a payment message to Wall·ette to add it.',
+      'Each bank account keeps its own balance, and Equitas statements import.',
+      'Importing goes step by step: format, statement, balance check, categories.',
+      'Faster start-up and Vault, even with years of entries.',
+    ],
+  },
+  {
+    versionCode: 16,
+    version: '1.5.8',
+    items: [
+      'Restore a Full backup in Data Studio: entries and settings come back, and nothing is deleted.',
+      "Payments Wall-ette can't name show as To review, and after each import you can say what they were.",
+      'A payment and its reversal cancel out, and fund redemptions no longer count as income.',
+      'Each import leaves a receipt: rows added and skipped, and how the balance check read.',
+      'Home says what Balance includes and how far your entries reach; new wallets start with a guide.',
+      'Clearer text in the light themes.',
+    ],
+  },
+  {
+    versionCode: 15,
+    version: '1.5.7',
+    // Play allows 500 characters in all (scripts/check-app-updates.mjs).
+    items: [
+      "What's new opens properly from the bell, on phones and computers.",
+      'Self → About can check Google Play for updates, and the bell shows when a new version is waiting.',
+    ],
+  },
+  {
+    versionCode: 14,
+    version: '1.5.6',
+    items: [
+      'A new Pulse: money in and out, your spending pace, where it went and what stands out, with charts.',
+      'Show amounts in any currency. They stay saved in rupees.',
+      'Left to spend, on Home: what you can still spend before your next pay.',
+      'Statement reports match Pulse to the rupee and look like the app.',
+      'The bell and phone reminders flag budgets, bills due and price rises.',
+      'Payees show by name, Vault is more compact, and Fee Hunter is gone.',
+      'Statement import and New entry are exact to the paisa.',
+    ],
+  },
+  {
     versionCode: 13,
     version: '1.5.5',
     items: [
@@ -35,7 +83,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     items: [
       "Wall-ette tells you if a change didn't save to your account, and lets you try again.",
       'Re-imports match payments by bank reference, so same-day payments of the same amount are never mixed up.',
-      'Fee Hunter finds duplicates from importing a statement as both PDF and Excel.',
+      'Entries imported twice, from both the PDF and the Excel of a statement, are found and can be removed.',
       'Signing out or deleting your account also clears your data from this phone.',
       'Screenshots and the recent-apps view no longer show your wallet, and phone backups leave it out.',
     ],

@@ -14,6 +14,26 @@ const config: CapacitorConfig = {
       // layout jump while Capacitor checks the page.
       initialViewportFitValueHint: 'cover',
     },
+    // Phone notifications (services/phoneNotifier.ts): the white wallet in
+    // android/app/src/main/res/drawable, tinted the theme's deep sage.
+    LocalNotifications: {
+      smallIcon: 'ic_stat_wallette',
+      iconColor: '#7D937A',
+    },
+    // Sign in with Google (services/googleSignIn.ts). Only Google is built in:
+    // no Facebook SDK (it would add the advertising-ID permission Play asks
+    // about), no Apple or X. android/gradle.properties says the same, so a
+    // build without `cap sync` leaves them out too.
+    SocialLogin: {
+      providers: { google: true, facebook: false, apple: false, twitter: false },
+      logLevel: 1,
+    },
+    // Google Play billing (services/billing.ts): only Wall-ette's server
+    // acknowledges a purchase, after checking it with Google Play, so the
+    // plugin never does it on its own.
+    NativePurchases: {
+      autoFinishTransactions: false,
+    },
   },
 };
 

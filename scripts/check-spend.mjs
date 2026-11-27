@@ -12,6 +12,15 @@
  *   - transfers no rule covers are suggested for sorting, and drop out once sorted
  *   - recurring charges leave money moved out, and a pay stream is a guess to
  *     confirm until a rule says so
+ *   - (1.5.8) a transfer nobody sorted reads "To review"; a payee sorted as
+ *     counting shows under its rule's category; the label never becomes
+ *     data; the review's guesses from a name; a payment and its reversal
+ *     (same reference and amount) cancel out, and only an exact pair does;
+ *     fund redemptions are money coming back, not income; Vault shows the
+ *     bank's narration, never the IDFC Excel reader's "UPI ID: DR" note
+ *   - (1.5.9) Flow's money diagram names each payee and category once: one
+ *     payee's narrations are one stream, and Other is only the pool of
+ *     smaller streams; the column still adds up to the month
  *
  * Usage (after `npm ci`):
  *   node scripts/check-spend.mjs
@@ -33,7 +42,12 @@ await build({
   stdin: {
     contents: [
       `export * from ${JSON.stringify(join(root, 'services', 'spend.ts'))};`,
-      `export { analyzeIncome, detectRecurringCharges } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
+      `export { analyzeIncome, byLabel, detectRecurringCharges, flowColumn, prettyMerchant } from ${JSON.stringify(join(root, 'services', 'analyticsService.ts'))};`,
+      `export { tidyName, paymentRail } from ${JSON.stringify(join(root, 'utils', 'names.ts'))};`,
+      `export * from ${JSON.stringify(join(root, 'services', 'review.ts'))};`,
+      `export { reversalPairs } from ${JSON.stringify(join(root, 'services', 'reversals.ts'))};`,
+      `export { categorizeNarration } from ${JSON.stringify(join(root, 'services', 'categorize.ts'))};`,
+      `export { bankWords } from ${JSON.stringify(join(root, 'services', 'narration.ts'))};`,
     ].join('\n'),
     resolveDir: root,
     loader: 'ts',
@@ -44,7 +58,8 @@ await build({
   format: 'esm',
   logLevel: 'error',
 });
-const { analyzeIncome, detectRecurringCharges, flowClassifier, matchText, payeeName, suggestPayees } =
+const { analyzeIncome, byLabel, detectRecurringCharges, flowClassifier, flowColumn, matchText, payeeName, paymentRail, prettyMerchant, suggestPayees, tidyName,
+  shownCategory, withShownCategories, categoryToStore, suggestChoice, reviewPayees, toReviewTotal, REVIEW_CHOICES, reversalPairs, categorizeNarration, bankWords } =
   await import(pathToFileURL(bundle).href);
 rmSync(tmp, { recursive: true, force: true });
 
@@ -57,6 +72,11 @@ const eq = (label, actual, expected) => {
     failures++;
     console.log(`  FAIL ${label}: got ${a}, expected ${e}`);
   }
+};
+
+const ok = (label, cond) => {
+  checks++;
+  if (!cond) { failures++; console.log(`  FAIL ${label}`); }
 };
 
 let n = 0;
@@ -73,6 +93,16 @@ const flows = (rules, list) => {
 eq('payee: UPI/DR', payeeName('UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI'), 'ZOMATO L');
 eq('payee: UPI/MOB note', payeeName('UPI/MOB/615230407557/RENT FOR MAY'), 'RENT FOR MAY');
 eq('payee: IFT', payeeName('IFT/10000123456/Mr. RAVI KUMAR SHAH/912345'), 'Mr. RAVI KUMAR SHAH');
+// 1.5.8: a short code read as the payee (the audits found one shown as a four-letter fragment)
+eq('payee: IMPS with the bank\'s code before the payee', payeeName('IMPS/DR/612345678901/HDFC/RENT AUG 2026/KAPOOR HOMES'), 'KAPOOR HOMES');
+eq('payee: a UPI payee called like a code is still the payee', payeeName('UPI/DR/612345678902/UBER/YESB/uber@ybl/UPI'), 'UBER');
+eq('payee: HDFC UPI Lite top-up', payeeName('UPI-LITE-12345678901234-612345678903-ADD MONEY'), 'UPI Lite top-up');
+eq('payee: a gateway, then the shop', payeeName('UPI-PAYU-POWERACCESS.PAYUPAYMENTS@AXISBANK-UTIB0000000-612345678904-ACME FOLKS PRIV'), 'ACME FOLKS PRIV');
+eq('payee: a gateway and nothing after it', payeeName('UPI-ACWO-ACWO.BDPG@HDFCBANK-HDFC0MERUPI-612345678905-PAY'), 'ACWO');
+eq('shown: the gateway by name', [prettyMerchant('UPI-ACWO-ACWO.BDPG@HDFCBANK-HDFC0MERUPI-612345678905-PAY'), prettyMerchant('UPI-PAYU-POWERACCESS.PAYUPAYMENTS@AXISBANK-UTIB0000000-612345678904-ACME FOLKS PRIV'), prettyMerchant('IMPS/DR/612345678901/HDFC/RENT AUG 2026/KAPOOR HOMES')],
+  ['BillDesk payment', 'Acme Folks Priv', 'Kapoor Homes']);
+eq('shown: a payee field that is only a number gives the rail', prettyMerchant('UPI/DR/612345678906/98765432/BARB/9876543/UPI'), 'UPI payment');
+eq('payee: HDFC funds transfer', payeeName('FT- 1234567890-12345678901234 - ACME MUTUAL FUND - COMMON REDEMPTION A/C -'), 'ACME MUTUAL FUND');
 eq('payee: NEFT', payeeName('NEFT/CMS123456789/ACME BROKING PVT LTD/ICIC0001234'), 'ACME BROKING PVT LTD');
 eq('payee: IMPS', payeeName('IMPS-OPM/512345678901/Test Associates LLP/HDFC0001234/512345/'), 'Test Associates LLP');
 eq('payee: none in boilerplate', [
@@ -82,6 +112,13 @@ eq('payee: none in boilerplate', [
   payeeName('UPI/CREDIT ADJUSTMENT/615230407557/26-12-25'),
   payeeName('Dad'),
 ], [null, null, null, null, null]);
+// Equitas (made-up rows): fields between spaced dashes, card rows between backslashes.
+eq('payee: Equitas IMPS', payeeName('IMP P2A 612345678901 - RAVI KUMAR - HDFC0001234 - HEAD OFFICE'), 'RAVI KUMAR');
+eq('payee: Equitas IMPS in', payeeName('IMP P2P 612345678902 - TEST ASSOCIATES LLP - ICIC0001234 - FORT'), 'TEST ASSOCIATES LLP');
+eq('payee: Equitas salary credit', payeeName('SALARY 0525 TRANSFER CR - NORTHWIND LABS PVT LTD'), 'NORTHWIND LABS PVT LTD');
+eq('payee: Equitas card purchase', payeeName('PURCHASE \\4XXXXXXXXXXX1234\\ACME STORE\\MUMBAI\\ IN'), 'ACME STORE');
+eq('payee: a name typed with a dash is not a statement payee', [payeeName('Dad - rent'), payeeName('Groceries - week 2')], [null, null]);
+eq('category: Equitas IMPS out is a transfer', categorizeNarration('imp p2a 612345678901 - ravi kumar - hdfc0001234 - head office', 'expense'), 'Transfer Out');
 eq('matchText drops filler', [matchText('Mr. RAVI/KUMAR'), matchText('TEST AND SONS PVT LTD')], ['ravi kumar', 'test sons']);
 
 // ── Defaults: investments and adjustments move; everything else counts ─────
@@ -166,6 +203,148 @@ const pay = r => {
 eq('pay: a guess to confirm', pay([]), ['ACME TECH SOLUTIONS', false]);
 eq('pay: confirmed', pay([{ id: 's', match: 'ACME TECH SOLUTIONS', kind: 'salary' }]), ['ACME TECH SOLUTIONS', true]);
 eq('pay: ruled out', pay([{ id: 's', match: 'ACME TECH SOLUTIONS', kind: 'counts' }]), null);
+
+// ── Names as the screens show them ─────────────────────────────────────────
+eq('show: UPI payee, not the handle', prettyMerchant('UPI/DR/62000000001/NETFLIX COM/ICIC/netflix@icici/UPI'), 'Netflix.com');
+eq('show: UPI payee in capitals', prettyMerchant('UPI/DR/615230407557/ZOMATO L/UTIB/zomatoo/UPI'), 'Zomato L');
+eq('show: NEFT company', prettyMerchant('NEFT/CMS123456789/ACME BROKING PVT LTD/ICIC0001234'), 'Acme Broking Pvt Ltd');
+eq('show: HDFC dashes, not the note', prettyMerchant('UPI-RAVI KUMAR-ravi@okicici-ICIC0000000-615200000000-PAYMENT FROM PHONE'), 'Ravi Kumar');
+eq('show: short codes give way to a name', prettyMerchant('NACH/DR/MF SIP/BLUECHIP FUND'), 'Bluechip Fund');
+eq('show: Mr. and capitals', prettyMerchant('IFT/10000123456/Mr. RAVI KUMAR SHAH/912345'), 'Mr. Ravi Kumar Shah');
+eq('show: a bank charge', prettyMerchant('SMS ALERT CHARGES QTR SEP'), 'SMS Alert Charges Qtr Sep');
+eq('show: typed names stay as typed', prettyMerchant('Starbucks Bandra'), 'Starbucks Bandra');
+eq('show: nothing but codes gives the rail (the narration stays under "From the bank")', prettyMerchant('UPI/DR/123456789012/UPI'), 'UPI payment');
+eq('show: only a handle', prettyMerchant('UPI/DR/123456789012/kirana@ybl'), 'kirana');
+eq('tidy: acronyms and initials stay', tidyName('SBI LIFE KV TRADERS'), 'SBI Life KV Traders');
+eq('tidy: small words', tidyName('THE BANK OF INDIA'), 'The Bank Of India');
+eq('rail: from the first field', ['UPI/DR/1/X', 'NEFT/2/Y', 'MB/IMPS/3/Z', 'POS 1234 STORE', 'ATW/5/6', 'IFT/7/Z', 'Coffee'].map(paymentRail),
+  ['UPI', 'NEFT', 'IMPS', 'Card', 'ATM', 'Transfer', null]);
+
+// ── To review (1.5.8) ──────────────────────────────────────────────────────
+{
+  const e = (id, merchant, amount, category = 'Transfer Out', date = '2026-11-10') => ({ id, date, type: 'EXPENSE', amount, category, merchant, note: merchant });
+  const i = (id, merchant, amount, category = 'Transfer In', date = '2026-11-12') => ({ id, date, type: 'INCOME', amount, category, merchant, note: merchant });
+  const soc = e('soc', 'UPI/DR/612300000001/SUNRISE CHS/YESB/sunrisechs@ybl/UPI', 18000);
+  const fund = e('fund', 'NEFT/N312000000901/BLUECHIP MUTUAL FUND/HDFC0000123', 150000);
+  const typed = e('typed', 'Paid Ravi for tickets', 900);           // a transfer typed by hand: no payee to sort
+  const shop = e('shop', 'UPI/DR/612300000005/KAVYA TRADERS/UTIB/kavya@axis/UPI', 2500, 'Shopping');
+  const back = i('back', 'IMPS/P2A/612300000006/SUNRISE CHS/ICIC0000456', 500);
+  const none = flowClassifier([]);
+  eq('to review: an unsorted transfer out', shownCategory(soc, none(soc)), 'To review');
+  eq('… not one typed by hand (nothing to sort it by)', shownCategory(typed, none(typed)), 'Transfer Out');
+  eq('… not a payment with a category of its own', shownCategory(shop, none(shop)), 'Shopping');
+  eq('… not money in', shownCategory(back, none(back)), 'Transfer In');
+  const rules = flowClassifier([
+    { id: 'r1', match: 'sunrise chs', kind: 'counts', category: 'Rent' },
+    { id: 'r2', match: 'bluechip mutual fund', kind: 'investment' },
+  ]);
+  eq('sorted as counting with a category: shown under it', shownCategory(soc, rules(soc)), 'Rent');
+  eq('… and still spending', rules(soc).flow, 'spend');
+  eq('… money in from the same payee keeps Transfer In', shownCategory(back, rules(back)), 'Transfer In');
+  eq('sorted as an investment: moved, Transfer Out', [rules(fund).flow, shownCategory(fund, rules(fund))], ['moved', 'Transfer Out']);
+  const keep = flowClassifier([{ id: 'r3', match: 'sunrise chs', kind: 'counts' }]);
+  eq('counts with no category: Transfer Out', shownCategory(soc, keep(soc)), 'Transfer Out');
+  const storedLabel = { ...soc, category: 'To review' };
+  eq('"To review" saved by an old edit reads Transfer Out once sorted', shownCategory(storedLabel, rules(storedLabel)), 'Rent');
+  eq('… and To review while not', shownCategory(storedLabel, none(storedLabel)), 'To review');
+  const list = [soc, fund, typed, shop, back];
+  const shown = withShownCategories(list, none);
+  eq('the shown list relabels only what changes', shown.map(t => t.category), ['To review', 'To review', 'Transfer Out', 'Shopping', 'Transfer In']);
+  ok('… keeps unchanged entries as the same objects', shown[2] === typed && shown[3] === shop);
+  ok('… and never touches the stored ones', soc.category === 'Transfer Out' && fund.category === 'Transfer Out');
+  eq('to review total: money out only', toReviewTotal(shown), { amount: 168000, count: 2 });
+  eq('edit saved unchanged keeps the stored category', categoryToStore(soc, 'To review', 'To review'), 'Transfer Out');
+  eq('edit to a new category stores it', categoryToStore(soc, 'To review', 'Rent'), 'Rent');
+
+  eq('guesses', ['BLUECHIP MUTUAL FUND', 'ZERODHA BROKING LTD', 'SUNRISE CHS', 'Green Park Co-op Housing Society', 'GITHUB INC', 'OPENAI LLC', 'Mr. ANITA SHARMA', 'KABIR S', 'KAVYA TRADERS', 'ACME FOODS PVT LTD', 'X'].map(suggestChoice),
+    ['investment', 'investment', 'rent', 'rent', 'software', 'software', 'family', 'family', null, null, null]);
+  eq('the review offers six answers, rules first-class', REVIEW_CHOICES.map(c => [c.id, c.kind, c.category ?? null]),
+    [['investment', 'investment', null], ['rent', 'counts', 'Rent'], ['software', 'counts', 'Software'], ['family', 'family', null], ['mine', 'mine', null], ['spend', 'counts', 'Other']]);
+  const review = reviewPayees(shown, none);
+  eq('review: payees with money out, largest first, with guesses', review.map(p => [p.name, p.out, p.in, p.suggestion]),
+    [['BLUECHIP MUTUAL FUND', 150000, 0, 'investment'], ['SUNRISE CHS', 18000, 500, 'rent']]);
+  eq('… limited to an import\'s rows, totals still cover every payment to the payee', reviewPayees(shown, none, new Set(['back'])).map(p => [p.name, p.out, p.in]),
+    [['SUNRISE CHS', 18000, 500]]);
+  eq('… gone once sorted', reviewPayees(withShownCategories(list, rules), rules).length, 0);
+
+  // Reversals
+  const paid = e('paid', 'UPI/DR/612399999991/ACME GADGETS/YESB/acme@ybl/UPI', 3200, 'Shopping', '2026-11-13');
+  const rev = i('rev', 'UPI/REV/612399999991/ACME GADGETS/YESB/acme@ybl/UPI', 3200, 'Refunds', '2026-11-13');
+  const revFirst = i('rev2', 'REV/UPI/612399999992/ACME GADGETS/YESB/acme@ybl/UPI', 450, 'Refunds', '2026-11-15');
+  const paid2 = e('paid2', 'UPI/DR/612399999992/ACME GADGETS/YESB/acme@ybl/UPI', 450, 'Shopping', '2026-11-14');
+  const hdfcPaid = e('hp', 'UPI-ZOMATO LTD-zomato@axis-UTIB0000000-612399999993-PAY', 299, 'Food Delivery');
+  const hdfcRev = i('hr', 'REV-UPI-ZOMATO LTD-zomato@axis-UTIB0000000-612399999993-PAY', 299, 'Refunds');
+  const otherAmount = i('oa', 'UPI/REV/612399999994/ACME GADGETS/YESB/acme@ybl/UPI', 100, 'Refunds');
+  const paid4 = e('p4', 'UPI/DR/612399999994/ACME GADGETS/YESB/acme@ybl/UPI', 1000, 'Shopping');
+  const notSaid = i('ns', 'UPI/CR/612399999995/ACME GADGETS/YESB/acme@ybl/UPI', 700);
+  const paid5 = e('p5', 'UPI/DR/612399999995/ACME GADGETS/YESB/acme@ybl/UPI', 700, 'Shopping');
+  const before = i('bf', 'UPI/REV/612399999996/ACME GADGETS/YESB/acme@ybl/UPI', 60, 'Refunds', '2026-11-01');
+  const paid6 = e('p6', 'UPI/DR/612399999996/ACME GADGETS/YESB/acme@ybl/UPI', 60, 'Shopping', '2026-11-05');
+  const pairs = reversalPairs([paid, rev, revFirst, paid2, hdfcPaid, hdfcRev, otherAmount, paid4, notSaid, paid5, before, paid6]);
+  eq('reversals: paired by reference and amount (UPI/REV, REV/UPI, HDFC REV-UPI)', [...pairs].sort(), ['hp', 'hr', 'paid', 'paid2', 'rev', 'rev2'].sort());
+  const withPairs = flowClassifier([], pairs);
+  eq('… both sides are money moved, as Reversed', [withPairs(paid).moved, withPairs(rev).moved], ['reversal', 'reversal']);
+  eq('… not a different amount, a credit that doesn\'t say reversed, or one before the payment',
+    [withPairs(otherAmount).flow, withPairs(paid4).flow, withPairs(notSaid).flow, withPairs(before).flow], ['income', 'spend', 'income', 'income']);
+  eq('… a payment pairs once', reversalPairs([paid, rev, { ...rev, id: 'rev-again' }]).size, 2);
+  eq('… a reversal wins over a payee rule', flowClassifier([{ id: 'c', match: 'acme gadgets', kind: 'counts' }], pairs)(paid).moved, 'reversal');
+
+  // Redemptions
+  eq('a fund redemption is Redemption proceeds, not Investment Returns',
+    ['NEFT/N312000000777/BLUECHIP MF REDEMPTION/HDFC0000123', 'ACH C- BLUECHIP MF DIVIDEND', 'NEFT/CR/123/ABC AMC REDEEM PROCEEDS'].map(n => categorizeNarration(n.toLowerCase(), 'income')),
+    ['Redemption proceeds', 'Investment Returns', 'Redemption proceeds']);
+  const red = i('red', 'Bluechip fund', 40000, 'Redemption proceeds');
+  eq('… money moved even when typed by hand', none(red).moved, 'investment');
+
+  // Vault's details: the bank's words and a note of the entry's own
+  const upiRow = 'UPI/DR/612300000001/ZOMATO LTD/UTIB/zomato@axis/UPI';
+  eq('details: an IDFC Excel row shows its narration, not the reader\'s "UPI ID: DR" note',
+    bankWords(upiRow, 'UPI ID: DR'), { narration: upiRow, note: null });
+  eq('… renamed payee with that note: nothing to show', bankWords('Zomato', 'UPI ID: CR'), { narration: null, note: null });
+  eq('… the reversal form too', bankWords('UPI/REV/612300000002/ZOMATO LTD/UTIB/zomato@axis/UPI', 'UPI ID: REV').note, null);
+  const longRow = `${upiRow}/A NOTE LONGER THAN THE PAYEE FIELD KEEPS`;
+  eq('… a PDF row: the full narration from the note', bankWords(longRow.slice(0, 40), longRow), { narration: longRow, note: null });
+  eq('… a renamed payee keeps its narration in the note', bankWords('Zomato', upiRow), { narration: upiRow, note: null });
+  eq('… typed by hand: the note is a note', bankWords('Coffee', 'with Ravi'), { narration: null, note: 'with Ravi' });
+  eq('… nothing at all', bankWords('Coffee', ''), { narration: null, note: null });
+}
+
+// ── Money Flow diagram: each name once (1.5.9) ─────────────────────────────
+{
+  const sum = col => Math.round(col.reduce((s, [, v]) => s + v, 0) * 100) / 100;
+  // Income: one clearing house paid by NEFT and by RTGS, a salary, and small bits.
+  const sources = new Map([
+    ['NEFT/N3120000001/NORTHWIND CLEARING LIMITED/HDFC0000123', 400000],
+    ['RTGS/HDFCR52026000001/NORTHWIND CLEARING LIMITED/HDFC0000123', 250000],
+    ['NEFT/N3120000002/ACME TECH SOLUTIONS/ICIC0001234', 300000],
+    ['UPI/CR/612300000001/RAVI KUMAR/OKAXIS/ravi@okaxis/UPI', 9000],
+    ['UPI/CR/612300000002/ASHA RAO/OKSBI/asha@oksbi/UPI', 6000],
+  ]);
+  const inc = 965000;
+  const left = flowColumn(byLabel(sources, prettyMerchant), inc, 4);
+  eq('flow: one payee, two narrations, one stream', left.map(([n]) => n),
+    ['Northwind Clearing Limited', 'Acme Tech Solutions', 'Other']);
+  eq('flow: its amount is both payments', left[0][1], 650000);
+  eq('flow: the income column still adds up', sum(left), inc);
+  ok('flow: no name twice (in)', new Set(left.map(([n]) => n)).size === left.length);
+
+  // Spending: a real "Other" category in the top four, and small categories.
+  const cats = new Map([['Rent', 30000], ['Other', 12000], ['Groceries', 9000], ['Dining', 6000], ['Travel', 5000], ['Gifts', 1500], ['Books', 900]]);
+  const out = 64400;
+  const right = flowColumn(cats, out, 4);
+  eq('flow: Other is the pool, last, and once', right.map(([n]) => n), ['Rent', 'Groceries', 'Dining', 'Travel', 'Other']);
+  eq('flow: the pool holds the Other category and the small ones', right[4][1], 12000 + 1500 + 900);
+  eq('flow: the spending column still adds up', sum(right), out);
+  ok('flow: no name twice (out)', new Set(right.map(([n]) => n)).size === right.length);
+
+  // Only the Other category: one stream, called Other.
+  eq('flow: only Other', flowColumn(new Map([['Other', 500]]), 500, 4), [['Other', 500]]);
+  // Everything under 4%: the largest still gets a slot, the rest pool.
+  const crumbs = new Map(Array.from({ length: 30 }, (_, k) => [`Shop ${k + 1}`, 100 + k]));
+  const crumbCol = flowColumn(crumbs, 3435, 4);
+  eq('flow: scattered spending keeps the largest and pools the rest', crumbCol.map(([n]) => n), ['Shop 30', 'Other']);
+  eq('flow: … and still adds up', sum(crumbCol), 3435);
+}
 
 console.log(`${checks - failures}/${checks} checks passed.`);
 process.exit(failures > 0 ? 1 : 0);

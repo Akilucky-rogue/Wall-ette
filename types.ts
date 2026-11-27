@@ -14,6 +14,28 @@ export interface Transaction {
   merchant?: string;
   /** When the entry was added in New Entry (ISO timestamp). Imported rows have none. */
   createdAt?: string;
+  /**
+   * The bank account an imported row came from (services/accounts.ts
+   * accountKey: bank and last four digits). From 1.5.9; rows imported
+   * earlier, and entries typed in, have none.
+   */
+  account?: string;
+  /**
+   * For an entry typed in another currency: the amount as typed and its code.
+   * `amount` is the same in rupees, to the paisa; these let the entry read
+   * back exactly as typed (¥1,500, not ¥1,500.01) while it's shown in that
+   * currency.
+   */
+  typedAmount?: number;
+  typedCurrency?: string;
+  /**
+   * Set on an entry Wall-ette added by itself (from 1.6.0): the payment app
+   * whose notification it was read from (services/paymentAlerts.ts
+   * PAYMENT_APPS id, e.g. 'gpay'), or 'share' for text shared to
+   * Wall-ette. It stands in for the payment until a statement brings the
+   * same one, whose row then takes its place (services/captured.ts).
+   */
+  via?: string;
 }
 
 export interface IncomeSource {
@@ -39,6 +61,12 @@ export interface PayeeRule {
   /** Words to look for in the payee, e.g. "ravi kumar". Matched as whole words. */
   match: string;
   kind: PayeeKind;
+  /**
+   * For a payee that counts: the category its payments show under instead of
+   * the importer's "Transfer Out" (a landlord's as Rent, say). Set by the
+   * review after an import; payments with a category of their own keep it.
+   */
+  category?: string;
 }
 
 export interface UserProfile {
@@ -50,17 +78,29 @@ export interface UserProfile {
 export enum AppScreen {
   LOCK = 'LOCK',
   DASHBOARD = 'DASHBOARD',
+  LEFT_TO_SPEND = 'LEFT_TO_SPEND', // Home's "what's left until pay day"
   HISTORY = 'HISTORY', // Vault
   NEW_ENTRY = 'NEW_ENTRY',
   ANALYSIS = 'ANALYSIS', // Pulse
+  PULSE_TRENDS = 'PULSE_TRENDS',
+  PULSE_CATEGORIES = 'PULSE_CATEGORIES',
+  PULSE_RECURRING = 'PULSE_RECURRING',
+  PULSE_HEALTH = 'PULSE_HEALTH',
   INCOME_INSIGHTS = 'INCOME_INSIGHTS', // Flow
   CATEGORY_SPLIT = 'CATEGORY_SPLIT',
   MONEY_MOVED = 'MONEY_MOVED', // payee rules: what counts as spending
+  BANK_ACCOUNTS = 'BANK_ACCOUNTS', // Self → Your data → Bank accounts
+  PAYMENT_APPS = 'PAYMENT_APPS', // Self → Your data → Payments from your apps (Android)
   IMPORT = 'IMPORT',
   EXPORT = 'EXPORT',
-  HUNTER = 'HUNTER', // Fee & Subscription Hunter
   REWIND = 'REWIND', // Time Machine + Wrapped
-  SELF = 'SELF' // Profile
+  SELF = 'SELF', // Profile
+  SELF_ACCOUNT = 'SELF_ACCOUNT', // Account and security
+  SELF_ALERTS = 'SELF_ALERTS', // Alerts and limits
+  SELF_DATA = 'SELF_DATA', // Your data
+  SELF_APPEARANCE = 'SELF_APPEARANCE',
+  SELF_ABOUT = 'SELF_ABOUT',
+  SELF_PLAN = 'SELF_PLAN', // Self → Your plan (once paid plans are on)
 }
 
 // The one category list: statement parsers (services/categorize.ts), New
@@ -74,12 +114,12 @@ export const CATEGORIES = [
   'Healthcare', 'Pharmacy', 'Doctor & Hospital', 'Insurance',
   'Education', 'Books', 'Courses',
   'Bills', 'Rent', 'Loan & EMI', 'Credit Card',
-  'Subscriptions', 'Gym', 'Charity',
+  'Subscriptions', 'Software', 'Gym', 'Charity',
   'Travel', 'Hotel', 'Vacation',
   'Personal Care', 'Beauty',
   'Pets', 'Gifts',
   'Salary', 'Freelance', 'Bonus', 'Interest Income', 'Dividend',
-  'Investment Returns', 'Rental Income', 'Refunds',
+  'Investment Returns', 'Redemption proceeds', 'Rental Income', 'Refunds',
   'Investment', 'Transfer Out', 'Transfer In', 'Cash Withdrawal', 'Adjustment',
   'Other', 'Uncategorized',
 ] as const;
@@ -112,11 +152,5 @@ export function categoryOptions(current: string): readonly string[] {
   return current && !(CATEGORIES as readonly string[]).includes(current) ? [current, ...CATEGORIES] : CATEGORIES;
 }
 
-export type CurrencyCode = 'INR' | 'USD' | 'EUR' | 'GBP';
-
-export interface CurrencyConfig {
-  code: CurrencyCode;
-  symbol: string;
-  rate: number; // Rate relative to base (INR)
-  locale: string;
-}
+/** An ISO 4217 code ('INR', 'USD', 'AED', …). Stored amounts are always INR. */
+export type CurrencyCode = string;

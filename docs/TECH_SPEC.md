@@ -494,6 +494,10 @@ Dev loop: `npm run dev` (Vite on port 8080) · `npm run build` · `npm run andro
 
 ## 10. Known limitations & roadmap
 
+- **First sign-in on a device** — about a minute on the emulator for a wallet of 2,700
+  entries: Firestore's on-device cache stores each entry as its own document (about 16,000
+  IndexedDB operations). Normal opens use the stored copy. Planned: entries stored by month
+  (`docs/PLAN_1.6.0.md`).
 - **TOTP MFA** — built end-to-end, parked as "Coming Soon" (needs Firebase console MFA toggle before enabling the UI).
 - **iOS** — pipeline exists, product decision parked.
 - **Android system bars** — follow the theme on every version with WebView 140+; with an

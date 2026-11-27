@@ -97,6 +97,43 @@ From 1.5.6 the app can show phone notifications (bill reminders, budget and dail
 - **Sideloading:** in India, Play Protect blocks apps that ask for notification access when installed from a browser, messaging app or file manager; Play installs (and adb, for testing) are unaffected.
 - **Release notes / listing:** say it's optional and off until turned on.
 
+## 5c. Paid plans: Essential and Plus (built in 1.6.0, switched off)
+
+1.6.0 carries Google Play billing (`@capgo/native-purchases`, which adds `com.android.vending.BILLING`), the plan screens and the server, all dormant while `config/app.plansLive` is false: everything stays open and no plan screen shows. A tester listed with `node scripts/plans-admin.mjs tester <email>` sees plans before everyone else. Steps, in order (Play Console and Firebase steps are the account owner's):
+
+**Data safety (with the 1.6.0 upload, since testers can buy):**
+
+| Question | Answer |
+|---|---|
+| Financial info → "Purchase history" | Collected · App functionality · Not shared. Which plan and period, its dates and state, and Google Play's purchase token, read from Google Play by the server. Payment details stay with Google Play |
+| Personal info → "Email address" | Already declared. Also used for student checks by institution email (App functionality): the address is in the email we send, deleted within two days; after that only a hash is kept |
+| Personal info → "Other info" | Collected, **optional** · App functionality · Not shared: institution, course and course end date, only from people who ask for a student review |
+
+**Play Console (after the payments profile, and after a build with the BILLING permission is uploaded to a track):**
+
+1. Monetize with Play → Products → **Subscriptions** → Create subscription, twice. Product IDs can never be reused, so type them exactly:
+   - `essential`, name "Wall·ette Essential", with base plans `essential-monthly` (auto-renewing, 1 month, ₹49) and `essential-yearly` (auto-renewing, 1 year, ₹449).
+   - `plus`, name "Wall·ette Plus", with base plans `plus-monthly` (₹99) and `plus-yearly` (₹899).
+   - Prices are what people pay, as on wall-ette.com. Set India; check the buyer price Play shows for India matches before activating.
+2. On each of the four base plans, add an offer with ID `free-month`: eligibility **New customer acquisition → Never had any subscription** (the free month is for new members only; a restart pays from day one), one phase **Free trial, 30 days**. Activate the base plans and the offers.
+3. Keep Play's **grace period** and **account hold** on (the defaults). The app tells members when Google Play couldn't take a payment.
+4. Settings → **License testing**: add the testers' Google accounts. Their purchases are free and renew in minutes; the server marks them as tests.
+5. Users and permissions → invite the Cloud Functions service account (`<project number>-compute@developer.gserviceaccount.com` of wall-e-7a113) with access to Wall-ette: *View app information*, *View financial data, orders and cancellation survey responses* and *Manage orders and subscriptions*. Without it the server can't read or acknowledge purchases, and Google Play refunds purchases that aren't acknowledged within 3 days.
+6. Monetize with Play → Monetization setup → **Real-time developer notifications**: topic `projects/wall-e-7a113/topics/play-billing`, content *Subscriptions and voided purchases*, then **Send test notification**.
+
+**Firebase / Google Cloud (wall-e-7a113, the owner's go each):**
+
+1. The Blaze plan (Cloud Functions and the scheduler need it).
+2. Enable the Google Play Android Developer API, Cloud Pub/Sub, Cloud Scheduler and the APIs `firebase deploy` asks for.
+3. Pub/Sub topic `play-billing`; give `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it.
+4. `firebase deploy --only functions,firestore:rules,firestore:indexes` from the repo (functions in asia-south1).
+5. Only for student checks by email: install the **Trigger Email from Firestore** extension on the `mail` collection with an email service, name that service in the privacy policy, then set `config/students` → `emailChecks: true` and `domains` (for example `["ac.in", "edu.in", "edu"]`).
+
+**Try it, then switch on:**
+
+- Testers: `node scripts/plans-admin.mjs tester <email>`, then sign out and in. Buy, move up, move to yearly, cancel and restore on the closed-test build; Self → Your plan shows the state.
+- Production: Firebase console → Firestore → `config/app` → boolean `plansLive` = true, with the release that announces paid plans. Everything stays as it is for members until then.
+
 ## 5a. Sign in with Google (from 1.5.9) — set up before building the 1.5.9 bundle
 
 The app signs in with Google through Android's own account picker (Credential Manager), then Firebase (`services/googleSignIn.ts`); the web app and website use Firebase's Google popup. Nothing here is a secret.
@@ -172,7 +209,7 @@ A new personal account can't release to Production until a closed test has had *
 - [ ] **Production:** create the release and submit it for review (typically 1–7 days).
 - [ ] Once Production is live: set `PLAY_LISTING_PUBLIC = true` in `utils/site.ts` and deploy the website, so wall-ette.com shows Android visitors a banner that opens Google Play.
 
-Later, paid memberships go through Google Play's billing: set up a merchant payments profile in Play Console before adding them as subscriptions.
+Paid plans go through Google Play's billing: set up a merchant payments profile in Play Console, then follow section 5c.
 
 ## 9. Shipping an update
 

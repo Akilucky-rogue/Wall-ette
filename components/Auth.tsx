@@ -15,7 +15,7 @@ import { FloatingLeaf, Paisley, RangoliCorner } from './ui/Decor';
 // Bump when the website's terms or privacy policy change materially —
 // recorded with each registration as the version the user agreed to. The
 // website's sign-up records the same (site/src/lib/auth-rules.ts).
-const TERMS_VERSION = '2026-11-27';
+const TERMS_VERSION = '2026-11-28';
 
 export type AuthType = 'login' | 'register';
 

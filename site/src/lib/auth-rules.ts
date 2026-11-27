@@ -6,7 +6,7 @@ export const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Z
 export const PASSWORD_HINT = "At least 8 characters, with an uppercase and a lowercase letter, a number and one of @ $ ! % * ? &.";
 
 /** The terms people accept on signing up; the app records the same version. */
-export const TERMS_VERSION = "2026-11-27";
+export const TERMS_VERSION = "2026-11-28";
 
 /** Firebase Auth error codes, in the app's words. */
 export function authMessage(code: string | undefined): string {

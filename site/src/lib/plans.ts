@@ -13,7 +13,12 @@ export const PLAN_RULES = {
   freeMonthForNewMembersOnly: true,
   restartCountsAsMonthOne: true,
   firstChargeDay: 31,
-  midTermCycleChangeChargesDifference: true,
+  /**
+   * Monthly to yearly, or a move up that also changes period (Google Play's
+   * CHARGE_FULL_PRICE): the new plan's full price is charged that day and the
+   * unused time of the old period is added on.
+   */
+  cycleUpChargesFullPriceAddsUnusedTime: true,
   /** Moving down (Plus → Essential, yearly → monthly) starts at the next renewal. */
   moveDownAtRenewal: true,
   /** A plan ending or moving down never deletes records; only the member does. */
@@ -25,8 +30,8 @@ export const SUBSCRIPTION_TERMS = {
   trial: "New members get 30 days at ₹0 on either plan. Card or UPI/bank payment details are required to start.",
   firstCharge: "The first charge is taken on day 31 at the full price of the plan and billing period you chose; cancel before then and you pay nothing.",
   renewal: "Plans renew automatically each month or year until you cancel. Cancel any time before a renewal: it stops the next charge, you keep access until the paid period ends, and nothing is deleted.",
-  planSwitch: "Move up from Essential to Plus at any time: Plus starts straight away, and you pay the price difference for the rest of your current period. Moving down from Plus to Essential is available after your first year and starts at your next renewal; you keep Plus until then.",
-  cycleSwitch: "Monthly to yearly starts straight away: you pay the yearly price less the unused part of your month, and your year starts that day. Yearly to monthly starts when your paid year ends; until then you keep the year you paid for.",
+  planSwitch: "Move up from Essential to Plus at any time: Plus starts straight away, and you pay the price difference for the rest of your current period. Moving up and changing between monthly and yearly at the same time charges Plus's full price for the new period that day, and the unused part of your current period is added on. Moving down from Plus to Essential is available after your first year and starts at your next renewal; you keep Plus until then.",
+  cycleSwitch: "Monthly to yearly starts straight away: you pay the full yearly price that day, and the unused part of your month is added on to your year. Yearly to monthly starts when your paid year ends; until then you keep the year you paid for.",
   afterDowngrade: "Nothing is deleted when you move down. Extra accounts and history beyond Essential's limits become read-only until you upgrade again.",
   dataAccess: "Export and deletion stay available on every plan, and after a plan ends.",
   records: "Your records are kept when a subscription ends or expires. They are deleted only when you delete them yourself or ask us to.",

@@ -176,13 +176,30 @@ Plain React context — no Redux/Zustand.
 | **Firestore** | Per-user data under `users/{uid}` (entries, settings, security log, consent record). From 1.6.0 a wallet's entries live in one document per month, `months/{YYYY-MM}` (see "Entries stored by month" in §5); up to 1.5.9 each entry was its own document in `transactions`. `persistentLocalCache` gives offline-first behavior with automatic sync. |
 | **Security rules** | `firestore.rules` — strict per-UID isolation; a user can only read/write their own subtree. Month documents must have a month id and only an `entries` map; once a wallet's settings say `entriesIn: 'moving'` or `'months'`, nothing can be added to or changed in its old `transactions` (read and delete stay open for the move). `firestore.indexes.json` leaves `months.entries` unindexed. Security log entries can be created and deleted by their owner (so account deletion erases them) but never edited. One shared read-only document, `config/app` (signed-in `get` only, edited in the console), holds app switches such as `androidMinVersionCode`. |
 | **Hosting** | Serves `dist/` as an SPA (`** → /index.html` rewrite). The self-hosted APK at `/downloads/wall-ette.apk` was removed on 19 Nov 2026. |
+| **Cloud Functions** (from 1.6.0, not deployed yet) | `functions/` (Node 22, asia-south1), the paid plans' server; see "Paid plans" below. Needs the Blaze plan. |
 
 External network calls are limited to: Firebase, Google Fonts, `exchangerate-api.com`
-(public FX rates for the currency selector) and, on Android, Google Play's update check and
-Firebase Crashlytics' crash reports.
+(public FX rates for the currency selector) and, on Android, Google Play's update check,
+Google Play billing (once plans are on) and Firebase Crashlytics' crash reports.
+
+### Paid plans: Essential and Plus (from 1.6.0, switched off)
+
+The terms are wall-ette.com's (`site/src/lib/plans.ts`); `scripts/check-plans.mjs` keeps the
+app's and the server's copies equal to them.
+
+| Part | What it does |
+|---|---|
+| `services/planRules.ts` | Pure rules shared by the screens and checks: prices, the free month, `accessOf` (open, plus, essential, none), what Plus opens, Essential's limits (`historyStart`: this month and the 11 before; `essentialAccount`: the account with the earliest statement), `editable`, `takesAccount`, `changeOf` (each change's Play replacement mode), code formats. |
+| `services/plan.ts` | `watchPlan(uid)` reads `config/app.plansLive`, `planTesters/{uid}` and follows `entitlements/{uid}`; `usePlan()`, `useLimits()`. Until the plan is read with plans on, nothing locks. Test builds: Self → About → Preview a plan. |
+| `services/billing.ts` | `@capgo/native-purchases` (Play Billing 9): offers, buying with the free month or a replacement (`oldPurchaseToken`, `replacementMode`), restore, Manage in Google Play. Every purchase goes to `verifyPlayPurchase`. Google Play's screens don't trigger the app lock (`utils/externalFlow.ts`). |
+| Screens | `PlansSheet` (monthly/yearly, Essential/Plus, the terms of the change), `PlanLock` and `PlanGate` (Recurring, Rewind, New entry and Import without a plan), `YourPlan` (Self → Your plan: status, invite code, codes, students, help), read-only entries in Vault and accounts in Bank accounts, Pulse's 12 months, the import's account and older-rows checks, bell notes (free month ending from day 25, a failed payment, a plan that won't renew; bills due and price rises only where Recurring is open). |
+| Server (`functions/src`) | `verifyPlayPurchase`, `refreshPlan`, `playNotifications` (Pub/Sub `play-billing`), `myInviteCode`, `redeemCode`, `studentEmailStart`/`studentEmailConfirm`/`studentReview`, `referralRewards` (daily 06:30 IST), `tidyStudentChecks` (daily 04:30 IST: unused student codes and their emails go after a day), `forgetPlan` (account deletion). Grants (`play`, `gift`, `student`, `reward`, `early`, `web`) are summed up into `entitlements/{uid}`: Plus over Essential, then the later end. |
+| Firestore | Owner-read only: `entitlements/{uid}` and `grants/`, `referrals/{uid}`, `planTesters/{uid}`. Server only: `codes`, `playTokens`, `studentChecks`, `studentEmails` (hashes), `studentRequests`, `mail`. Nothing about a plan is written from the app (`scripts/check-plan-rules.mjs`). |
+| Owner's tool | `scripts/plans-admin.mjs`: gift and institution codes, approving a student review, early-member grants, plan testers, a member's grants. |
+
 Statement files never leave the device.
 
-**Consent gate** — new registrations must accept Terms & Privacy (version `2026-06-11`);
+**Consent gate** — new registrations must accept Terms & Privacy (version `2026-11-28` from 1.6.0);
 acceptance is recorded with a server timestamp for auditability. Existing logins are unaffected.
 
 ---

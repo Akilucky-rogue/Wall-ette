@@ -33,7 +33,7 @@ import { PLAN_RULES as RULES2 } from "./plans";
 import { COMPANY as CO } from "./site";
 describe("operator and billing rules", () => {
   it("charges first on day 31", () => { expect(RULES2.firstChargeDay).toBe(31); });
-  it("charges the difference on mid-term cycle change", () => { expect(RULES2.midTermCycleChangeChargesDifference).toBe(true); });
+  it("charges the full yearly price on a cycle change up and adds the unused time", () => { expect(RULES2.cycleUpChargesFullPriceAddsUnusedTime).toBe(true); });
   it("names the developer as operator, backed by SERNET, and the support email", () => {
     expect(CO.legalName).toBe("Akshat Vora");
     expect(CO.endorsement).toBe("Backed by SERNET");
@@ -57,5 +57,6 @@ describe("plan terms shown before choosing", () => {
   it("says what each direction of a billing change does", () => {
     expect(SUBSCRIPTION_TERMS.cycleSwitch).toMatch(/Monthly to yearly starts straight away/);
     expect(SUBSCRIPTION_TERMS.cycleSwitch).toMatch(/Yearly to monthly starts when your paid year ends/);
+    expect(SUBSCRIPTION_TERMS.cycleSwitch).toMatch(/full yearly price that day/);
   });
 });

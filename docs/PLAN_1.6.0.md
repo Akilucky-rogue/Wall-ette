@@ -1,8 +1,10 @@
 # 1.6.0 plan: one release, then paid plans
 
 Agreed on 27 November 2026. 1.5.9 was never uploaded, so 1.6.0 carries it and
-everything below that can be built and tested now. Essential and Plus follow
-in the production release, after the 14-day closed test.
+everything below that can be built and tested now. Essential and Plus are
+built into 1.6.0 too, switched off (28 November 2026): testers try Google
+Play billing on the closed test, and the production release switches them
+on.
 
 ## Decisions
 
@@ -127,7 +129,7 @@ for Transfer Out or To review; payee fragments; the message for Play's update
 error -6; "Kept 0%"; comma and minus formatting. Website: the hydration
 error #418, and the privacy policy line about turning on two-step sign-in.
 
-## Paid plans: Essential and Plus (production release)
+## Paid plans: Essential and Plus (built in 1.6.0, on at production)
 
 As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
 
@@ -141,23 +143,43 @@ As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
   offer on each base plan (Play asks for a payment method too), so the
   server-granted free month in the earlier plan is dropped. A restart counts
   as month one; the free month is for new members only.
-- **Changes.** Upgrade any time; down to Essential only after the first
-  year; switching monthly and yearly mid-term charges the difference. After
-  moving down, extra accounts and older history become read-only, never
-  deleted. Export and deletion stay on every plan.
-- **What the website doesn't place** (defaults, 27 November 2026). Budgets,
-  the savings goal and Left to spend, with bills, are Essential, and their
-  settings move out of Flow. Plus has the Flow page, Rewind, the Recurring
-  page with bill reminders, more accounts and full history. Data Studio
-  reports and Pulse's Trends, Categories and Insights are in both.
-- **Billing.** The `premium-billing` branch (built 24 November for
-  Basic/Advanced) becomes two subscriptions, `essential` and `plus`, each
-  with monthly and yearly base plans and a 30-day free-trial offer for new
-  customers. Play never reuses a product ID, so the products are created only
-  once this is final, after the payments profile (account owner).
+- **Changes,** as Google Play makes them (`changeOf` in
+  `services/planRules.ts`). Essential to Plus on the same period: straight
+  away, the difference charged for the rest of it (`CHARGE_PRORATED_PRICE`).
+  Monthly to yearly, or up to Plus on another period: straight away at the
+  new plan's full price, the unused time added on (`CHARGE_FULL_PRICE`).
+  Down to Essential (after the first year) and yearly to monthly: at the
+  next renewal (`DEFERRED`). After moving down, extra accounts and older
+  history become read-only, never deleted. Export and deletion stay on
+  every plan, and with no plan.
+- **What the website doesn't place,** as built. Plus only: Flow's Story tab,
+  Rewind, the Recurring page with its bill reminders and price-rise notes,
+  more accounts, full history and priority support. Flow's Goals (budgets,
+  the savings goal), Left to spend with bills, Data Studio and Pulse's pages
+  are in both. Essential's limits: Pulse looks at this month and the 11
+  before; older entries and a second bank account's stay in Vault,
+  read-only (deleting always works); an import of another account's
+  statement is refused, older rows of the kept account are saved read-only;
+  New entry can't be dated before the 12 months. With no plan: everything
+  reads, exports and deletes; nothing is added, and payments from apps wait.
+- **Billing,** built (fd9df95 and the app commit): subscriptions `essential`
+  and `plus`, base plans `essential-monthly`, `essential-yearly`,
+  `plus-monthly`, `plus-yearly`, a `free-month` offer (30 days, new
+  customers) on each. Cloud Functions in asia-south1 check every purchase
+  with Google Play, follow its real-time notifications on the `play-billing`
+  topic and keep `entitlements/{uid}`, which only they write. Play never
+  reuses a product ID, so the products are created once, after the
+  payments profile, exactly as `PLAY_SUBMISSION.md` §5c lists.
+- **The switch.** `config/app.plansLive` (false in 1.6.0) turns plans on
+  for everyone; `planTesters/{uid}` turns them on for one tester first
+  (`scripts/plans-admin.mjs tester`). In test builds, Self → About →
+  Preview a plan shows each state without the server.
+- **Reminders.** From day 25 of the free month the bell says when it ends
+  and what Google Play then charges (Google Play emails too); also a payment
+  Play couldn't take, and a plan that won't renew.
 - **Web.** Checkout on wall-ette.com through the payment gateway; the Android
   app can't point people there.
-- **Spread** (on the website now; wired after payments). Referral: a month of
+- **Spread** (built in 1.6.0 with the plans, in Self → Your plan). Referral: a month of
   each person's own plan after the friend's first paid month, not stacked on
   the trial. Students 18+: Essential until the verified course end date,
   checked every 12 months, no card. Institution codes. Annual gifts at 5%
@@ -190,4 +212,8 @@ As on wall-ette.com (`site/src/lib/plans.ts`, `routes/pricing.tsx`):
 7. The 1.6.0 release (versionCode 18; one What's new entry): Data safety
    check, bundle; the Firestore rules deploy, web deploy and push on the
    owner's go.
-8. After the 14-day closed test: Essential and Plus, Spread, production.
+8. Asked on 28 Nov: the website's features in 1.6.0, switched off.
+   Essential and Plus, Spread, the plan screens and locks, Essential's
+   limits and the reminders are built; the server is ready to deploy.
+9. After the 14-day closed test, with testers' purchases tried: switch on
+   `plansLive` with the production release.

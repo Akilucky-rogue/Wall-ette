@@ -7,7 +7,8 @@ import { gardenBackground, placeGarden, type GardenColors, type Placed, type Rec
  * buttons, cards or header there) and scatters the eco motifs into it at
  * random, as the root's own background images: underneath everything, so
  * they never get in the way. A fresh arrangement each time the page opens;
- * when the page grows or loads more, the motifs still clear stay put.
+ * when the page grows, loads more or changes, the motifs still clear stay
+ * put and any now covered move.
  */
 const READS = new Set(['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT', 'IMG', 'svg', 'SVG', 'CANVAS', 'VIDEO', 'LABEL', 'H1', 'H2', 'H3', 'H4', 'P', 'LI', 'TABLE']);
 
@@ -95,12 +96,17 @@ export const Garden: React.FC = () => {
     frame = requestAnimationFrame(grow);
     const resized = new ResizeObserver(later);
     resized.observe(root);
+    // Content that changes without the page changing size (another tab of
+    // the same page, a list redrawn): motifs it now covers move.
+    const changed = new MutationObserver(later);
+    changed.observe(root, { childList: true, subtree: true });
     window.addEventListener('resize', later);
     window.addEventListener('wallette:theme', paint);
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(timer);
       resized.disconnect();
+      changed.disconnect();
       window.removeEventListener('resize', later);
       window.removeEventListener('wallette:theme', paint);
       root.style.backgroundImage = '';

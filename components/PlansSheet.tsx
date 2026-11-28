@@ -30,7 +30,7 @@ const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDat
 const today = () => new Date().toISOString().slice(0, 10);
 
 type Status =
-  | { kind: 'loading' } | { kind: 'ready' } | { kind: 'web' } | { kind: 'buying' } | { kind: 'restoring' }
+  | { kind: 'loading' } | { kind: 'ready' } | { kind: 'web' } | { kind: 'soon' } | { kind: 'buying' } | { kind: 'restoring' }
   | { kind: 'pending' } | { kind: 'done'; text: string } | { kind: 'error'; text: string };
 
 /**
@@ -41,13 +41,15 @@ type Status =
  */
 const PlansSheet: React.FC<{ reason: LockReason | null }> = ({ reason }) => {
   const uid = useAuth().user?.uid ?? null;
-  const { entitlement, preview } = usePlan();
+  const { entitlement, preview, live } = usePlan();
   const native = billingSupported();
+  // Paid plans not switched on yet (config/app.plansLive): show them, sell nothing.
+  const soon = !live && !preview;
   const current = entitlement?.plan && entitlement.cycle ? { plan: entitlement.plan, cycle: entitlement.cycle, memberSince: entitlement.memberSince } : null;
   const [cycle, setCycle] = useState<Cycle>(current?.cycle ?? 'yearly');
   const [choice, setChoice] = useState<PlanId>(reason && reason !== 'add' && reason !== 'import' && reason !== 'payments-paused' ? 'plus' : current?.plan ?? 'plus');
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [status, setStatus] = useState<Status>(preview ? { kind: 'ready' } : native ? { kind: 'loading' } : { kind: 'web' });
+  const [status, setStatus] = useState<Status>(preview ? { kind: 'ready' } : soon ? { kind: 'soon' } : native ? { kind: 'loading' } : { kind: 'web' });
 
   useBackHandler(true, closePlans);
   useEffect(() => {
@@ -57,13 +59,13 @@ const PlansSheet: React.FC<{ reason: LockReason | null }> = ({ reason }) => {
   }, []);
 
   useEffect(() => {
-    if (!native || preview) return;
+    if (!native || preview || soon) return;
     let gone = false;
     loadOffers()
       .then(found => { if (!gone) { setOffers(found); setStatus(found.length ? { kind: 'ready' } : { kind: 'error', text: 'Google Play has no Wall·ette plans for this phone yet.' }); } })
       .catch(() => { if (!gone) setStatus({ kind: 'error', text: "Couldn't load prices from Google Play. Check your connection and try again." }); });
     return () => { gone = true; };
-  }, [native, preview]);
+  }, [native, preview, soon]);
 
   const offer = offers.find(o => o.plan === choice && o.cycle === cycle);
   const price = (p: PlanId) => offers.find(o => o.plan === p && o.cycle === cycle)?.priceString ?? rupees(PRICES[p][cycle]);
@@ -195,7 +197,11 @@ const PlansSheet: React.FC<{ reason: LockReason | null }> = ({ reason }) => {
           })}
         </div>
 
-        {status.kind === 'web' ? (
+        {status.kind === 'soon' ? (
+          <p className="mt-4 text-[13px] text-premium-charcoal leading-relaxed bg-sage-light/60 rounded-2xl p-4">
+            Paid plans open soon. Until then everything is free, and we'll tell you before anything changes.
+          </p>
+        ) : status.kind === 'web' ? (
           <p className="mt-4 text-[13px] text-premium-charcoal leading-relaxed bg-sage-light/60 rounded-2xl p-4">
             Choose a plan in the Wall·ette Android app. Paying here on the web opens soon; your plan works in both once chosen.
           </p>
@@ -216,7 +222,7 @@ const PlansSheet: React.FC<{ reason: LockReason | null }> = ({ reason }) => {
         {status.kind === 'done' && <p role="status" className="mt-3 text-[13px] text-sage font-semibold text-center">{status.text}</p>}
         {status.kind === 'error' && <p role="alert" className="mt-3 text-[13px] text-rose bg-rose-light/40 rounded-2xl p-3 leading-relaxed">{status.text}</p>}
 
-        {native && !preview && (
+        {native && !preview && !soon && (
           <button onClick={() => { void restorePurchases(); }} disabled={busy} className="mt-3 w-full text-[13px] font-semibold text-sage py-2 disabled:opacity-50">
             {status.kind === 'restoring' ? 'Checking Google Play…' : 'Restore purchases'}
           </button>

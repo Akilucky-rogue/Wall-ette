@@ -457,7 +457,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
     ? `${plan.entitlement.plan === 'plus' ? 'Plus' : 'Essential'}${plan.entitlement.trial ? ', free month' : ''}`
     : 'Essential or Plus, invites, codes and students';
   const pages: { screen: AppScreen; title: string; icon: string; tint: string; preview: string }[] = [
-    ...(plan.live ? [{ screen: AppScreen.SELF_PLAN, title: 'Your plan', icon: 'workspace_premium', tint: 'bg-sand-light text-sand-ink', preview: planLabel }] : []),
+    // On the web and in the app, plans on or not (1.6.1): free for now until they start.
+    { screen: AppScreen.SELF_PLAN, title: 'Membership', icon: 'workspace_premium', tint: 'bg-sand-light text-sand-ink', preview: plan.live ? planLabel : 'Free while paid plans are set up' },
     {
       screen: AppScreen.SELF_ACCOUNT, title: PAGE_TITLE.account, icon: 'shield_person', tint: 'bg-sage-light text-sage',
       preview: isNative() && bioOn ? 'Biometric unlock is on' : 'Password, unlock and sign-in',

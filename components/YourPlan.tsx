@@ -5,7 +5,7 @@ import { AppScreen } from '../types';
 import { billingSupported, manageSubscription } from '../services/billing';
 import { usePlan } from '../services/plan';
 import { openPlans } from '../services/planSheet';
-import { looksLikeCode, PRICES, showCode, type Entitlement } from '../services/planRules';
+import { looksLikeCode, PRICES, showCode, TRIAL_DAYS, type Entitlement } from '../services/planRules';
 import { myInviteCode, redeemCode, studentEmailConfirm, studentEmailStart, studentReview } from '../services/spread';
 import { SPREAD_URL, SUPPORT_EMAIL } from '../utils/site';
 import { Card } from './ui/Paper';
@@ -51,13 +51,87 @@ const secondary = 'px-4 py-2 rounded-full bg-sage-light text-sage text-[13px] fo
 const Note: React.FC<{ text: string | null; bad?: boolean }> = ({ text, bad }) =>
   text ? <p role={bad ? 'alert' : 'status'} className={`mt-2 text-[12px] leading-relaxed ${bad ? 'text-rose' : 'text-sage'}`}>{text}</p> : null;
 
+const Header: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNavigate }) => (
+  <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+    <button
+      onClick={() => onNavigate(AppScreen.SELF)}
+      className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
+      aria-label="Back to Self"
+    >
+      <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
+    </button>
+    <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Membership</h2>
+  </div>
+);
+
+const mail = (subject: string, body: string) => {
+  window.open(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+};
+const BANK_REQUEST = 'Bank:\nStatement format (PDF or Excel):\nCan you share a sample statement with the numbers and names removed? (yes/no)\n';
+
+/** What opens with paid plans, said plainly while they're off. */
+const SOON = [
+  { icon: 'group_add', title: 'Invite a friend', text: 'Your own code. When a friend joins with it, you each get a month of your plan once their first paid month is done.' },
+  { icon: 'redeem', title: 'Codes', text: 'Gift and institution codes. Keep any code you\'re sent: it will still work.' },
+  { icon: 'school', title: 'Students', text: 'Essential at no cost until your course ends, for students aged 18 or older.' },
+] as const;
+
 /**
- * Self → Your plan, once paid plans are switched on (or previewed in a test
+ * Self → Membership while paid plans are off (the web app and the app alike):
+ * everything is free, what the plans will cost and when, what opens with
+ * them, and help, which works now.
+ */
+const MembershipSoon: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNavigate }) => (
+  <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <Header onNavigate={onNavigate} />
+    <div className="px-6 pt-2 space-y-4">
+      <Section icon="workspace_premium" title="Free for now">
+        <p className="text-[13px] text-muted-taupe leading-relaxed mt-0.5">
+          Every part of Wall·ette is open while paid plans are set up, and nothing asks for a card.
+          When they start, Essential is ₹{PRICES.essential.monthly} a month and Plus ₹{PRICES.plus.monthly}, and new members get
+          their first {TRIAL_DAYS} days at ₹0. We'll tell you before anything changes.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button onClick={() => openPlans()} className={primary}>See the plans</button>
+        </div>
+      </Section>
+
+      <Section icon="event_upcoming" title="Opens with paid plans">
+        <ul className="mt-2 space-y-3">
+          {SOON.map(item => (
+            <li key={item.title} className="flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-sage text-[18px] mt-0.5" aria-hidden="true">{item.icon}</span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-premium-charcoal">{item.title}</span>
+                <span className="block text-[12px] text-muted-taupe leading-relaxed">{item.text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section icon="support_agent" title="Help">
+        <p className="text-[13px] text-muted-taupe leading-relaxed mt-0.5">Questions, and banks you'd like Wall·ette to read.</p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button onClick={() => mail('Wall·ette question', '')} className={secondary}>Ask us</button>
+          <button onClick={() => mail('Bank request', BANK_REQUEST)} className={secondary}>Ask for your bank</button>
+        </div>
+      </Section>
+
+      <button onClick={() => onNavigate(AppScreen.EXPORT)} className="w-full text-[12px] text-muted-taupe py-2">
+        Export or back up your data: always open, on every plan
+      </button>
+    </div>
+  </div>
+);
+
+/**
+ * Self → Membership once paid plans are switched on (or previewed in a test
  * build): the plan and what can change it, the member's invite code,
  * redeeming a code, student access, and help, which Plus gets first.
  */
 const YourPlan: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNavigate }) => {
-  const { access, entitlement, preview } = usePlan();
+  const { access, entitlement, preview, live } = usePlan();
   const native = billingSupported();
   const plus = access === 'plus';
 
@@ -127,23 +201,13 @@ const YourPlan: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNav
     setStudentNote({ text: "Asked. We'll check and reply by email, usually within a few days." });
   };
 
-  const mail = (subject: string, body: string) => {
-    window.open(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-  };
   const tag = plus ? '[Plus · priority] ' : '';
+
+  if (!live && !preview) return <MembershipSoon onNavigate={onNavigate} />;
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
-      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
-        <button
-          onClick={() => onNavigate(AppScreen.SELF)}
-          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
-          aria-label="Back to Self"
-        >
-          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">arrow_back</span>
-        </button>
-        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight">Your plan</h2>
-      </div>
+      <Header onNavigate={onNavigate} />
 
       <div className="px-6 pt-2 space-y-4">
         {preview && (
@@ -258,7 +322,7 @@ const YourPlan: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNav
           <div className="flex flex-wrap gap-2 mt-3">
             <button onClick={() => mail(`${tag}Wall·ette question`, '')} className={secondary}>Ask us</button>
             <button
-              onClick={() => mail(`${tag}Bank request`, 'Bank:\nStatement format (PDF or Excel):\nCan you share a sample statement with the numbers and names removed? (yes/no)\n')}
+              onClick={() => mail(`${tag}Bank request`, BANK_REQUEST)}
               className={secondary}
             >
               Ask for your bank

@@ -7,7 +7,7 @@ import { Mascot } from './ui/Brand';
  * signing out, which clears this device's copy. A returning user never sees
  * an empty wallet, or "Start your wallet", in the meantime.
  */
-const WalletArriving: React.FC<{ isOnline: boolean; className?: string }> = ({ isOnline, className = '' }) => {
+const WalletArriving: React.FC<{ isOnline: boolean; className?: string; onRetry?: () => void }> = ({ isOnline, className = '', onRetry }) => {
   // After a while, say why it can take longer.
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -27,6 +27,11 @@ const WalletArriving: React.FC<{ isOnline: boolean; className?: string }> = ({ i
             : 'Bringing your entries from your account to this device. Next time, it opens straight away.'}
       </p>
       {isOnline && <div className="mt-5 h-6 w-6 rounded-full border-[3px] border-sage/20 border-t-sage animate-spin" aria-hidden="true" />}
+      {isOnline && slow && onRetry && (
+        <button onClick={onRetry} className="mt-4 text-[13px] font-semibold text-sage hover:underline underline-offset-2">
+          Try again
+        </button>
+      )}
     </div>
   );
 };

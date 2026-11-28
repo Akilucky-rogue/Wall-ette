@@ -322,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {arriving ? (
         <section className="px-5 pt-3 pb-2 lg:px-0 lg:col-span-7" aria-label="Your wallet">
           <div className="bg-white rounded-[30px] px-6 py-8 shadow-raised border border-black/[0.02]">
-            <WalletArriving isOnline={isOnline} />
+            <WalletArriving isOnline={isOnline} onRetry={refresh} />
           </div>
         </section>
       ) : isNewWallet ? startPanel : (

@@ -98,9 +98,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   });
   // What the big figure is: the balance the entries add up to (opening
   // balance included), now, or at the end of an earlier month picked below.
-  const balanceLabel = periodMode === 'ALL' || showingThisMonth
-    ? 'Balance from your entries'
-    : `Balance on ${dayText(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0))}`;
+  // With no entries at all, the figure is only the opening balance (a
+  // statement's, kept after its entries went, or a restored one): say so,
+  // rather than call it a balance "from your entries" (1.6.1).
+  const balanceLabel = transactions.length === 0 && openingBalance !== 0
+    ? 'Opening balance'
+    : periodMode === 'ALL' || showingThisMonth
+      ? 'Balance from your entries'
+      : `Balance on ${dayText(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0))}`;
   // How far the entries reach: the wallet holds what was imported or added,
   // it isn't a live bank feed.
   const dataThrough = useMemo(() => {
@@ -264,6 +269,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <p className="text-[13px] text-muted-taupe leading-relaxed mt-2 max-w-[52ch]">
           Import a bank statement to bring in months of entries at once, or add one by hand. Statements are processed on this device and checked against the bank's balance before anything is saved.
         </p>
+        {openingBalance !== 0 && (
+          <p className="text-[13px] text-premium-charcoal leading-relaxed mt-3 bg-sage-light/50 rounded-2xl px-4 py-3">
+            The {formatWhole(openingBalance)} above is an opening balance: there are no entries yet. Entries you import or add start from it.{' '}
+            <button onClick={() => onNavigate(AppScreen.BANK_ACCOUNTS)} className="font-semibold text-sage hover:underline underline-offset-2">
+              See which account it's from
+            </button>
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row gap-2.5 mt-5">
           <button
             onClick={() => onNavigate(AppScreen.IMPORT)}

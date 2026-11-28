@@ -50,11 +50,21 @@ h1, h2, h3, h4, h5, h6 {
 	@apply font-display;
 }
 
-/* The wordmark (components/ui/Brand.tsx): dark ink on light themes, its
-   cream copy on dark ones. */
-.wordmark-dark { display: none; }
-[data-theme-dark="1"] .wordmark-light { display: none; }
-[data-theme-dark="1"] .wordmark-dark { display: block; }
+/* The wordmark (components/ui/Brand.tsx), inline vector: dark ink on light
+   themes, cream on dark ones, where the dot is a lighter sage too. */
+.wordmark { color: #282D20; }
+.wordmark svg { display: block; width: 100%; height: 100%; }
+[data-theme-dark="1"] .wordmark { color: #F2EFE7; }
+[data-theme-dark="1"] .wordmark .wm-dot { fill: #A2B57A; }
+
+/* Buttons and icons are things to tap, not text: no selection on a long
+   press, and no text cursor in them (Chrome's caret browsing, F7, would
+   otherwise put a blinking cursor in a button's label or icon). */
+button, [role="button"], [role="tab"], [role="radio"], .material-symbols-outlined {
+  -webkit-user-select: none;
+  user-select: none;
+  caret-color: transparent;
+}
 
 /* Google's sign-in button (components/ui/GoogleButton.tsx), in the colours
    Google's branding guidelines give for light and dark surfaces. */

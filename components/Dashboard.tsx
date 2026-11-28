@@ -294,7 +294,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         {/* Left: Logo and Name */}
         <div className="flex items-center gap-3 min-w-0">
           <BrandIcon size={36} />
-          <Wordmark height={22} />
+          <Wordmark height={17} />
         </div>
         {/* Right: currency and the notification bell */}
         <div className="relative flex items-center ml-auto min-w-0 gap-2">

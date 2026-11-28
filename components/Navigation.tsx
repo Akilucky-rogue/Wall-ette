@@ -82,7 +82,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate, show
         </div>
         <button onClick={() => go(AppScreen.DASHBOARD)} className="flex items-center gap-2.5 px-2.5 mb-7" aria-label="Wall·ette, Home">
           <BrandIcon size={34} />
-          <Wordmark height={20} />
+          <Wordmark height={17} />
         </button>
 
         <ul className="space-y-1">

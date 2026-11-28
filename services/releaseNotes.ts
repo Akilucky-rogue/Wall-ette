@@ -25,7 +25,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       'Wall·ette Wrapped plays as a story of your year, and ends on a card to share. Amounts stay off it unless you add them.',
       'Adding an entry fits on one screen.',
       'Self → Membership shows what is free now and what the plans will be, on the web too.',
-      'A sharper logo and mascot everywhere.',
+      'A sharper logo, and the mascot redrawn with clean, even lines.',
       "Signing out warns you if some changes didn't save.",
       'Cashback says which app paid it, and coffee shops go under Coffee.',
     ],

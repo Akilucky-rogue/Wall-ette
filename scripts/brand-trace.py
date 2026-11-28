@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Wall·ette's wordmark and mascot poses as vectors, traced from the approved
-artwork, so they stay sharp at any size (as scripts/brand-icons.mjs does for
-the icon).
+Wall·ette's wordmark as a vector, traced from the approved artwork, so it
+stays sharp at any size (as scripts/brand-icons.mjs does for the icon).
 
 - Wordmark: assets/brand/wordmark.webp (the brand kit's logo, 933 x 176) is
   traced with potrace at 4x. The letters use currentColor, so the app's light
   and dark themes colour them; the dot is a true circle in brand sage (class
   wm-dot, which dark themes lighten).
-- Mascot poses: assets/brand/mascot-*.webp (cut out from the identity board)
-  are enlarged 6x, smoothed, snapped to each pose's own palette and traced in
-  colour with vtracer, so edges come out smooth rather than stepped.
+- The mascot poses are no longer traced: scripts/mascot/build.py draws them
+  as clean vector art. --pose still traces one from its artwork (enlarged 6x,
+  smoothed, snapped to its palette, traced with vtracer) for comparison.
+- With --site, the website's larger scenes are traced the same way to
+  site/public/img/mascot-<scene>.svg.
 
-Writes assets/brand/wordmark.svg and assets/brand/mascot-<pose>.svg; with
---site, the website's scenes as site/public/img/mascot-<scene>.svg.
+Writes assets/brand/wordmark.svg.
 
 Needs: pip install pillow numpy potracer vtracer
-Usage: python3 scripts/brand-trace.py [pose ...]
+Usage: python3 scripts/brand-trace.py
+       python3 scripts/brand-trace.py --pose <pose> <out.svg>
        python3 scripts/brand-trace.py --site [scene ...]
 """
 import io
@@ -202,7 +203,7 @@ if __name__ == '__main__':
         for scene in args[1:] or SITE_SCENES:
             mascot(scene, k=14, up=4, src_path=os.path.join(SITE_IMG, f'mascot-{scene}.webp'),
                    out_path=os.path.join(SITE_IMG, f'mascot-{scene}.svg'))
+    elif args[:1] == ['--pose'] and len(args) == 3:
+        mascot(args[1], out_path=args[2])
     else:
         wordmark()
-        for pose in args or ['welcome', 'think', 'encourage', 'celebrate', 'review']:
-            mascot(pose)

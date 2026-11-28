@@ -11,6 +11,7 @@ import { analyzeIncome, byLabel, flowColumn, StreamBadge, prettyMerchant } from 
 import { Mascot } from './ui/Brand';
 import BalanceTrend from './BalanceTrend';
 import { tick } from '../utils/haptics';
+import Garden from './ui/Garden';
 
 // Categories Flow doesn't offer a budget for (services/review.ts TO_REVIEW).
 const NOT_BUDGETED = new Set(['Transfer Out', 'Transfer In', 'To review', 'Adjustment', 'Investment']);
@@ -258,7 +259,8 @@ const IncomeInsights: React.FC<IncomeInsightsProps> = ({ onNavigate }) => {
   const hasData = transactions.length > 0;
 
   return (
-    <div className="eco-frame relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button

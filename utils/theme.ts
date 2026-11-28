@@ -4,7 +4,6 @@
 // utility classes (bg-white, text-sage, …) follow the active theme, and
 // inline SVG/chart colors read the `--*` hex aliases directly.
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
-import { ecoFrameImages } from './ecoFrame';
 
 export type ThemeId = 'sage' | 'midnight' | 'teal' | 'terra' | 'slate' | 'techie' | 'custom';
 export type ThemeMode = ThemeId | 'auto';
@@ -231,11 +230,10 @@ function applyPalette(palette: Palette, dark: boolean) {
   };
   for (const [name, value] of Object.entries(depth)) root.style.setProperty(`--${name}`, value);
 
-  // The garden frame on every page (styles.css .eco-frame), in this theme's colours.
-  root.style.setProperty('--eco-frame', ecoFrameImages({ leaf: palette['sage-3'], lotus: palette['rose-2'], flame: palette['gold-2'] }));
-
   root.setAttribute('data-theme-dark', dark ? '1' : '0');
   root.style.colorScheme = dark ? 'dark' : 'light';
+  // The page gardens repaint in the new colours (components/ui/Garden.tsx).
+  window.dispatchEvent(new Event('wallette:theme'));
 
   // Browser chrome (web) — theme-color meta.
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;

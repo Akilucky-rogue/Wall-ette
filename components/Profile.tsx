@@ -40,6 +40,7 @@ import { askPhonePermission, clearPhoneNotes, phonePermission } from '../service
 import { hapticsOn, setHapticsOn, tick } from '../utils/haptics';
 import { readerSupported } from '../services/paymentAlertsBridge';
 import { getInbox, subscribeInbox } from '../services/paymentInbox';
+import Garden from './ui/Garden';
 
 /** Self is a hub (who you are, and links) and a page for each group of settings. */
 export type SelfPage = 'hub' | 'account' | 'alerts' | 'data' | 'appearance' | 'about';
@@ -490,7 +491,8 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   useBackHandler(outWarn, () => setOutWarn(false));
 
   return (
-    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       {/* Header: Self, or the page's title with a way back */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         {page !== 'hub' && (

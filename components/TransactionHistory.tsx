@@ -19,6 +19,7 @@ import { openPlans } from '../services/planSheet';
 import { takeVaultAccount } from '../utils/vaultAccount';
 import { moneyInPayer, viaName } from '../services/paymentAlerts';
 import { bankReference } from '../services/statementImport';
+import Garden from './ui/Garden';
 
 /**
  * A name for money in from a payment app that the app saved without one
@@ -404,7 +405,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
+      <Garden />
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
         <div className="flex items-center justify-between mb-5 -mt-0.5">

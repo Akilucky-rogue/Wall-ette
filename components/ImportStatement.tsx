@@ -18,6 +18,7 @@ import { capturedRows, carryOver, isCaptured } from '../services/captured';
 import { useLimits } from '../services/plan';
 import { takesAccount } from '../services/planRules';
 import PlanLock from './PlanLock';
+import Garden from './ui/Garden';
 
 // Pagination settings
 const ITEMS_PER_PAGE = 20;
@@ -709,7 +710,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+      <Garden />
       {/* Eco & Indian decorative elements */}
 
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">

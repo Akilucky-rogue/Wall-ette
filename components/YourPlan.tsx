@@ -9,6 +9,7 @@ import { looksLikeCode, PRICES, showCode, TRIAL_DAYS, type Entitlement } from '.
 import { myInviteCode, redeemCode, studentEmailConfirm, studentEmailStart, studentReview } from '../services/spread';
 import { SPREAD_URL, SUPPORT_EMAIL } from '../utils/site';
 import { Card } from './ui/Paper';
+import Garden from './ui/Garden';
 
 const NAME = { essential: 'Essential', plus: 'Plus' } as const;
 const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null);
@@ -82,7 +83,8 @@ const SOON = [
  * them, and help, which works now.
  */
 const MembershipSoon: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNavigate }) => (
-  <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+  <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <Garden />
     <Header onNavigate={onNavigate} />
     <div className="px-6 pt-2 space-y-4">
       <Section icon="workspace_premium" title="Free for now">
@@ -206,7 +208,8 @@ const YourPlan: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNav
   if (!live && !preview) return <MembershipSoon onNavigate={onNavigate} />;
 
   return (
-    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       <Header onNavigate={onNavigate} />
 
       <div className="px-6 pt-2 space-y-4">

@@ -56,7 +56,7 @@ const phone = {
     { x: 20, y: 680, w: 350, h: 420 },    // a card
   ],
 };
-const MARGIN = 8, SPACING = 48, VISIBLE = 0.55;
+const MARGIN = 8, SPACING = 30, VISIBLE = 0.5;
 const hiddenShare = p => phone.surfaces.reduce((sum, c) =>
   sum + Math.max(0, Math.min(p.x + p.w, c.x + c.w) - Math.max(p.x, c.x)) * Math.max(0, Math.min(p.y + p.h, c.y + c.h) - Math.max(p.y, c.y)), 0) / (p.w * p.h);
 
@@ -78,7 +78,7 @@ for (let seed = 1; seed <= 300; seed++) {
 eq('300 gardens: none on text or controls, none touching, none outside, none mostly hidden', bad, { onContent: 0, touching: 0, outside: 0, mostlyHidden: 0 });
 eq('some motifs tuck behind a card, as leaves would', tucked > 0, true);
 eq('a roomy page gets its full count (300 gardens)', short, 0);
-eq('the count grows with the page, 3 to 16', [G.gardenSize(390, 300), G.gardenSize(390, 1500), G.gardenSize(1280, 2400)], [3, 7, 16]);
+eq('the count grows with the page, 6 to 30', [G.gardenSize(390, 300), G.gardenSize(390, 1500), G.gardenSize(1280, 2400)], [6, 20, 30]);
 
 const full = { width: 390, height: 800, obstacles: [{ x: 0, y: 0, w: 390, h: 800 }] };
 const cards = { width: 390, height: 800, obstacles: [], surfaces: [{ x: 0, y: 0, w: 390, h: 800 }] };

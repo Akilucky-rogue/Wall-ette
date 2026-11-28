@@ -116,6 +116,19 @@ button.shadow-raised:active, .press:active {
 	font-variation-settings: 'FILL' 1, 'wght' 200, 'GRAD' 0, 'opsz' 24;
 }
 
+/* A page's height: the screen less the status and navigation bars, which
+   body already pads for (index.html). min-h-screen made every page that
+   much taller than the screen, so short pages scrolled and the Add page's
+   Save button sat below the fold (1.6.1). dvh follows the keyboard. */
+.min-h-page {
+	min-height: calc(100vh - var(--sat, 0px) - var(--sab, 0px));
+	min-height: calc(100dvh - var(--sat, 0px) - var(--sab, 0px));
+}
+.h-page {
+	height: calc(100vh - var(--sat, 0px) - var(--sab, 0px));
+	height: calc(100dvh - var(--sat, 0px) - var(--sab, 0px));
+}
+
 /* The wallet: Home's balance, a stitched card in the theme's colour. Every
    screen opens with one for its key figure (components/ui/Denim.tsx); the
    rest is lit paper. Kept minimal on purpose: a fine weave and one soft

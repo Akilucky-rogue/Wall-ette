@@ -26,7 +26,7 @@ export interface Placed extends Rect {
 export interface GardenColors { leaf: string; lotus: string; sand: string }
 
 const SIZE: Record<Motif, [number, number]> = {
-  leaf: [16, 20], sprout: [16, 20], lotus: [24, 17], mandala: [28, 28], paisley: [18, 24], rangoli: [34, 34],
+  leaf: [20, 25], sprout: [20, 25], lotus: [30, 21], mandala: [32, 32], paisley: [22, 29], rangoli: [38, 38],
 };
 // How often each turns up: mostly leaves, now and then something else.
 const WEIGHTS: [Motif, number][] = [['leaf', 34], ['sprout', 14], ['lotus', 16], ['mandala', 12], ['paisley', 10], ['rangoli', 14]];
@@ -58,21 +58,21 @@ function pick(rand: Rand): Motif {
 function styleOf(motif: Motif, rand: Rand): Pick<Placed, 'rotate' | 'flip' | 'opacity'> {
   const flip = rand() < 0.5;
   switch (motif) {
-    case 'leaf': return { rotate: between(rand, -55, 55), flip, opacity: between(rand, 0.3, 0.45) };
-    case 'sprout': return { rotate: between(rand, -12, 12), flip, opacity: between(rand, 0.3, 0.45) };
-    case 'lotus': return { rotate: between(rand, -8, 8), flip: false, opacity: between(rand, 0.3, 0.42) };
-    case 'mandala': return { rotate: 0, flip: false, opacity: between(rand, 0.2, 0.3) };
-    case 'paisley': return { rotate: between(rand, -40, 40), flip, opacity: between(rand, 0.28, 0.4) };
-    case 'rangoli': return { rotate: Math.floor(rand() * 4) * 90, flip, opacity: between(rand, 0.28, 0.4) };
+    case 'leaf': return { rotate: between(rand, -55, 55), flip, opacity: between(rand, 0.55, 0.8) };
+    case 'sprout': return { rotate: between(rand, -12, 12), flip, opacity: between(rand, 0.55, 0.8) };
+    case 'lotus': return { rotate: between(rand, -8, 8), flip: false, opacity: between(rand, 0.55, 0.75) };
+    case 'mandala': return { rotate: 0, flip: false, opacity: between(rand, 0.4, 0.55) };
+    case 'paisley': return { rotate: between(rand, -40, 40), flip, opacity: between(rand, 0.5, 0.7) };
+    case 'rangoli': return { rotate: Math.floor(rand() * 4) * 90, flip, opacity: between(rand, 0.5, 0.7) };
   }
 }
 
 const overlaps = (a: Rect, b: Rect, gap = 0) =>
   a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 
-/** How many motifs a page of this size gets: about one per 90,000 px², 3 to 16. */
+/** How many motifs a page of this size gets: about one per 30,000 px², 6 to 30. */
 export const gardenSize = (width: number, height: number): number =>
-  Math.max(3, Math.min(16, Math.round((width * height) / 90_000)));
+  Math.max(6, Math.min(30, Math.round((width * height) / 30_000)));
 
 const overlapArea = (a: Rect, b: Rect) =>
   Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
@@ -102,8 +102,8 @@ export function placeGarden(opts: {
   const surfaces = opts.surfaces ?? [];
   const rand = opts.rand ?? Math.random;
   const margin = opts.margin ?? 8;
-  const spacing = opts.spacing ?? 48;
-  const visible = opts.visible ?? 0.55;
+  const spacing = opts.spacing ?? 30;
+  const visible = opts.visible ?? 0.5;
   const count = opts.count ?? gardenSize(width, height);
   const blocked = obstacles.map(o => ({ x: o.x - margin, y: o.y - margin, w: o.w + 2 * margin, h: o.h + 2 * margin }));
   const inside = (r: Rect) => r.x >= 2 && r.y >= 2 && r.x + r.w <= width - 2 && r.y + r.h <= height - 2;
@@ -127,7 +127,7 @@ export function placeGarden(opts: {
   const candidate = (w: number, h: number, band: number | null): Rect => {
     const edge = rand() < 0.65;
     const x = edge
-      ? (rand() < 0.5 ? between(rand, 2, 30) : between(rand, width - w - 30, width - w - 2))
+      ? (rand() < 0.5 ? between(rand, 2, 36) : between(rand, width - w - 36, width - w - 2))
       : between(rand, 2, width - w - 2);
     const y = band === null ? between(rand, 2, height - h - 2) : between(rand, band * bandH, (band + 1) * bandH - h);
     return { x: Math.round(Math.max(2, Math.min(width - w - 2, x))), y: Math.round(Math.max(2, Math.min(height - h - 2, y))), w, h };

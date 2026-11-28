@@ -83,7 +83,7 @@ const SOON = [
  * them, and help, which works now.
  */
 const MembershipSoon: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNavigate }) => (
-  <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+  <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
     <Garden />
     <Header onNavigate={onNavigate} />
     <div className="px-6 pt-2 space-y-4">
@@ -208,7 +208,7 @@ const YourPlan: React.FC<{ onNavigate: (screen: AppScreen) => void }> = ({ onNav
   if (!live && !preview) return <MembershipSoon onNavigate={onNavigate} />;
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <Garden />
       <Header onNavigate={onNavigate} />
 

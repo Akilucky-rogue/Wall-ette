@@ -225,7 +225,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   );
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
       {/* The splash's garden (components/ui/Decor.tsx) */}
       <SplashGarden />
 

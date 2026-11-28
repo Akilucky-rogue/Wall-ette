@@ -198,7 +198,7 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <Garden />
       {/* Eco & Indian decorative elements */}
 

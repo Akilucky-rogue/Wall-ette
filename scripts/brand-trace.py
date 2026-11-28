@@ -138,27 +138,42 @@ def palette(px, k):
     return pal
 
 
-def mascot(pose, k=12, up=6, blur=0.6, length=36.0, speckle=40, src_path=None, out_path=None):
-    """Enlarged, smoothed and snapped to the pose's own palette, then traced:
-    smooth edges and few, large shapes. Coordinates go back to the source's
-    units, one decimal."""
+def mascot(pose, k=12, up=6, sigma=1.6, asigma=1.8, length=40.0, speckle=60, src_path=None, out_path=None):
+    """Enlarged and snapped to the pose's own palette, then every region's
+    edge smoothed at once before tracing (1.6.1): each colour's mask is
+    blurred by `sigma` source pixels and every pixel goes to the strongest,
+    so the staircase of the small source becomes smooth curves (the
+    outlines read clean at any size); `asigma` smooths the silhouette the
+    same way. Details under about a pixel and a half go. Coordinates go back
+    to the source's units, one decimal."""
     src = Image.open(src_path or os.path.join(BRAND, f'mascot-{pose}.webp')).convert('RGBA')
     a0 = np.asarray(src).astype(np.float32)
     pal = palette(a0[a0[..., 3] > 200][:, :3], k)
-    big = src.resize((src.size[0] * up, src.size[1] * up), Image.BICUBIC).filter(ImageFilter.GaussianBlur(up * blur))
-    b = np.asarray(big).astype(np.float32)
-    flat = b[..., :3].reshape(-1, 3)
-    lab = np.empty(flat.shape[0], dtype=np.int32)
-    for i in range(0, flat.shape[0], 300000):
-        lab[i:i + 300000] = ((flat[i:i + 300000, None, :] - pal[None]) ** 2).sum(-1).argmin(1)
-    q = pal[lab].reshape(b.shape[0], b.shape[1], 3).astype(np.uint8)
-    img = Image.fromarray(np.dstack([q, np.where(b[..., 3] > 160, 255, 0).astype(np.uint8)]), 'RGBA')
+    big = src.resize((src.size[0] * up, src.size[1] * up), Image.LANCZOS)
+    b = np.asarray(big.convert('RGB').filter(ImageFilter.GaussianBlur(up * 0.35))).astype(np.float32)
+    hgt, wid = b.shape[:2]
+    flat = b.reshape(-1, 3)
+    lab = np.empty(flat.shape[0], dtype=np.uint8)
+    for i in range(0, flat.shape[0], 400000):
+        lab[i:i + 400000] = ((flat[i:i + 400000, None, :] - pal[None]) ** 2).sum(-1).argmin(1)
+    lab = lab.reshape(hgt, wid)
+    best = np.zeros((hgt, wid), np.float32)
+    voted = np.zeros((hgt, wid), np.uint8)
+    for j in range(len(pal)):
+        m = Image.fromarray(((lab == j) * 255).astype(np.uint8), 'L').filter(ImageFilter.GaussianBlur(up * sigma))
+        v = np.asarray(m).astype(np.float32)
+        sel = v > best
+        best[sel] = v[sel]
+        voted[sel] = j
+    alpha = np.asarray(big.getchannel('A').filter(ImageFilter.GaussianBlur(up * asigma))) > 128
+    q = pal[voted].astype(np.uint8)
+    img = Image.fromarray(np.dstack([q, (alpha * 255).astype(np.uint8)]), 'RGBA')
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     svg = vtracer.convert_raw_image_to_svg(
         buf.getvalue(), img_format='png', colormode='color', hierarchical='stacked', mode='spline',
-        filter_speckle=speckle, color_precision=8, layer_difference=1, corner_threshold=90,
-        length_threshold=length, max_iterations=10, splice_threshold=60, path_precision=0,
+        filter_speckle=speckle, color_precision=8, layer_difference=1, corner_threshold=100,
+        length_threshold=length, max_iterations=10, splice_threshold=50, path_precision=0,
     )
     num = lambda m: f'{float(m.group(0)) / up:.1f}'.rstrip('0').rstrip('.')
     fix = lambda m: m.group(1) + re.sub(r'-?\d+(?:\.\d+)?', num, m.group(2)) + m.group(3)

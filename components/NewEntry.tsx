@@ -198,7 +198,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   // categories scroll sideways, and payee, category, date and note share a
   // card, so the keypad and Save stay in view without scrolling.
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
+    <div className="relative flex h-page w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
       <Garden />
 
       {/* Header, with Expense or Income */}
@@ -366,7 +366,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
       </div>
 
       {/* Keypad + save */}
-      <div className="bg-white/80 backdrop-blur-xl border-t border-black/[0.05] rounded-t-[32px] px-6 pt-3 pb-[calc(0.75rem+var(--sab))] shadow-soft">
+      <div className="bg-white/80 backdrop-blur-xl border-t border-black/[0.05] rounded-t-[32px] px-6 pt-3 pb-3 shadow-soft">
         <div className="grid grid-cols-3 gap-x-4">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
             <button key={num} onClick={() => handleKeypad(num.toString())} className="py-2 flex items-center justify-center text-[22px] font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">

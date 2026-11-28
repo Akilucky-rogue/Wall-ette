@@ -185,7 +185,7 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   };
 
   return (
-    <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
+    <div className="relative flex h-page w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
       {/* The splash's garden (components/ui/Decor.tsx) */}
       <SplashGarden />
 

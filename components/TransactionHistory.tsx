@@ -405,7 +405,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
       <Garden />
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">

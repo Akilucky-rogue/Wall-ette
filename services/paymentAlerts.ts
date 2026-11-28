@@ -495,10 +495,27 @@ export function paymentNarration(p: Pick<AppPayment, 'app' | 'rail' | 'reference
   return [word, reference, payee].filter(Boolean).join('/');
 }
 
+const KIND_WORD = { refund: 'refund', cashback: 'cashback', interest: 'interest' } as const;
+
+/**
+ * Who paid money in that isn't from a person when the text names no one: the
+ * app or bank it came through ("Google Pay cashback", "HDFC Bank interest"),
+ * or the kind alone for shared text ("Cashback"). Vault shows it in place of
+ * "Unknown payee".
+ */
+export function moneyInPayer(p: Pick<AppPayment, 'app' | 'kind' | 'payee'>): string | undefined {
+  if (!p.kind || p.payee) return undefined;
+  const word = KIND_WORD[p.kind];
+  const app = BY_ID.get(p.app);
+  if (!app) return word[0].toUpperCase() + word.slice(1);
+  return `${p.kind === 'interest' && app.bank ? app.bank : app.name} ${word}`;
+}
+
 /** The entry a payment becomes. */
 export function paymentEntry(p: AppPayment, id: string): Transaction {
   const type = p.direction === 'debit' ? TransactionType.EXPENSE : TransactionType.INCOME;
-  const merchant = paymentNarration(p);
+  const payer = moneyInPayer(p);
+  const merchant = paymentNarration(payer ? { ...p, payee: payer } : p);
   const category = p.kind === 'refund' ? 'Refunds' : p.kind === 'cashback' ? 'Bonus' : p.kind === 'interest' ? 'Interest Income'
     : categorizeNarration(merchant ?? '', p.direction === 'debit' ? 'expense' : 'income');
   const entry: Transaction = {

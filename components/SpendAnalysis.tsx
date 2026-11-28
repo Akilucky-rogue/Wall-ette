@@ -19,6 +19,7 @@ import PlanLock from './PlanLock';
 import { useLimits } from '../services/plan';
 import { opens } from '../services/planRules';
 import { openPlans } from '../services/planSheet';
+import Garden from './ui/Garden';
 
 /** Pulse is a hub (the month at a glance) with a page for each topic. */
 export type PulsePage = 'hub' | 'trends' | 'categories' | 'recurring' | 'health';
@@ -116,7 +117,8 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
   );
 
   const shell = (body: React.ReactNode) => (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-6xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex h-auto min-h-page w-full flex-col max-w-[430px] lg:max-w-6xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       <PageHeader
         title={PAGE_TITLE[page]}
         onBack={page === 'hub' ? undefined : () => onNavigate(AppScreen.ANALYSIS)}

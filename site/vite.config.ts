@@ -13,6 +13,10 @@ import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   server: { port: 5310, strictPort: true },
+  // The site's CSS is Tailwind 4, built by its Vite plugin below; it needs no
+  // PostCSS. Left to search, Vite can find the app's PostCSS config one folder
+  // up (Tailwind 3), which rejects this CSS: it does on Windows.
+  css: { postcss: { plugins: [] } },
   resolve: { dedupe: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-query"] },
   plugins: [
     tsConfigPaths({ projects: ["./tsconfig.json"] }),

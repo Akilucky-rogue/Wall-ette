@@ -609,12 +609,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     // From 1.6.0: one document per month.
+    // Listeners hear metadata changes too: an empty wallet read from this
+    // device's cache only counts as arrived once the cloud confirms it, and
+    // that confirmation changes nothing but the metadata (fromCache). Without
+    // it, a wallet emptied by Clear All showed "Getting your wallet" for good
+    // (1.6.1). Snapshots that change only metadata are not read again.
+    let read = false;
+    const onlyMetadata = (snapshot: { docChanges: () => unknown[] }) => {
+        if (!read) { read = true; return false; }
+        return snapshot.docChanges().length === 0;
+    };
+
     const listenMonths = () => {
         storageRef.current = 'months';
-        unsubscribe = onSnapshot(monthsCollection(db, uid), (snapshot) => {
+        unsubscribe = onSnapshot(monthsCollection(db, uid), { includeMetadataChanges: true }, (snapshot) => {
             markArrived(snapshot.size, snapshot.metadata.fromCache);
             // Ignore echoes while Clear All is deleting.
             if (clearingRef.current) return;
+            if (onlyMetadata(snapshot)) return;
             const { entries, layout } = readMonths(snapshot.docs
                 .filter(d => MONTH_DOC_ID.test(d.id))
                 .map(d => ({ id: d.id, entries: d.get('entries') })));
@@ -630,11 +642,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         storageRef.current = 'legacy';
         // Sorted by date descending in the database
         const q = query(collection(db, `users/${uid}/transactions`), orderBy('date', 'desc'));
-        unsubscribe = onSnapshot(q, (snapshot) => {
+        unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
             markArrived(snapshot.size, snapshot.metadata.fromCache);
             // Ignore echoes while Clear All is deleting in batches — otherwise
             // half-deleted snapshots repopulate the UI mid-clear.
             if (clearingRef.current) return;
+            if (onlyMetadata(snapshot)) return;
             const txData: Transaction[] = [];
             const timestamped: { ref: DocumentReference; t: Transaction }[] = [];
             snapshot.forEach((d) => {

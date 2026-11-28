@@ -5,6 +5,7 @@ import { prettyMerchant } from '../services/analyticsService';
 import { addDays, localDay, parseDay } from '../utils/dates';
 import { openAt } from '../utils/screenSection';
 import { shortDay, UsageBar, useLeftToSpend } from './LeftToSpendCard';
+import Garden from './ui/Garden';
 
 const dueLabel = (day: string) => {
   const today = localDay();
@@ -26,7 +27,8 @@ const LeftToSpendPage: React.FC<LeftToSpendProps> = ({ onNavigate }) => {
   const goals = () => { openAt('goals'); onNavigate(AppScreen.INCOME_INSIGHTS); };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}

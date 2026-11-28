@@ -50,11 +50,21 @@ h1, h2, h3, h4, h5, h6 {
 	@apply font-display;
 }
 
-/* The wordmark (components/ui/Brand.tsx): dark ink on light themes, its
-   cream copy on dark ones. */
-.wordmark-dark { display: none; }
-[data-theme-dark="1"] .wordmark-light { display: none; }
-[data-theme-dark="1"] .wordmark-dark { display: block; }
+/* The wordmark (components/ui/Brand.tsx), inline vector: dark ink on light
+   themes, cream on dark ones, where the dot is a lighter sage too. */
+.wordmark { color: #282D20; }
+.wordmark svg { display: block; width: 100%; height: 100%; }
+[data-theme-dark="1"] .wordmark { color: #F2EFE7; }
+[data-theme-dark="1"] .wordmark .wm-dot { fill: #A2B57A; }
+
+/* Buttons and icons are things to tap, not text: no selection on a long
+   press, and no text cursor in them (Chrome's caret browsing, F7, would
+   otherwise put a blinking cursor in a button's label or icon). */
+button, [role="button"], [role="tab"], [role="radio"], .material-symbols-outlined {
+  -webkit-user-select: none;
+  user-select: none;
+  caret-color: transparent;
+}
 
 /* Google's sign-in button (components/ui/GoogleButton.tsx), in the colours
    Google's branding guidelines give for light and dark surfaces. */
@@ -104,6 +114,19 @@ button.shadow-raised:active, .press:active {
 /* Filled symbols read as objects rather than line drawings. */
 .icon-fill {
 	font-variation-settings: 'FILL' 1, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+}
+
+/* A page's height: the screen less the status and navigation bars, which
+   body already pads for (index.html). min-h-screen made every page that
+   much taller than the screen, so short pages scrolled and the Add page's
+   Save button sat below the fold (1.6.1). dvh follows the keyboard. */
+.min-h-page {
+	min-height: calc(100vh - var(--sat, 0px) - var(--sab, 0px));
+	min-height: calc(100dvh - var(--sat, 0px) - var(--sab, 0px));
+}
+.h-page {
+	height: calc(100vh - var(--sat, 0px) - var(--sab, 0px));
+	height: calc(100dvh - var(--sat, 0px) - var(--sab, 0px));
 }
 
 /* The wallet: Home's balance, a stitched card in the theme's colour. Every

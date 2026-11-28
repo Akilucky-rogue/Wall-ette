@@ -287,7 +287,7 @@ function AppContent() {
   };
 
   const LoadingFallback = () => (
-      <div className="h-full min-h-screen bg-zen-bg flex items-center justify-center">
+      <div className="h-full min-h-page bg-zen-bg flex items-center justify-center">
            <div className="h-10 w-10 rounded-full border-4 border-sage/20 border-t-sage animate-spin"></div>
       </div>
   );
@@ -436,7 +436,7 @@ function AppContent() {
   return (
     <WalletProvider>
       <div
-        className="font-sans antialiased text-premium-charcoal bg-zen-bg min-h-screen"
+        className="font-sans antialiased text-premium-charcoal bg-zen-bg min-h-page"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >

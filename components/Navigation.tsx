@@ -2,7 +2,6 @@ import React from 'react';
 import { AppScreen } from '../types';
 import { tick } from '../utils/haptics';
 import { BrandIcon, Wordmark } from './ui/Brand';
-import { LotusFlower, Sprout } from './ui/Decor';
 
 interface NavigationProps {
   currentScreen: AppScreen;
@@ -47,13 +46,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate, show
           className="lg:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] z-40 bg-gradient-to-t from-zen-bg via-zen-bg to-transparent pointer-events-none"
         >
           <div className="relative bg-white/95 backdrop-blur-xl border border-black/[0.05] rounded-[32px] shadow-soft px-8 py-3 flex justify-between items-center pointer-events-auto">
-            {/* Mini eco decorations */}
-            <div className="absolute -top-3 left-8 opacity-60" aria-hidden="true">
-              <Sprout size="sm" />
-            </div>
-            <div className="absolute -top-2 right-12 opacity-50" aria-hidden="true">
-              <LotusFlower size="sm" color="var(--rose-2)" />
-            </div>
             {TABS.map(tab => {
               const active = isActive(tab, currentScreen);
               return (
@@ -77,12 +69,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate, show
         aria-label="Main"
         className="hidden lg:flex fixed left-5 top-5 bottom-5 w-[220px] z-40 flex-col bg-white rounded-[32px] shadow-soft border border-black/[0.05] px-3 py-5"
       >
-        <div className="absolute top-3 right-4 opacity-50" aria-hidden="true">
-          <LotusFlower size="sm" color="var(--rose-2)" />
-        </div>
         <button onClick={() => go(AppScreen.DASHBOARD)} className="flex items-center gap-2.5 px-2.5 mb-7" aria-label="Wall·ette, Home">
           <BrandIcon size={34} />
-          <Wordmark height={20} />
+          <Wordmark height={17} />
         </button>
 
         <ul className="space-y-1">
@@ -106,9 +95,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate, show
         </ul>
 
         <div className="mt-auto space-y-2">
-          <div className="px-3 opacity-60" aria-hidden="true">
-            <Sprout size="sm" />
-          </div>
           <button
             onClick={() => go(AppScreen.NEW_ENTRY)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-sage text-white text-[13px] font-semibold shadow-raised"

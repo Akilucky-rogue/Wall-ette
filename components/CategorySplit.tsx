@@ -7,7 +7,7 @@ import { MOVED_LABELS } from '../services/spend';
 import UnsortedTransfers from './UnsortedTransfers';
 import { prettyMerchant } from '../services/analyticsService';
 import { Mascot } from './ui/Brand';
-import { FloatingLeaf, MandalaDots, Paisley, RangoliCorner } from './ui/Decor';
+import Garden from './ui/Garden';
 
 interface CategorySplitProps {
   onNavigate: (screen: AppScreen) => void;
@@ -178,12 +178,8 @@ const CategorySplit: React.FC<CategorySplitProps> = ({ onNavigate }) => {
     : String(selectedDate.getFullYear());
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
-      <FloatingLeaf className="top-24 right-5 opacity-35" />
-      <FloatingLeaf className="top-60 left-3 opacity-25" color="var(--sage-3)" />
-      <MandalaDots className="absolute top-36 left-4 opacity-20" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Paisley className="absolute bottom-36 left-6 opacity-25" flip />
+    <div className="relative flex h-auto min-h-page w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">

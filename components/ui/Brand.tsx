@@ -3,21 +3,22 @@
  *
  * - BrandIcon: the app icon's tile (assets/brand/icon.svg, drawn by
  *   scripts/brand-icons.mjs from the approved icon).
- * - Wordmark: the approved logo artwork, in dark ink, with a cream copy that
- *   light-on-dark themes show instead (styles.css).
- * - Mascot: the approved poses, cut out from the identity board. Welcome is
+ * - Wordmark: the approved logo, traced to vector (scripts/brand-trace.py) and
+ *   drawn inline, so it stays sharp at any size: the letters take the text
+ *   colour (dark ink, cream on dark themes, styles.css), the dot brand sage.
+ * - Mascot: the approved poses, cut out from the identity board and traced
+ *   to vector the same way, so they never pixelate. Welcome is
  *   for first steps, Think for insights and empty screens, Encourage for
  *   progress, Celebrate for a real achievement, Review for statements.
  *   Decorative, so screen readers skip them.
  */
 import iconUrl from '../../assets/brand/icon.svg';
-import wordmarkUrl from '../../assets/brand/wordmark.webp';
-import wordmarkDarkUrl from '../../assets/brand/wordmark-dark.webp';
-import welcomeUrl from '../../assets/brand/mascot-welcome.webp';
-import thinkUrl from '../../assets/brand/mascot-think.webp';
-import encourageUrl from '../../assets/brand/mascot-encourage.webp';
-import celebrateUrl from '../../assets/brand/mascot-celebrate.webp';
-import reviewUrl from '../../assets/brand/mascot-review.webp';
+import wordmarkSvg from '../../assets/brand/wordmark.svg?raw';
+import welcomeUrl from '../../assets/brand/mascot-welcome.svg';
+import thinkUrl from '../../assets/brand/mascot-think.svg';
+import encourageUrl from '../../assets/brand/mascot-encourage.svg';
+import celebrateUrl from '../../assets/brand/mascot-celebrate.svg';
+import reviewUrl from '../../assets/brand/mascot-review.svg';
 
 export const TAGLINE = 'Your personal finance companion';
 
@@ -25,14 +26,17 @@ export function BrandIcon({ size = 40, className = '' }: { size?: number; classN
   return <img src={iconUrl} alt="" width={size} height={size} draggable={false} className={`shrink-0 select-none ${className}`} />;
 }
 
-/** The logo. `height` in px; the artwork is 933 × 176. */
+/** The logo, as vector. `height` in px; the artwork is 933 × 176. */
 export function Wordmark({ height = 28, className = '' }: { height?: number; className?: string }) {
   const width = Math.round((height * 933) / 176);
   return (
-    <span role="img" aria-label="Wall·ette" className={`inline-flex shrink-0 ${className}`}>
-      <img src={wordmarkUrl} alt="" width={width} height={height} draggable={false} className="wordmark-light select-none" />
-      <img src={wordmarkDarkUrl} alt="" width={width} height={height} draggable={false} className="wordmark-dark select-none" />
-    </span>
+    <span
+      role="img"
+      aria-label="Wall·ette"
+      className={`wordmark inline-flex shrink-0 select-none ${className}`}
+      style={{ width, height }}
+      dangerouslySetInnerHTML={{ __html: wordmarkSvg }}
+    />
   );
 }
 

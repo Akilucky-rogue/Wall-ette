@@ -232,6 +232,8 @@ function applyPalette(palette: Palette, dark: boolean) {
 
   root.setAttribute('data-theme-dark', dark ? '1' : '0');
   root.style.colorScheme = dark ? 'dark' : 'light';
+  // The page gardens repaint in the new colours (components/ui/Garden.tsx).
+  window.dispatchEvent(new Event('wallette:theme'));
 
   // Browser chrome (web) — theme-color meta.
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;

@@ -10,7 +10,6 @@ import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
 import { useBackHandler } from '../utils/backStack';
 import { Mascot } from './ui/Brand';
-import { Diya, FloatingLeaf, PottedPlant, RangoliCorner, Sprout } from './ui/Decor';
 import ReviewPayees from './ReviewPayees';
 import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
 import { receiptLines, type ImportReceipt } from '../services/importReceipt';
@@ -19,12 +18,16 @@ import { capturedRows, carryOver, isCaptured } from '../services/captured';
 import { useLimits } from '../services/plan';
 import { takesAccount } from '../services/planRules';
 import PlanLock from './PlanLock';
+import Garden from './ui/Garden';
 
 // Pagination settings
 const ITEMS_PER_PAGE = 20;
 
 /** A statement day as the rest of the app shows one: "18 Nov 2026". */
 const showDay = (day: string) => parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+/** A review row as a screen reader hears it: "Swiggy, expense of ₹450.00, 12 Mar 2026". */
+const rowName = (t: Transaction) =>
+  `${t.merchant || 'Unnamed'}, ${t.type === TransactionType.EXPENSE ? 'expense' : 'income'} of ₹${t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}, ${showDay(t.date)}`;
 
 interface ImportStatementProps {
     onNavigate: (screen: AppScreen) => void;
@@ -707,14 +710,9 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+      <Garden />
       {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" />
-      <FloatingLeaf className="top-48 left-4 opacity-25" color="var(--sage-3)" />
-      <Sprout className="absolute top-36 left-6 opacity-40" />
-      <PottedPlant className="absolute bottom-32 right-6 opacity-35" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Diya className="absolute bottom-40 left-8 opacity-30" />
 
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
@@ -1195,13 +1193,19 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             )}
                             
                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className={`shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+                                <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={selectedIds.has(t.id)}
+                                    aria-label={`Import ${rowName(t)}`}
+                                    onClick={(e) => { e.stopPropagation(); toggleSelection(t.id); }}
+                                    className={`shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
                                     selectedIds.has(t.id) 
                                         ? (isDuplicate ? 'bg-blue-500 border-blue-500' : 'bg-sage border-sage')
                                         : 'bg-transparent border-gray-300'
                                 }`}>
-                                    {selectedIds.has(t.id) && <span className="material-symbols-outlined text-white text-[14px]">check</span>}
-                                </div>
+                                    {selectedIds.has(t.id) && <span className="material-symbols-outlined text-white text-[14px]" aria-hidden="true">check</span>}
+                                </button>
                                 
                                 <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center ${t.type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'bg-sage-light text-sage'}`}>
                                     <span className="material-symbols-outlined text-[20px]">
@@ -1218,11 +1222,13 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <button
+                                    type="button"
                                     onClick={(e) => openEditModal(t, e)}
                                     className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                                    aria-label={`Edit ${rowName(t)}`}
                                     title="Edit transaction"
                                 >
-                                    <span className="material-symbols-outlined text-[16px] text-muted-taupe">edit</span>
+                                    <span className="material-symbols-outlined text-[16px] text-muted-taupe" aria-hidden="true">edit</span>
                                 </button>
                                 <div className="text-right">
                                     <p className={`font-semibold tabular-nums ${t.type === TransactionType.EXPENSE ? 'text-rose' : 'text-sage'}`}>
@@ -1246,8 +1252,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-lg font-display font-bold text-premium-charcoal">Edit transaction</h3>
-                                <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-muted-taupe">close</span>
+                                <button type="button" onClick={cancelEdit} aria-label="Close without changing it" className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-muted-taupe" aria-hidden="true">close</span>
                                 </button>
                             </div>
                             

@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { reauthenticateWithCredential, EmailAuthProvider, type MultiFactorResolver } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
+import { getUnsaved, subscribeUnsaved } from '../services/cloudSaves';
 import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
 import { BrandIcon } from './ui/Brand';
 import { GoogleButton } from './ui/GoogleButton';
-import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
+import { SplashGarden } from './ui/Decor';
 
 interface SecurityLockProps {
   onUnlock: () => void;
@@ -21,6 +22,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const unsaved = useSyncExternalStore(subscribeUnsaved, getUnsaved);
+  const [outWarned, setOutWarned] = useState(false);
   // How this account signs in: a password, Google, or both. An account made
   // with Google has no password to type here.
   const google = signsInWithGoogle(auth.currentUser);
@@ -182,19 +185,9 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   };
 
   return (
-    <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
-      {/* Eco & Indian decorative elements - guardians of wealth */}
-      <FloatingLeaf className="top-16 right-8 opacity-40" />
-      <FloatingLeaf className="top-32 left-6 opacity-30" color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-24 right-6 opacity-35" />
-      <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
-      <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
-      <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="var(--gold-1)" mirror />
-      <RangoliCorner className="absolute bottom-16 right-4 opacity-20 rotate-180" color="var(--gold-1)" />
-      <MandalaDots className="absolute top-24 right-10 opacity-15" />
-      <MandalaDots className="absolute bottom-32 left-8 opacity-15" />
-      <LotusFlower className="absolute top-28 left-8 opacity-30" size="sm" />
-      <Diya className="absolute bottom-24 left-12 opacity-40" />
+    <div className="relative flex h-page w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
+      {/* The splash's garden (components/ui/Decor.tsx) */}
+      <SplashGarden />
 
       <div className="relative text-center mb-8">
         <div className="relative inline-flex items-center justify-center mb-6">
@@ -313,12 +306,21 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         )}
 
         <div className="mt-6 text-center border-t border-premium-charcoal/[0.08] pt-4">
+            {outWarned && unsaved.count > 0 && (
+                <p role="alert" className="text-[12px] text-rose leading-snug mb-2 px-2">
+                    {unsaved.count} change{unsaved.count === 1 ? '' : 's'} didn't save to your account. Signing out loses {unsaved.count === 1 ? 'it' : 'them'}.
+                </p>
+            )}
             <button
-                onClick={() => { setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false)); }}
+                onClick={() => {
+                    // Changes the cloud refused are lost on sign-out: the first tap warns.
+                    if (unsaved.count > 0 && !outWarned) { setOutWarned(true); return; }
+                    setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false));
+                }}
                 disabled={signingOut}
                 className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
-                {signingOut ? 'Signing out…' : 'Sign out'}
+                {signingOut ? 'Signing out…' : outWarned && unsaved.count > 0 ? 'Sign out anyway' : 'Sign out'}
             </button>
         </div>
       </div>

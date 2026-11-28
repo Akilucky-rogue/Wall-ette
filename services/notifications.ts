@@ -368,7 +368,7 @@ const PLAN_NAME = { essential: 'Essential', plus: 'Plus' } as const;
 
 /**
  * The plan's dates: the free month ending, a payment Google Play couldn't
- * take, a plan that won't renew. Each opens Self → Your plan.
+ * take, a plan that won't renew. Each opens Self → Membership.
  */
 function planNotes({ plan, now }: NotificationInput): AppNotification[] {
   if (!plan?.plan || !plan.expiresAt) return [];
@@ -413,7 +413,7 @@ function planNotes({ plan, now }: NotificationInput): AppNotification[] {
       title: `${plan.trial ? 'Your free month' : name} ends on ${day}`,
       body: plan.trial
         ? "It won't turn into a paid plan, so nothing is charged. Your records stay: you can read, export or delete them."
-        : "It won't renew. Your records stay: you can read, export or delete them, or restart in Your plan.",
+        : "It won't renew. Your records stay: you can read, export or delete them, or restart in Membership.",
       action,
       rank: RANK.plan,
     }];

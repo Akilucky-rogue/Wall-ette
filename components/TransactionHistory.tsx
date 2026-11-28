@@ -17,8 +17,21 @@ import { useLimits } from '../services/plan';
 import { editable } from '../services/planRules';
 import { openPlans } from '../services/planSheet';
 import { takeVaultAccount } from '../utils/vaultAccount';
-import { viaName } from '../services/paymentAlerts';
+import { moneyInPayer, viaName } from '../services/paymentAlerts';
 import { bankReference } from '../services/statementImport';
+import Garden from './ui/Garden';
+
+/**
+ * A name for money in from a payment app that the app saved without one
+ * (1.6.0 left cashback unnamed): "Google Pay cashback" rather than
+ * "Unknown payee". Anything else without a name stays unknown.
+ */
+const KIND_OF: Record<string, 'cashback' | 'refund' | 'interest'> = { Bonus: 'cashback', Refunds: 'refund', 'Interest Income': 'interest' };
+function unnamedPayer(t: Transaction): string | null {
+  const kind = KIND_OF[t.category];
+  if (!t.via || !kind || t.type !== TransactionType.INCOME) return null;
+  return moneyInPayer({ app: t.via, kind }) ?? null;
+}
 
 // The list draws this many entries at a time, and the next lot on request:
 // thousands of rows at once made Vault slow to open and to scroll. The
@@ -37,7 +50,7 @@ const entryTime = (t: Transaction): string | null =>
     : null;
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline, accounts, unassignedOpening } = useWallet();
+  const { transactions, flowOf, deleteTransaction, editTransaction, clearAllTransactions, formatAmount, formatAmountCompact, formatEntry, shownRate, shownCurrency, walletLoaded, isOnline, accounts, unassignedOpening, refresh } = useWallet();
   // A saved amount as the edit box and the amount filter see it: as typed
   // when typed in the currency shown, else converted, to the decimals that
   // currency can hold.
@@ -392,7 +405,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-4xl mx-auto overflow-x-hidden pb-28 lg:pb-12 bg-zen-bg">
+      <Garden />
       {/* Header */}
       <header className="sticky top-0 z-40 bg-zen-bg/90 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-sage-border/20">
         <div className="flex items-center justify-between mb-5 -mt-0.5">
@@ -741,7 +755,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
         {groupedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
                 {transactions.length === 0 && !walletLoaded ? (
-                  <WalletArriving isOnline={isOnline} />
+                  <WalletArriving isOnline={isOnline} onRetry={refresh} />
                 ) : transactions.length === 0 ? (
                   <>
                     <Mascot pose="welcome" height={120} />
@@ -797,7 +811,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 {group.items.map(t => {
                     const expanded = expandedId === t.id;
                     const isExpense = t.type === TransactionType.EXPENSE;
-                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : null;
+                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : unnamedPayer(t);
                     const sub = [
                       paymentRail(t.merchant),
                       t.category && t.category.trim() ? t.category : 'Uncategorized',

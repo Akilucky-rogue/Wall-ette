@@ -1,13 +1,12 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppScreen, Transaction, TransactionType } from '../types';
 import { useWallet } from '../context/WalletContext';
 import { localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
-import { exportImage } from '../utils/exportFile';
-import { log } from '../utils/log';
-import { SITE_HOST } from '../utils/site';
-import { Mascot, mascotImage } from './ui/Brand';
-import { Diya, FloatingLeaf, LotusFlower, RangoliCorner } from './ui/Decor';
+import { percent, wrapYear } from '../services/wrapped';
+import { Mascot } from './ui/Brand';
+import WrappedStory from './WrappedStory';
+import Garden from './ui/Garden';
 
 interface RewindProps {
   onNavigate: (screen: AppScreen) => void;
@@ -30,11 +29,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const TRANSFER_RX = /^(ift|imps|rtgs)[\s\/\-]|payrequest|^atm[\s\/\-]/i;
 
 const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
-  const { transactions, flowOf, formatAmount, formatWhole, formatAmountCompact } = useWallet();
-  const [wrapYear, setWrapYear] = useState<number | null>(null);
-  const [sharing, setSharing] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { transactions, counted, flowOf, formatWhole, formatAmountCompact } = useWallet();
+  const [pickedYear, setPickedYear] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   const fmt = formatWhole;
 
@@ -117,122 +114,17 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
   }, [transactions, flowOf]);
 
   const wrapYears = useMemo(() => (life ? life.yearRows.map(([y]) => y).reverse() : []), [life]);
-  const activeWrapYear = wrapYear ?? (wrapYears[0] ?? null);
-
-  const wrapped = useMemo(() => {
-    if (!life || activeWrapYear === null) return null;
-    const ya = life.yearRows.find(([y]) => y === activeWrapYear)?.[1];
-    if (!ya) return null;
-    const topMerchant = [...ya.merchants.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
-    const topCat = [...ya.cats.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
-    let busiestMonth = 0;
-    for (let i = 1; i < 12; i++) if (ya.monthsOut[i] > ya.monthsOut[busiestMonth]) busiestMonth = i;
-    const isCurrent = activeWrapYear === new Date().getFullYear();
-    const daysInYear = isCurrent
-      ? Math.ceil((Date.now() - parseDay(`${activeWrapYear}-01-01`).getTime()) / 86400000)
-      : 365;
-    return {
-      year: activeWrapYear,
-      inc: ya.inc, out: ya.out, saved: ya.inc - ya.out,
-      rate: ya.inc > 0 ? Math.round(((ya.inc - ya.out) / ya.inc) * 100) : 0,
-      txCount: ya.count,
-      topMerchant, topCat,
-      busiestMonth: MONTHS[busiestMonth],
-      noSpendDays: Math.max(0, daysInYear - ya.spendDays.size),
-      isCurrent,
-    };
-  }, [life, activeWrapYear]);
-
-  // ── Wrapped card renderer (canvas → PNG → share) ──
-  const shareWrapped = async () => {
-    if (!wrapped || sharing) return;
-    setSharing(true);
-    try {
-      const canvas = canvasRef.current ?? document.createElement('canvas');
-      const W = 540, H = 960;
-      canvas.width = W; canvas.height = H;
-      const ctx = canvas.getContext('2d')!;
-
-      // The brand's type, loaded before drawing so the canvas uses it.
-      await Promise.all(['700 76px "Manrope Variable"', '600 13px "Inter Variable"', '700 32px "Inter Variable"'].map(f => document.fonts?.load(f).catch(() => undefined)));
-
-      // background
-      ctx.fillStyle = '#F9F3ED';
-      ctx.fillRect(0, 0, W, H);
-
-      // soft sage blobs
-      ctx.fillStyle = 'rgba(151,169,109,0.12)';
-      ctx.beginPath(); ctx.arc(W - 40, 120, 140, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(30, H - 160, 120, 0, Math.PI * 2); ctx.fill();
-
-      // The mascot: celebrating a year that kept money, cheering one that didn't.
-      const pose = mascotImage(wrapped.saved >= 0 ? 'celebrate' : 'encourage');
-      const img = new Image();
-      img.src = pose.src;
-      await img.decode();
-      const mh = 196, mw = Math.round(mh * pose.w / pose.h);
-      ctx.drawImage(img, (W - mw) / 2, 40, mw, mh);
-
-      const center = (text: string, y: number, font: string, color: string) => {
-        ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center';
-        ctx.fillText(text, W / 2, y);
-      };
-
-      center('W A L L · E T T E   W R A P P E D', 270, '600 15px "Inter Variable", Inter, sans-serif', '#646859');
-      center(String(wrapped.year), 344, '700 76px "Manrope Variable", Manrope, sans-serif', '#282C20');
-
-      // stats
-      const row = (label: string, value: string, y: number, color = '#282C20', big = false) => {
-        ctx.font = '600 13px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
-        ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = `700 ${big ? 44 : 32}px "Inter Variable", Inter, sans-serif`; ctx.fillStyle = color;
-        ctx.fillText(value, W / 2, y + (big ? 50 : 40));
-      };
-
-      row('came in', `+${fmt(wrapped.inc)}`, 420, '#49693E');
-      row('went out', `−${fmt(wrapped.out)}`, 510, '#A35B48');
-      row(wrapped.saved >= 0 ? `kept · ${wrapped.rate}% of income` : 'overspent',
-          `${wrapped.saved >= 0 ? '+' : '−'}${fmt(Math.abs(wrapped.saved))}`, 600,
-          wrapped.saved >= 0 ? '#49693E' : '#A35B48', true);
-
-      // divider
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(80, 690); ctx.lineTo(W - 80, 690); ctx.stroke();
-
-      const small = (label: string, value: string, y: number) => {
-        ctx.font = '600 11px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#646859'; ctx.textAlign = 'center';
-        ctx.fillText(label.toUpperCase(), W / 2, y);
-        ctx.font = '600 19px "Inter Variable", Inter, sans-serif'; ctx.fillStyle = '#282C20';
-        const v = value.length > 34 ? value.slice(0, 33) + '…' : value;
-        ctx.fillText(v, W / 2, y + 26);
-      };
-
-      let sy = 726;
-      if (wrapped.topMerchant) { small('most paid to', prettyMerchant(wrapped.topMerchant[0]), sy); sy += 62; }
-      if (wrapped.topCat) { small('top category', `${wrapped.topCat[0]} · ${fmt(wrapped.topCat[1])}`, sy); sy += 62; }
-      small('busiest month · no-spend days', `${wrapped.busiestMonth} · ${wrapped.noSpendDays} days`, sy);
-
-      center(`tallied to the rupee · ${SITE_HOST}`, H - 28, '600 12px "Inter Variable", Inter, sans-serif', '#8C8F80');
-
-      const base64 = canvas.toDataURL('image/png').split(',')[1];
-      const outcome = await exportImage(`wall-ette-wrapped-${wrapped.year}.png`, base64);
-      setToast(outcome === 'shared' ? 'Share sheet opened' : 'Wrapped card downloaded');
-    } catch (e) {
-      log.warn('Wrapped share failed');
-      setToast('Could not create the card — try again');
-    } finally {
-      setSharing(false);
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
+  const activeWrapYear = pickedYear ?? (wrapYears[0] ?? null);
+  // Wall·ette Wrapped for the year picked (services/wrapped.ts), played as a
+  // story that ends on the card to share (components/WrappedStory.tsx).
+  const wrapped = useMemo(
+    () => (activeWrapYear === null ? null : wrapYear(transactions, counted, activeWrapYear)),
+    [transactions, counted, activeWrapYear],
+  );
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
-      <FloatingLeaf className="top-24 right-6 opacity-40" />
-      <FloatingLeaf className="top-56 left-4 opacity-30" color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="#D4B896" />
-      <Diya className="absolute bottom-44 left-8 opacity-30" />
+    <div className="relative flex h-auto min-h-page w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
@@ -254,6 +146,59 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
         </div>
       ) : (
         <div className="px-6 pt-2 space-y-4 lg:columns-2 lg:gap-x-5">
+          {/* Wall·ette Wrapped */}
+          {wrapped && (
+            <section className="wallet rounded-[30px] px-6 pt-6 pb-5 shadow-raised overflow-hidden break-inside-avoid" aria-labelledby="wrapped-title">
+              <div className="relative">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-denim-mut">Wall·ette Wrapped</p>
+                    <h3 id="wrapped-title" className="wallet-emboss font-display font-extrabold text-[40px] leading-none mt-1">
+                      {wrapped.year}{wrapped.current && <span className="text-[16px] font-sans font-medium text-denim-mut"> so far</span>}
+                    </h3>
+                  </div>
+                  <Mascot pose={wrapped.kept >= 0 ? 'celebrate' : 'encourage'} height={84} className="-mt-1 -mr-1 shrink-0" />
+                </div>
+                {wrapYears.length > 1 && (
+                  <div className="denim-track inline-flex rounded-full p-0.5 mt-4 max-w-full overflow-x-auto no-scrollbar" role="group" aria-label="Year">
+                    {wrapYears.slice(0, 5).map(y => (
+                      <button
+                        key={y}
+                        onClick={() => setPickedYear(y)}
+                        aria-pressed={activeWrapYear === y}
+                        className={`px-3 py-1 rounded-full text-[12px] font-semibold shrink-0 transition-all ${activeWrapYear === y ? 'denim-on' : 'text-denim-mut'}`}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2.5 mt-4">
+                  <div className="wallet-pocket rounded-2xl px-3 py-2.5 min-w-0">
+                    <p className="text-[11px] text-denim-mut">Came in</p>
+                    <p className="text-[15px] font-semibold tabular-nums truncate">{formatAmountCompact(wrapped.inc)}</p>
+                  </div>
+                  <div className="wallet-pocket rounded-2xl px-3 py-2.5 min-w-0">
+                    <p className="text-[11px] text-denim-mut">Went out</p>
+                    <p className="text-[15px] font-semibold tabular-nums truncate">{formatAmountCompact(wrapped.out)}</p>
+                  </div>
+                  <div className="wallet-pocket rounded-2xl px-3 py-2.5 min-w-0">
+                    <p className="text-[11px] text-denim-mut">Kept</p>
+                    <p className="text-[15px] font-semibold tabular-nums truncate">{wrapped.rate === null ? '—' : percent(Math.max(0, wrapped.rate) / 100)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPlaying(true)}
+                  className="mt-4 w-full bg-[#FBFAF6] text-[#3E5430] py-3.5 rounded-2xl text-[15px] font-semibold active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[20px]" aria-hidden="true">play_circle</span>
+                  Play your {wrapped.year} Wrapped
+                </button>
+                <p className="mt-2 text-center text-[12px] text-denim-mut">Ends on a card you can share. Amounts stay off it unless you add them.</p>
+              </div>
+            </section>
+          )}
+
           {/* Lifetime hero */}
           <div className="bg-white rounded-3xl p-6 shadow-soft border border-black/[0.02] break-inside-avoid">
             <p className="text-[10px] uppercase tracking-widest text-muted-taupe font-bold mb-1">Your money since {parseDay(life.first).getFullYear()}</p>
@@ -354,58 +299,11 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
             </div>
           )}
 
-          {/* Wrapped */}
-          {wrapped && (
-            <div className="bg-premium-charcoal rounded-3xl p-6 shadow-soft break-inside-avoid">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] uppercase tracking-widest text-white/60 font-bold">Wall·ette Wrapped</p>
-                <div className="flex gap-1.5">
-                  {wrapYears.slice(0, 4).map(y => (
-                    <button
-                      key={y}
-                      onClick={() => setWrapYear(y)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${activeWrapYear === y ? 'bg-sage text-white' : 'bg-white/10 text-white/60'}`}
-                    >
-                      {y}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-white font-display text-3xl font-bold">{wrapped.year}{wrapped.isCurrent ? <span className="text-white/40 text-base font-sans font-medium"> so far</span> : ''}</p>
-              <div className="grid grid-cols-3 gap-3 mt-4 mb-5">
-                <div>
-                  <p className="text-[9px] text-white/50 uppercase tracking-wider">In</p>
-                  <p className="text-[14px] font-semibold text-sage-light whitespace-nowrap tabular-nums">{formatAmountCompact(wrapped.inc)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-white/50 uppercase tracking-wider">Out</p>
-                  <p className="text-[14px] font-semibold text-rose-light whitespace-nowrap tabular-nums">{formatAmountCompact(wrapped.out)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-white/50 uppercase tracking-wider">Kept</p>
-                  <p className="text-[14px] font-semibold text-white whitespace-nowrap tabular-nums">{wrapped.rate}%</p>
-                </div>
-              </div>
-              <button
-                onClick={shareWrapped}
-                disabled={sharing}
-                className="w-full bg-sage text-white py-3.5 rounded-2xl text-[15px] font-semibold active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                <span className="material-symbols-outlined text-[18px]">{sharing ? 'progress_activity' : 'ios_share'}</span>
-                {sharing ? 'Creating card…' : 'Share your Wrapped'}
-              </button>
-            </div>
-          )}
-
-          <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
 
-      {toast && (
-        <div className="fixed bottom-[calc(6rem_+_var(--sab))] left-1/2 -translate-x-1/2 bg-premium-charcoal text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2">
-          <span className="material-symbols-outlined text-sage text-[20px]">check_circle</span>
-          <span className="text-[13px] font-medium">{toast}</span>
-        </div>
+      {playing && wrapped && (
+        <WrappedStory year={wrapped} money={formatWhole} onClose={() => setPlaying(false)} />
       )}
     </div>
   );

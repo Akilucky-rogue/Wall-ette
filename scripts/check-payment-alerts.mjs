@@ -311,6 +311,11 @@ console.log('Entries');
   eq('cashback is a bonus', A.paymentEntry(read('paytm', '', '₹75 cashback received. Paytm cashback for mobile recharge.'), 'a').category, 'Bonus');
   eq('a refund is a refund', A.paymentEntry(read('hdfc', '', bankCases.find(c => c[0] === 'a refund is money in')[3]), 'b').category, 'Refunds');
   eq('interest is interest', A.paymentEntry(read('hdfc', '', '₹250 interest credited. Savings account interest for November.'), 'c').category, 'Interest Income');
+  // Money in that names no payer is named after the app or bank it came through (Vault showed "Unknown payee").
+  eq('cashback names the app that paid it', A.paymentEntry(read('gpay', '', '₹150 cashback received. Reward for paying with Google Pay at More Supermarket.'), 'e').merchant, 'UPI/Google Pay cashback');
+  eq('interest names the bank', A.paymentEntry(read('hdfc', '', '₹250 interest credited. Savings account interest for November.'), 'f').merchant, 'HDFC Bank interest');
+  eq('shared cashback is named by its kind', A.moneyInPayer({ app: 'shared', kind: 'cashback' }), 'Cashback');
+  eq('a payer the text names is kept', A.moneyInPayer({ app: 'gpay', kind: 'refund', payee: 'Myntra' }), undefined);
   eq('a card spend reads as a card payment', A.paymentEntry(read('idfc', '', bankCases.find(c => c[0].startsWith('IDFC FIRST, debit card'))[3]), 'd').merchant, 'POS/ACME CLOUD');
   eq('a name with a slash keeps the narration\'s fields', A.paymentNarration({ app: 'gpay', payee: 'A/B Traders' }), 'UPI/A B Traders');
 

@@ -68,3 +68,6 @@ private/
 # Cloud Functions build output (npm --prefix functions run build)
 functions/lib/
 functions/node_modules/
+
+# Python byte code (scripts/brand-trace.py)
+__pycache__/

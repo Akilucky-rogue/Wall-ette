@@ -103,3 +103,32 @@ export const PottedPlant: React.FC<{ className?: string; size?: 'sm' | 'md' }> =
     </svg>
   );
 };
+
+/**
+ * The splash's garden: corners, leaves, lotuses and mandala dots around the
+ * edges, the same on every full-screen moment (the splash, sign-in, the lock
+ * screen, a required update). `lamps` adds the two diyas of the launch
+ * splash. Pages carry the smaller garden frame instead (utils/ecoFrame.ts).
+ */
+export const SplashGarden: React.FC<{ lamps?: boolean }> = ({ lamps = false }) => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+    <FloatingLeaf className="top-20 right-16 opacity-40" />
+    <FloatingLeaf className="top-32 left-12 opacity-30" color="#A8B89E" />
+    <FloatingLeaf className="bottom-40 right-20 opacity-35" />
+    <FloatingLeaf className="bottom-28 left-16 opacity-25" color={SAND} />
+    <RangoliCorner className="absolute top-8 left-6 opacity-30" />
+    <RangoliCorner className="absolute top-8 right-6 opacity-30" mirror />
+    <RangoliCorner className="absolute bottom-12 left-6 opacity-25 rotate-180" color={SAND} mirror />
+    <RangoliCorner className="absolute bottom-12 right-6 opacity-25 rotate-180" color={SAND} />
+    <LotusFlower className="absolute top-24 left-8 opacity-35" size="sm" color="#E8A5A5" />
+    <LotusFlower className="absolute bottom-32 right-10 opacity-30" size="sm" color={SAND_LIGHT} />
+    <MandalaDots className="absolute top-1/4 right-8 opacity-20" />
+    <MandalaDots className="absolute bottom-1/3 left-10 opacity-15" />
+    {lamps && (
+      <>
+        <Diya className="absolute bottom-24 left-1/4 opacity-40" />
+        <Diya className="absolute bottom-24 right-1/4 opacity-40" />
+      </>
+    )}
+  </div>
+);

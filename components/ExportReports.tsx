@@ -11,7 +11,7 @@ import RestoreBackupSheet from './RestoreBackupSheet';
 import PageHeader from './ui/PageHeader';
 import { Denim, DenimFigure, DenimLabel, Pocket } from './ui/Denim';
 import { Card, IconChip, SectionTitle, Segmented } from './ui/Paper';
-import { Diya, FloatingLeaf, LotusFlower, PottedPlant, RangoliCorner } from './ui/Decor';
+import Garden from './ui/Garden';
 
 interface ExportReportsProps {
   onNavigate: (screen: AppScreen) => void;
@@ -198,14 +198,9 @@ const ExportReports: React.FC<ExportReportsProps> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="relative flex min-h-page w-full flex-col max-w-[430px] lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+      <Garden />
       {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-6 opacity-40" />
-      <FloatingLeaf className="top-52 left-4 opacity-30" color="#A8B89E" />
-      <PottedPlant className="absolute bottom-40 right-6 opacity-40" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute bottom-52 left-8 opacity-35" size="sm" />
-      <Diya className="absolute top-48 right-4 opacity-40" />
 
       <PageHeader title="Data Studio" onBack={() => onNavigate(AppScreen.DASHBOARD)} backLabel="Back to Home" />
 

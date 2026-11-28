@@ -180,16 +180,29 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
 
   const quickCats = type === TransactionType.EXPENSE ? EXPENSE_QUICK : INCOME_QUICK;
   const catList = showAllCats ? CATEGORIES : quickCats;
-  const amtFont = amount.length > 9 ? 'text-[36px]' : amount.length > 6 ? 'text-[46px]' : 'text-[56px]';
+  const amtFont = amount.length > 9 ? 'text-[30px]' : amount.length > 6 ? 'text-[36px]' : 'text-[44px]';
+  const typeButton = (t: TransactionType, label: string, icon: string, on: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={type === t}
+      onClick={() => { setType(t); setCategory(''); setAutoCat(false); }}
+      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold flex items-center gap-1 transition-all ${type === t ? on : 'text-muted-taupe'}`}
+    >
+      <span className="hidden min-[390px]:inline-flex" aria-hidden="true"><span className="material-symbols-outlined text-[15px]">{icon}</span></span>
+      {label}
+    </button>
+  );
 
+  // One screen on a phone: the type sits in the header, quick amounts and
+  // categories scroll sideways, and payee, category, date and note share a
+  // card, so the keypad and Save stay in view without scrolling.
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
-      <FloatingLeaf className="top-20 right-5 opacity-35" />
-      <Sprout className="absolute top-32 left-4 opacity-40" />
-      <RangoliCorner className="absolute bottom-40 right-2 opacity-20" color="var(--gold-1)" mirror />
+      <FloatingLeaf className="top-16 right-5 opacity-25" />
 
-      {/* Header */}
-      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
+      {/* Header, with Expense or Income */}
+      <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-5 pb-2 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.DASHBOARD)}
           className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full text-premium-charcoal hover:bg-white/70 transition-colors"
@@ -197,25 +210,28 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
         >
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
         </button>
-        <h2 className="text-premium-charcoal text-[22px] font-display font-bold tracking-tight leading-tight flex-1 truncate">New entry</h2>
+        <h2 className="text-premium-charcoal text-[20px] font-display font-bold tracking-tight leading-tight flex-1 truncate">New entry</h2>
+        <div className="bg-white/70 p-1 rounded-full flex gap-0.5 border border-black/[0.04] shadow-soft" role="radiogroup" aria-label="Type">
+          {typeButton(TransactionType.EXPENSE, 'Expense', 'arrow_downward', 'bg-rose-light text-rose')}
+          {typeButton(TransactionType.INCOME, 'Income', 'arrow_upward', 'bg-sage-light text-sage')}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pt-2 flex flex-col gap-6 pb-4">
-        {/* Amount hero */}
-        <div className="text-center py-4 relative">
-          <div className="absolute top-2 right-8"><Diya className="opacity-50" /></div>
-          <p className="text-muted-taupe text-[11px] font-medium uppercase tracking-[0.2em] mb-2">Amount</p>
-          <div className="flex items-center justify-center gap-1">
-            <span className={`text-3xl mb-2 font-medium ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{getSymbol(shownCurrency)}</span>
+      <div className="flex-1 overflow-y-auto px-5 flex flex-col gap-3 pb-3">
+        {/* Amount */}
+        <div className="text-center pt-1">
+          <p className="sr-only">Amount</p>
+          <div className="flex items-center justify-center gap-1 min-h-[52px]">
+            <span className={`text-2xl font-medium ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{getSymbol(shownCurrency)}</span>
             <span className={`font-semibold leading-none tabular-nums ${amtFont} ${numAmount > 0 ? 'text-premium-charcoal' : 'text-muted-taupe'}`}>{amount}</span>
           </div>
-          {/* Quick amounts */}
-          <div className="flex justify-center gap-1.5 mt-4 flex-wrap">
+          {/* Quick amounts: one row */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar justify-start sm:justify-center -mx-5 px-5">
             {quickAmounts.map(q => (
               <button
                 key={q}
                 onClick={() => setAmount(String(q))}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${amount === String(q) ? 'bg-sage text-white border-sage' : 'bg-white text-muted-taupe border-premium-charcoal/[0.08] hover:border-sage/30'}`}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap shrink-0 transition-all ${amount === String(q) ? 'bg-sage text-white border-sage' : 'bg-white text-muted-taupe border-premium-charcoal/[0.08] hover:border-sage/30'}`}
               >
                 {getSymbol(shownCurrency)}{q.toLocaleString(localeFor(shownCurrency))}
               </button>
@@ -223,49 +239,27 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Type toggle */}
-        <div className="bg-white/50 p-1.5 rounded-full flex gap-1 border border-black/[0.03] shadow-soft">
-          <button
-            onClick={() => { setType(TransactionType.EXPENSE); setCategory(''); setAutoCat(false); }}
-            className={`flex-1 py-3 px-4 rounded-full text-[13px] font-semibold tracking-wide flex items-center justify-center gap-2 transition-all ${type === TransactionType.EXPENSE ? 'bg-rose-light text-rose' : 'text-muted-taupe hover:bg-white'}`}
-          >
-            <span className="material-symbols-outlined text-sm font-bold" aria-hidden="true">arrow_downward</span>
-            Expense
-          </button>
-          <button
-            onClick={() => { setType(TransactionType.INCOME); setCategory(''); setAutoCat(false); }}
-            className={`flex-1 py-3 px-4 rounded-full text-[13px] font-semibold tracking-wide flex items-center justify-center gap-2 transition-all ${type === TransactionType.INCOME ? 'bg-sage-light text-sage' : 'text-muted-taupe hover:bg-white'}`}
-          >
-            <span className="material-symbols-outlined text-sm font-bold" aria-hidden="true">arrow_upward</span>
-            Income
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Merchant / Payee + recent suggestions */}
-          <div className="bg-white rounded-[24px] p-4 shadow-soft border border-black/[0.01]">
-            <div className="flex items-center gap-4">
-              <div className="bg-lavender-light text-lavender p-2.5 rounded-2xl shrink-0">
-                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">storefront</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Merchant / Payee</p>
-                <input
-                  type="text"
-                  value={merchant}
-                  onChange={e => applyMerchant(e.target.value)}
-                  placeholder={type === TransactionType.EXPENSE ? 'e.g. Swiggy, Amazon' : 'e.g. Employer, Client'}
-                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-semibold outline-none placeholder:text-muted-taupe placeholder:font-sans placeholder:font-normal placeholder:text-sm"
-                />
-              </div>
+        {/* Payee, category, date and note: one card */}
+        <div className="bg-white rounded-[22px] shadow-soft border border-black/[0.02] divide-y divide-premium-charcoal/[0.06]">
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-lavender text-[20px] shrink-0" aria-hidden="true">storefront</span>
+              <input
+                type="text"
+                value={merchant}
+                onChange={e => applyMerchant(e.target.value)}
+                placeholder={type === TransactionType.EXPENSE ? 'Paid to (Swiggy, Amazon…)' : 'From (employer, client…)'}
+                aria-label={type === TransactionType.EXPENSE ? 'Paid to' : 'Received from'}
+                className="flex-1 min-w-0 bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] font-semibold outline-none placeholder:text-muted-taupe placeholder:font-normal placeholder:text-[14px]"
+              />
             </div>
             {merchant === '' && suggestions.length > 0 && (
-              <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar">
+              <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar -mx-4 px-4">
                 {suggestions.map(s => (
                   <button
                     key={s}
                     onClick={() => applyMerchant(s)}
-                    className="px-3 py-1.5 rounded-full text-[10px] font-semibold bg-zen-bg text-premium-charcoal border border-premium-charcoal/[0.08] whitespace-nowrap shrink-0 hover:border-sage/40"
+                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-zen-bg text-premium-charcoal border border-premium-charcoal/[0.08] whitespace-nowrap shrink-0 hover:border-sage/40"
                   >
                     {s}
                   </button>
@@ -274,25 +268,23 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             )}
           </div>
 
-          {/* Category — visual chip grid */}
-          <div className="bg-white rounded-[24px] p-4 shadow-soft border border-black/[0.01]">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">
-                Category{autoCat && category ? <span className="text-sage normal-case tracking-normal"> · auto: {category}</span> : ''}
+          {/* Category: one row, More opens them all */}
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] text-muted-taupe font-semibold">
+                Category{autoCat && category ? <span className="text-sage font-medium"> · picked from the payee</span> : ''}
               </p>
-              <button
-                onClick={() => setShowAllCats(v => !v)}
-                className="text-[10px] font-bold uppercase tracking-wider text-sage"
-              >
-                {showAllCats ? 'Less' : 'More'}
+              <button onClick={() => setShowAllCats(v => !v)} className="text-[11px] font-semibold text-sage">
+                {showAllCats ? 'Fewer' : 'All categories'}
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 max-h-[168px] overflow-y-auto">
+            <div className={showAllCats ? 'flex flex-wrap gap-1.5 max-h-[148px] overflow-y-auto' : 'flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4'}>
               {catList.map(cat => (
                 <button
                   key={cat}
                   onClick={() => pickCategory(cat)}
-                  className={`px-3 py-2 rounded-2xl text-[11px] font-medium border transition-all flex items-center gap-1.5 ${
+                  aria-pressed={category === cat}
+                  className={`px-2.5 py-1.5 rounded-xl text-[12px] font-medium border whitespace-nowrap shrink-0 transition-all flex items-center gap-1 ${
                     category === cat
                       ? (type === TransactionType.EXPENSE ? 'bg-rose text-white border-rose shadow-sm' : 'bg-sage text-white border-sage shadow-sm')
                       : 'bg-zen-bg text-premium-charcoal border-transparent hover:border-premium-charcoal/[0.12]'
@@ -305,24 +297,31 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Date */}
-          <div
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01] cursor-pointer hover:shadow-lg transition-shadow"
-          >
-            <div className="bg-rose-light text-rose p-2.5 rounded-2xl">
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">calendar_today</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Date</p>
-              <p className="text-premium-charcoal text-[15px] font-semibold">{dateLabel}</p>
-            </div>
-            <span className="material-symbols-outlined text-muted-taupe opacity-40" aria-hidden="true">expand_more</span>
+          {/* Date and note: one row */}
+          <div className="flex items-center gap-2 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              aria-expanded={showDatePicker}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-light/60 text-rose text-[12px] font-semibold shrink-0"
+            >
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">calendar_today</span>
+              {dateLabel}
+              <span className="material-symbols-outlined text-[16px] opacity-60" aria-hidden="true">{showDatePicker ? 'expand_less' : 'expand_more'}</span>
+            </button>
+            <input
+              className="flex-1 min-w-0 bg-transparent border-none px-1 py-1.5 focus:ring-0 text-premium-charcoal text-[14px] placeholder:text-muted-taupe outline-none"
+              placeholder="Add a note"
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              aria-label="Note"
+            />
           </div>
 
           {showDatePicker && (
-            <div className="bg-white rounded-[24px] p-6 shadow-soft border border-black/[0.01] space-y-4">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="px-4 py-3 space-y-3">
+              <div className="grid grid-cols-4 gap-1.5">
                 {[
                   { label: 'Today', days: 0 },
                   { label: 'Yesterday', days: 1 },
@@ -335,102 +334,75 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
                       const d = new Date(); d.setDate(d.getDate() - q.days);
                       setSelectedDate(d); setShowDatePicker(false);
                     }}
-                    className="bg-sage-light text-sage py-2 rounded-lg text-[13px] font-semibold hover:bg-sage hover:text-white transition-colors"
+                    className="bg-sage-light text-sage py-1.5 px-1 rounded-lg text-[12px] font-semibold whitespace-nowrap hover:bg-sage hover:text-white transition-colors"
                   >
                     {q.label}
                   </button>
                 ))}
               </div>
-              <div className="border-t border-premium-charcoal/[0.08] pt-4">
-                <input
-                  type="date"
-                  value={localDay(selectedDate)}
-                  max={localDay()}
-                  min={earliest}
-                  onChange={(e) => { if (isDay(e.target.value) && !(earliest && e.target.value < earliest)) setSelectedDate(parseDay(e.target.value)); }}
-                  className="w-full px-4 py-2 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal"
-                  title="Custom date"
-                  aria-label="Custom date"
-                />
-              </div>
-              <button
-                onClick={() => setShowDatePicker(false)}
-                className="w-full bg-sage-light text-sage py-2 rounded-lg text-[13px] font-semibold hover:bg-sage hover:text-white transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          )}
-
-          {/* Note */}
-          <div className="bg-white rounded-[24px] p-4 flex items-center gap-4 shadow-soft border border-black/[0.01]">
-            <div className="bg-zen-bg text-muted-taupe p-2.5 rounded-2xl border border-black/[0.03]">
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notes</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-muted-taupe font-bold">Note</p>
               <input
-                className="w-full bg-transparent border-none p-0 focus:ring-0 text-premium-charcoal text-[15px] placeholder:text-muted-taupe"
-                placeholder="Add details..."
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                title="Note"
-                aria-label="Note"
+                type="date"
+                value={localDay(selectedDate)}
+                max={localDay()}
+                min={earliest}
+                onChange={(e) => { if (isDay(e.target.value) && !(earliest && e.target.value < earliest)) { setSelectedDate(parseDay(e.target.value)); setShowDatePicker(false); } }}
+                className="w-full px-3 py-1.5 rounded-lg border border-sage-border focus:outline-none focus:ring-2 focus:ring-sage text-premium-charcoal text-[14px]"
+                aria-label="Another day"
               />
-            </div>
-          </div>
-
-          {/* Daily limit heads-up */}
-          {overLimit && (
-            <div className="flex items-center gap-2 bg-rose-light/40 border border-rose/20 rounded-2xl px-4 py-3">
-              <span className="material-symbols-outlined text-rose text-[18px]" aria-hidden="true">warning</span>
-              <p className="text-rose text-[11px] font-medium leading-relaxed">
-                This takes today past your {formatWhole(dailyLimit)} daily limit
-                ({formatWhole(todaySpend)} spent so far). It still saves.
-              </p>
             </div>
           )}
         </div>
+
+        {/* Daily limit heads-up */}
+        {overLimit && (
+          <div className="flex items-center gap-2 bg-rose-light/40 border border-rose/20 rounded-2xl px-4 py-2.5">
+            <span className="material-symbols-outlined text-rose text-[18px]" aria-hidden="true">warning</span>
+            <p className="text-rose text-[11px] font-medium leading-relaxed">
+              This takes today past your {formatWhole(dailyLimit)} daily limit
+              ({formatWhole(todaySpend)} spent so far). It still saves.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Keypad + save */}
-      <div className="bg-white/80 backdrop-blur-xl border-t border-black/[0.05] rounded-t-[40px] px-8 pt-6 pb-10 shadow-soft">
-        <div className="grid grid-cols-3 gap-y-1 gap-x-4">
+      <div className="bg-white/80 backdrop-blur-xl border-t border-black/[0.05] rounded-t-[32px] px-6 pt-3 pb-[calc(0.75rem+var(--sab))] shadow-soft">
+        <div className="grid grid-cols-3 gap-x-4">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-            <button key={num} onClick={() => handleKeypad(num.toString())} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
+            <button key={num} onClick={() => handleKeypad(num.toString())} className="py-2 flex items-center justify-center text-[22px] font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
               {num}
             </button>
           ))}
-          <button onClick={() => handleKeypad('.')} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">.</button>
-          <button onClick={() => handleKeypad('0')} className="py-3 flex items-center justify-center text-2xl font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">0</button>
-          <button onClick={() => handleKeypad('backspace')} aria-label="Delete the last digit" className="py-3 flex items-center justify-center text-muted-taupe rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-[24px]" aria-hidden="true">backspace</span>
+          <button onClick={() => handleKeypad('.')} aria-label="Decimal point" className="py-2 flex items-center justify-center text-[22px] font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">.</button>
+          <button onClick={() => handleKeypad('0')} className="py-2 flex items-center justify-center text-[22px] font-medium tabular-nums text-premium-charcoal rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">0</button>
+          <button onClick={() => handleKeypad('backspace')} aria-label="Delete the last digit" className="py-2 flex items-center justify-center text-muted-taupe rounded-2xl active:bg-sage-light/50 active:scale-95 transition-all">
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">backspace</span>
           </button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 mt-3 select-none">
+        <div className="flex items-center gap-3 mt-2">
+          <label className="flex items-center gap-2 shrink-0 select-none cursor-pointer">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={saveAndAdd}
+              aria-labelledby="save-and-add-label"
+              onClick={() => setSaveAndAdd(p => !p)}
+              className={`relative w-9 h-5 rounded-full transition-colors ${saveAndAdd ? 'bg-sage' : 'bg-black/10'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+            <span id="save-and-add-label" onClick={() => setSaveAndAdd(p => !p)} className="text-[12px] text-muted-taupe font-medium leading-tight">Add<br />another</span>
+          </label>
           <button
-            type="button"
-            role="switch"
-            aria-checked={saveAndAdd}
-            aria-labelledby="save-and-add-label"
-            onClick={() => setSaveAndAdd(p => !p)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${saveAndAdd ? 'bg-sage' : 'bg-black/10'}`}
+            onClick={handleSave}
+            disabled={numAmount <= 0 || saving}
+            className="flex-1 bg-sage text-white py-3.5 rounded-[20px] text-[16px] font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${saveAndAdd ? 'translate-x-5' : 'translate-x-0'}`} />
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{saveAndAdd ? 'add' : 'check'}</span>
+            {saveAndAdd ? 'Save and add another' : 'Save entry'}
           </button>
-          <span id="save-and-add-label" onClick={() => setSaveAndAdd(p => !p)} className="text-[12px] text-muted-taupe font-medium cursor-pointer">Save and add another</span>
         </div>
-
-        <button
-          onClick={handleSave}
-          disabled={numAmount <= 0 || saving}
-          className="w-full mt-3 bg-sage text-white py-4 rounded-[24px] text-lg font-semibold shadow-soft flex items-center justify-center gap-2 hover:bg-sage/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <span className="material-symbols-outlined text-[22px]" aria-hidden="true">{saveAndAdd ? 'add' : 'check'}</span>
-          {saveAndAdd ? 'Save and add another' : 'Save entry'}
-        </button>
       </div>
 
       {toast && (

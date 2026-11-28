@@ -116,6 +116,22 @@ button.shadow-raised:active, .press:active {
 	font-variation-settings: 'FILL' 1, 'wght' 200, 'GRAD' 0, 'opsz' 24;
 }
 
+/* The garden frame (utils/ecoFrame.ts): the same two rangoli corners, a
+   leaf and a lotus on every page, phone and web, in the page's own
+   background, so cards, headers and the nav bar always sit on top. Each
+   page's root carries the class; the full-screen moments use the splash's
+   garden instead (components/ui/Decor.tsx SplashGarden). */
+.eco-frame {
+	background-image: var(--eco-frame, none);
+	background-repeat: no-repeat;
+	background-size: 40px 40px, 40px 40px, 16px 20px, 20px 14px;
+	background-position:
+		left 2px top calc(var(--sat, 0px) + 78px),
+		right 2px top calc(var(--sat, 0px) + 78px),
+		right 6px top calc(var(--sat, 0px) + 250px),
+		left 4px top calc(var(--sat, 0px) + 360px);
+}
+
 /* The wallet: Home's balance, a stitched card in the theme's colour. Every
    screen opens with one for its key figure (components/ui/Denim.tsx); the
    rest is lit paper. Kept minimal on purpose: a fine weave and one soft

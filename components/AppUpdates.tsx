@@ -4,7 +4,7 @@ import { checkForUpdate, closeBanner, getUpdateState, restartToUpdate, subscribe
 import { markSeen, notesToShow, readSeenVersion, type ReleaseNote } from '../services/releaseNotes';
 import WhatsNewSheet from './WhatsNewSheet';
 import { BrandIcon } from './ui/Brand';
-import { FloatingLeaf, RangoliCorner } from './ui/Decor';
+import { SplashGarden } from './ui/Decor';
 
 /** Lets the unlocked screen settle before Google's update dialog can appear. */
 const CHECK_DELAY_MS = 1500;
@@ -122,10 +122,7 @@ export const UpdateRequired: React.FC<UpdateRequiredProps> = ({ downloaded, busy
     className="fixed inset-0 z-[200] bg-zen-bg flex justify-center pt-[var(--sat)] pb-[var(--sab)]"
   >
     <div className="relative w-full max-w-[430px] flex flex-col items-center justify-center overflow-hidden px-8 text-center">
-      <FloatingLeaf className="top-16 right-8 opacity-40" />
-      <FloatingLeaf className="bottom-24 left-6 opacity-30" color="var(--sage-3)" />
-      <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
-      <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
+      <SplashGarden />
 
       <div className="relative inline-flex items-center justify-center mb-6">
         <BrandIcon size={80} className="drop-shadow-md" />

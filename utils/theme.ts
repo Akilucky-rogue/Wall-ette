@@ -4,6 +4,7 @@
 // utility classes (bg-white, text-sage, …) follow the active theme, and
 // inline SVG/chart colors read the `--*` hex aliases directly.
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { ecoFrameImages } from './ecoFrame';
 
 export type ThemeId = 'sage' | 'midnight' | 'teal' | 'terra' | 'slate' | 'techie' | 'custom';
 export type ThemeMode = ThemeId | 'auto';
@@ -229,6 +230,9 @@ function applyPalette(palette: Palette, dark: boolean) {
     'wallet-ink': '#FBFAF6', 'wallet-mut': 'rgb(251 250 246 / 0.85)', 'wallet-stitch': 'rgb(255 255 255 / 0.24)',
   };
   for (const [name, value] of Object.entries(depth)) root.style.setProperty(`--${name}`, value);
+
+  // The garden frame on every page (styles.css .eco-frame), in this theme's colours.
+  root.style.setProperty('--eco-frame', ecoFrameImages({ leaf: palette['sage-3'], lotus: palette['rose-2'], flame: palette['gold-2'] }));
 
   root.setAttribute('data-theme-dark', dark ? '1' : '0');
   root.style.colorScheme = dark ? 'dark' : 'light';

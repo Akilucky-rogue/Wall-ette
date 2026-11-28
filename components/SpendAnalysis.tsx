@@ -116,7 +116,7 @@ const SpendAnalysis: React.FC<SpendAnalysisProps> = ({ onNavigate, page = 'hub' 
   );
 
   const shell = (body: React.ReactNode) => (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-6xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="eco-frame relative flex h-auto min-h-screen w-full flex-col max-w-[430px] lg:max-w-6xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <PageHeader
         title={PAGE_TITLE[page]}
         onBack={page === 'hub' ? undefined : () => onNavigate(AppScreen.ANALYSIS)}

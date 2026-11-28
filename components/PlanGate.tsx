@@ -26,7 +26,7 @@ const PlanGate: React.FC<{
   if (feature ? opens(access, feature) : canAdd(access)) return <>{children}</>;
   const reason: LockReason = feature ? REASON[feature] ?? 'rewind' : adds ?? 'add';
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto pb-32 lg:pb-12 bg-zen-bg">
+    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto pb-32 lg:pb-12 bg-zen-bg">
       <PageHeader title={title} onBack={() => onNavigate(back)} backLabel={BACK_LABEL[back] ?? 'Back'} />
       <div className="px-6 pt-2">
         <PlanLock reason={reason} />

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Mascot, TAGLINE, Wordmark } from './ui/Brand';
-import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
+import { SplashGarden } from './ui/Decor';
 
 export type SplashVariant = 'launch' | 'login' | 'register' | 'logout';
 
@@ -54,26 +54,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, variant = 'laun
       }`}
     >
       {/* The garden, around the edges (components/ui/Decor.tsx) */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <FloatingLeaf className="top-20 right-16 opacity-40" />
-        <FloatingLeaf className="top-32 left-12 opacity-30" color="#A8B89E" />
-        <FloatingLeaf className="bottom-40 right-20 opacity-35" />
-        <FloatingLeaf className="bottom-28 left-16 opacity-25" color="#C4A98E" />
-        <RangoliCorner className="absolute top-8 left-6 opacity-30" />
-        <RangoliCorner className="absolute top-8 right-6 opacity-30" mirror />
-        <RangoliCorner className="absolute bottom-12 left-6 opacity-25 rotate-180" color="#C4A98E" mirror />
-        <RangoliCorner className="absolute bottom-12 right-6 opacity-25 rotate-180" color="#C4A98E" />
-        <LotusFlower className="absolute top-24 left-8 opacity-35" size="sm" color="#E8A5A5" />
-        <LotusFlower className="absolute bottom-32 right-10 opacity-30" size="sm" color="#D4B896" />
-        <MandalaDots className="absolute top-1/4 right-8 opacity-20" />
-        <MandalaDots className="absolute bottom-1/3 left-10 opacity-15" />
-        {variant === 'launch' && (
-          <>
-            <Diya className="absolute bottom-24 left-1/4 opacity-40" />
-            <Diya className="absolute bottom-24 right-1/4 opacity-40" />
-          </>
-        )}
-      </div>
+      <SplashGarden lamps={variant === 'launch'} />
 
       <div className={`relative transition-all duration-700 ease-out motion-reduce:transition-none ${entering ? 'opacity-0 translate-y-3' : 'opacity-100 translate-y-0'}`}>
         <Mascot pose="welcome" height={184} />

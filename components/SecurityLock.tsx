@@ -10,7 +10,7 @@ import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoog
 import { sendResetLink } from '../services/passwordReset';
 import { BrandIcon } from './ui/Brand';
 import { GoogleButton } from './ui/GoogleButton';
-import { Diya, FloatingLeaf, LotusFlower, MandalaDots, RangoliCorner } from './ui/Decor';
+import { SplashGarden } from './ui/Decor';
 
 interface SecurityLockProps {
   onUnlock: () => void;
@@ -186,18 +186,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
 
   return (
     <div className="relative flex h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg overflow-hidden items-center justify-center px-8">
-      {/* Eco & Indian decorative elements - guardians of wealth */}
-      <FloatingLeaf className="top-16 right-8 opacity-40" />
-      <FloatingLeaf className="top-32 left-6 opacity-30" color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-24 right-6 opacity-35" />
-      <RangoliCorner className="absolute top-8 left-4 opacity-25" color="var(--sage-2)" />
-      <RangoliCorner className="absolute top-8 right-4 opacity-25" color="var(--sage-2)" mirror />
-      <RangoliCorner className="absolute bottom-16 left-4 opacity-20 rotate-180" color="var(--gold-1)" mirror />
-      <RangoliCorner className="absolute bottom-16 right-4 opacity-20 rotate-180" color="var(--gold-1)" />
-      <MandalaDots className="absolute top-24 right-10 opacity-15" />
-      <MandalaDots className="absolute bottom-32 left-8 opacity-15" />
-      <LotusFlower className="absolute top-28 left-8 opacity-30" size="sm" />
-      <Diya className="absolute bottom-24 left-12 opacity-40" />
+      {/* The splash's garden (components/ui/Decor.tsx) */}
+      <SplashGarden />
 
       <div className="relative text-center mb-8">
         <div className="relative inline-flex items-center justify-center mb-6">

@@ -10,7 +10,6 @@ import { log } from '../utils/log';
 import { parseDay } from '../utils/dates';
 import { useBackHandler } from '../utils/backStack';
 import { Mascot } from './ui/Brand';
-import { Diya, FloatingLeaf, PottedPlant, RangoliCorner, Sprout } from './ui/Decor';
 import ReviewPayees from './ReviewPayees';
 import { reviewPayees, shownCategory, TO_REVIEW } from '../services/review';
 import { receiptLines, type ImportReceipt } from '../services/importReceipt';
@@ -710,14 +709,8 @@ const ImportStatement: React.FC<ImportStatementProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
+    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-24 bg-zen-bg">
       {/* Eco & Indian decorative elements */}
-      <FloatingLeaf className="top-24 right-5 opacity-35" />
-      <FloatingLeaf className="top-48 left-4 opacity-25" color="var(--sage-3)" />
-      <Sprout className="absolute top-36 left-6 opacity-40" />
-      <PottedPlant className="absolute bottom-32 right-6 opacity-35" />
-      <RangoliCorner className="absolute top-20 right-2 opacity-20" color="var(--gold-1)" mirror />
-      <Diya className="absolute bottom-40 left-8 opacity-30" />
 
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button

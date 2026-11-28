@@ -66,7 +66,7 @@ const BankAccounts: React.FC<BankAccountsProps> = ({ onNavigate }) => {
   );
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="eco-frame relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">
         <button
           onClick={() => onNavigate(AppScreen.SELF_DATA)}

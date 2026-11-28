@@ -301,7 +301,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   );
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-6xl mx-auto overflow-x-hidden pb-24 lg:pb-12 bg-zen-bg">
+    <div className="eco-frame relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-6xl mx-auto overflow-x-hidden pb-24 lg:pb-12 bg-zen-bg">
       {/* Header */}
       <div className="flex items-center bg-zen-bg/80 backdrop-blur-md p-6 lg:px-8 pb-2 sticky top-0 z-30">
         {/* Left: Logo and Name */}

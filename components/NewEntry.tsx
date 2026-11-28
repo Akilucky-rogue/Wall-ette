@@ -8,7 +8,6 @@ import { opens } from '../services/planRules';
 import { addDays, isDay, localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { done } from '../utils/haptics';
-import { Diya, FloatingLeaf, RangoliCorner, Sprout } from './ui/Decor';
 
 interface NewEntryProps {
   onNavigate: (screen: AppScreen) => void;
@@ -198,8 +197,7 @@ const NewEntry: React.FC<NewEntryProps> = ({ onNavigate }) => {
   // categories scroll sideways, and payee, category, date and note share a
   // card, so the keypad and Save stay in view without scrolling.
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
-      <FloatingLeaf className="top-16 right-5 opacity-25" />
+    <div className="eco-frame relative flex h-full min-h-screen w-full flex-col max-w-[430px] md:max-w-xl mx-auto bg-zen-bg overflow-hidden">
 
       {/* Header, with Expense or Income */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-5 pb-2 sticky top-0 z-30">

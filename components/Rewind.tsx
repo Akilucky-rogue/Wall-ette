@@ -5,7 +5,6 @@ import { localDay, parseDay } from '../utils/dates';
 import { prettyMerchant } from '../services/analyticsService';
 import { percent, wrapYear } from '../services/wrapped';
 import { Mascot } from './ui/Brand';
-import { Diya, FloatingLeaf, LotusFlower, RangoliCorner } from './ui/Decor';
 import WrappedStory from './WrappedStory';
 
 interface RewindProps {
@@ -123,12 +122,7 @@ const Rewind: React.FC<RewindProps> = ({ onNavigate }) => {
   );
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
-      <FloatingLeaf className="top-24 right-6 opacity-40" />
-      <FloatingLeaf className="top-56 left-4 opacity-30" color="#A8B89E" />
-      <RangoliCorner className="absolute top-20 left-2 opacity-20" color="#8B9E82" />
-      <LotusFlower className="absolute top-40 right-4 opacity-35" size="sm" color="#D4B896" />
-      <Diya className="absolute bottom-44 left-8 opacity-30" />
+    <div className="eco-frame relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-3xl lg:max-w-5xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
 
       {/* Header */}
       <div className="flex items-center gap-2 bg-zen-bg/85 backdrop-blur-md px-5 pt-6 pb-3 sticky top-0 z-30">

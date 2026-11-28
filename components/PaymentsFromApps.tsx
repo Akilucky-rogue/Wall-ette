@@ -156,7 +156,7 @@ const PaymentsFromApps: React.FC<PaymentsFromAppsProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
+    <div className="eco-frame relative flex h-auto min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
       <PageHeader title="Payments from your apps" onBack={() => onNavigate(AppScreen.SELF_DATA)} backLabel="Back to Your data" />
 
       <div className="px-6 pt-4 pb-4">

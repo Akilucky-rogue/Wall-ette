@@ -10,7 +10,7 @@ import { log } from '../utils/log';
 import { ACCOUNT_EMAIL_FROM, PRIVACY_URL, TERMS_URL } from '../utils/site';
 import { Mascot, TAGLINE, Wordmark } from './ui/Brand';
 import { GoogleButton } from './ui/GoogleButton';
-import { FloatingLeaf, Paisley, RangoliCorner } from './ui/Decor';
+import { RangoliCorner, SplashGarden } from './ui/Decor';
 
 // Bump when the website's terms or privacy policy change materially —
 // recorded with each registration as the version the user agreed to. The
@@ -226,14 +226,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto bg-zen-bg px-8 justify-center overflow-hidden">
-      {/* Decorative eco & Indian elements */}
-      <FloatingLeaf className="top-16 left-6 opacity-60" />
-      <FloatingLeaf className="top-24 right-8 opacity-40" color="var(--sage-3)" />
-      <FloatingLeaf className="bottom-32 left-10 opacity-50" />
-      <RangoliCorner className="absolute top-4 left-4 opacity-40" color="var(--sage-2)" />
-      <RangoliCorner className="absolute top-4 right-4 opacity-40" color="var(--sage-2)" mirror />
-      <Paisley className="absolute bottom-20 right-6 opacity-30" color="var(--gold-1)" />
-      <Paisley className="absolute top-40 left-4 opacity-25" color="var(--sage-3)" flip />
+      {/* The splash's garden (components/ui/Decor.tsx) */}
+      <SplashGarden />
 
       <div className="relative flex flex-col items-center text-center mb-8">
         <Mascot pose="welcome" height={128} />

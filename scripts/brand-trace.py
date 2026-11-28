@@ -7,18 +7,16 @@ stays sharp at any size (as scripts/brand-icons.mjs does for the icon).
   traced with potrace at 4x. The letters use currentColor, so the app's light
   and dark themes colour them; the dot is a true circle in brand sage (class
   wm-dot, which dark themes lighten).
-- The mascot poses are no longer traced: scripts/mascot/build.py draws them
-  as clean vector art. --pose still traces one from its artwork (enlarged 6x,
-  smoothed, snapped to its palette, traced with vtracer) for comparison.
-- With --site, the website's larger scenes are traced the same way to
-  site/public/img/mascot-<scene>.svg.
+- The mascot (the app's poses and the website's scenes) is no longer traced:
+  scripts/mascot/build.py draws it as clean vector art. --trace still traces
+  one image (enlarged, smoothed, snapped to its palette, traced with vtracer),
+  for comparison.
 
 Writes assets/brand/wordmark.svg.
 
 Needs: pip install pillow numpy potracer vtracer
 Usage: python3 scripts/brand-trace.py
-       python3 scripts/brand-trace.py --pose <pose> <out.svg>
-       python3 scripts/brand-trace.py --site [scene ...]
+       python3 scripts/brand-trace.py --trace <image.webp> <out.svg>
 """
 import io
 import os
@@ -192,18 +190,9 @@ def mascot(pose, k=12, up=6, sigma=1.6, asigma=1.8, length=40.0, speckle=60, src
     print(f'{os.path.basename(out_path or pose)}: {len(out) // 1024} KB, {out.count("<path")} shapes')
 
 
-SITE_IMG = os.path.join(ROOT, 'site', 'public', 'img')
-# The website's larger scenes (800 px tall), traced the same way.
-SITE_SCENES = ['open-welcome', 'statement-review', 'gift-sharing', 'gentle-encourage']
-
-
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if args[:1] == ['--site']:
-        for scene in args[1:] or SITE_SCENES:
-            mascot(scene, k=14, up=4, src_path=os.path.join(SITE_IMG, f'mascot-{scene}.webp'),
-                   out_path=os.path.join(SITE_IMG, f'mascot-{scene}.svg'))
-    elif args[:1] == ['--pose'] and len(args) == 3:
-        mascot(args[1], out_path=args[2])
+    if args[:1] == ['--trace'] and len(args) == 3:
+        mascot(None, src_path=args[1], out_path=args[2])
     else:
         wordmark()

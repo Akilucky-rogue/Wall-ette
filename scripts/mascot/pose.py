@@ -104,7 +104,7 @@ class Pose:
             S.add(S.circle(cx, cy, r, fill=GOLD))
         return d
 
-    def head_mask(self, seed, leaf=None, classes=('head',)):
+    def head_mask(self, seed, leaf=None, classes=('head',), exclude=(), behind=(), rim_depth=None):
         """The head's area (with its darker rim), before anything is drawn."""
         A = self.A
         core = A.region(list(classes), [seed], holes=False)
@@ -118,17 +118,31 @@ class Pose:
                                (self.YY > ndimage.center_of_mass(core)[0] / UP))
         touch = np.unique(lab[grow(core, 1.5) & (lab > 0)])
         rim = np.isin(lab, touch[touch > 0])
+        for e in exclude:                      # hands or arms that touch the head are not its rim
+            rim &= ~grow(e, 1.0)
+        if rim_depth:                          # the rim is a band along the edge, not specks inside
+            rim &= grow(~ndimage.binary_fill_holes(core | rim), rim_depth)
         head = close_fill(core | rim, 1.5)
         if leaf is not None:
             head |= morphology.convex_hull_image(head) & grow(leaf, 3)
+        for b in behind:                       # parts in front of the head: it carries on under them
+            head |= morphology.convex_hull_image(head) & grow(b, self.OW + 1.0)
         self.head_mask_, self.head_core, self.head_rim = head, core, rim
         self.head_d = shape(head, 16, 0.0, 1.5)[0]
         return head
 
-    def draw_head(self, n=16):
+    def draw_head(self, n=16, shift=None):
+        """The head, with its darker rim along the lower left: either where the artwork
+        has it (split along the rim's inner edge), or, with shift=(dx, dy), as the head's
+        own shape moved up and right over a darker copy (an even crescent)."""
         head, core, rim = self.head_mask_, self.head_core, self.head_rim
         hd = self.fit('head', head, n, 0.0, 1.5)
         S = self.S
+        if shift is not None:
+            items = [S.path(hd, fill=HEAD_RIM),
+                     S.path(hd, fill=HEAD, extra=' transform="translate(%s %s)"' % (num(shift[0]), num(shift[1])))]
+            S.add(S.group(items, clip=S.clip(hd)))
+            return hd
         items = [S.path(hd, fill=HEAD)]
         if rim.sum() > 50 * UP * UP:
             ys, xs = np.nonzero(head)
@@ -215,11 +229,18 @@ class Pose:
         self.report.append('eyes: L ring (%.1f,%.1f) r%.1f pupil r%.1f hl r%.1f | R iris (%.1f,%.1f) r%.1f pupil r%.1f hl r%.1f'
                            % (lx, ly, lr, pr, hr, rx, ry, rr, qr, gr))
 
-    def leaf(self, seed, vein_seed, head_core):
+    def leaf(self, seed, vein_seed, head_core, vein_classes=None, leaf_classes=('leaf', 'rim'), over_head=False):
         A, S = self.A, self.S
         hull = morphology.convex_hull_image(head_core)
-        leaf_only = A.region(['leaf', 'rim'], [seed], holes=False) & ~hull
-        vein = A.region(LIMB, [vein_seed])
+        leaf_only = A.region(list(leaf_classes), [seed], holes=False)
+        # where the leaf lies over the head, keep it (over_head) or leave it to the head
+        leaf_only &= ~grow(head_core, 0.5) if over_head else ~hull
+        if vein_classes:
+            # only the light stroke inside the leaf, not the light rim round it
+            vein = A.region(list(vein_classes), [vein_seed], holes=False,
+                            within=shrink(morphology.convex_hull_image(leaf_only | hull), 1.0) | hull)
+        else:
+            vein = A.region(LIMB, [vein_seed])
         leafm = close_fill(leaf_only | (vein & morphology.convex_hull_image(leaf_only) & ~hull), 1.0)
         lp = resample(outline(leafm, 0.0, 0.6), 0.25)
         tip = lp[np.argmax(lp[:, 0] - lp[:, 1])]
@@ -256,11 +277,11 @@ def arc(cx, cy, r, a0, a1):
     return 'M%s %sA%s %s 0 %d 1 %s %s' % (num(p0[0]), num(p0[1]), num(r), num(r), large, num(p1[0]), num(p1[1]))
 
 
-def compare(pose, svg, out, w=None):
+def compare(pose, svg, out, src=None):
     """Side by side: the artwork and the redraw, same size."""
     import subprocess
     from PIL import Image
-    src = Image.open(os.path.join(BRAND, 'mascot-%s.webp' % pose)).convert('RGBA')
+    src = Image.open(src or os.path.join(BRAND, 'mascot-%s.webp' % pose)).convert('RGBA')
     s = 3 if src.width < 400 else 2
     W, H = src.width * s, src.height * s
     tmp = out + '.render.png'

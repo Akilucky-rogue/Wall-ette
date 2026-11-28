@@ -23,7 +23,7 @@ const AUTO_CATEGORY: [RegExp, Category][] = [
   [/zomato|swiggy|eatsure/i, 'Food Delivery'],
   [/blinkit|zepto|bigbasket|jiomart|grofers|instamart|dmart/i, 'Groceries'],
   [/mcdonald|kfc|domino|pizza|burger|subway|restaurant/i, 'Dining'],
-  [/starbucks|cafe|ccd|barista|chaayos/i, 'Coffee'],
+  [/starbucks|coffee|cafe|ccd|barista|chaayos|chai point|third wave|blue tokai|tim hortons/i, 'Coffee'],
   [/uber|ola cab|rapido|metro|irctc|redbus/i, 'Transport'],
   [/netflix|hotstar|spotify|prime video|sonyliv/i, 'Streaming'],
   [/amazon|flipkart|myntra|ajio|meesho|nykaa/i, 'Shopping'],

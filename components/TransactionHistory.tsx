@@ -17,8 +17,20 @@ import { useLimits } from '../services/plan';
 import { editable } from '../services/planRules';
 import { openPlans } from '../services/planSheet';
 import { takeVaultAccount } from '../utils/vaultAccount';
-import { viaName } from '../services/paymentAlerts';
+import { moneyInPayer, viaName } from '../services/paymentAlerts';
 import { bankReference } from '../services/statementImport';
+
+/**
+ * A name for money in from a payment app that the app saved without one
+ * (1.6.0 left cashback unnamed): "Google Pay cashback" rather than
+ * "Unknown payee". Anything else without a name stays unknown.
+ */
+const KIND_OF: Record<string, 'cashback' | 'refund' | 'interest'> = { Bonus: 'cashback', Refunds: 'refund', 'Interest Income': 'interest' };
+function unnamedPayer(t: Transaction): string | null {
+  const kind = KIND_OF[t.category];
+  if (!t.via || !kind || t.type !== TransactionType.INCOME) return null;
+  return moneyInPayer({ app: t.via, kind }) ?? null;
+}
 
 // The list draws this many entries at a time, and the next lot on request:
 // thousands of rows at once made Vault slow to open and to scroll. The
@@ -797,7 +809,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ onNavigate }) =
                 {group.items.map(t => {
                     const expanded = expandedId === t.id;
                     const isExpense = t.type === TransactionType.EXPENSE;
-                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : null;
+                    const name = t.merchant && t.merchant.trim() ? prettyMerchant(t.merchant) : unnamedPayer(t);
                     const sub = [
                       paymentRail(t.merchant),
                       t.category && t.category.trim() ? t.category : 'Uncategorized',

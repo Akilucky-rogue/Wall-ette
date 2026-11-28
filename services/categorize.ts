@@ -56,7 +56,9 @@ export function categorizeNarration(description: string, type: RowDirection): Ca
   // ── EXPENSE: Food & Dining ───────────────────────────────────────────────
   if (desc.match(/zomato|swiggy|dunzo|magicpin|eatsure|box8|freshmenu|rebel.?foods/))
     return 'Food Delivery';
-  if (desc.match(/dominos|dominoes|pizza.?hut|kfc|mcdonalds|mcd\b|burger.?king|subway|starbucks|cafe.?coffee|ccd\b|barista|chaayos|naturals.?ice/))
+  if (desc.match(/starbucks|cafe.?coffee|\bccd\b|barista|chaayos|chai.?point|third.?wave|blue.?tokai|tim.?hortons|costa.?coffee|\bcoffee\b/))
+    return 'Coffee';
+  if (desc.match(/dominos|dominoes|pizza.?hut|kfc|mcdonalds|mcd\b|burger.?king|subway|naturals.?ice/))
     return 'Dining';
   if (desc.match(/restaurant|dhaba|hotel.?food|biryani|thali|mess\b|canteen|cafeteria/))
     return 'Dining';

@@ -24,6 +24,7 @@ import {
 } from '../services/appUpdates';
 import type { UpdateFinding } from '../services/appUpdatePolicy';
 import { forgetDeletedAccount, signOutOfDevice } from '../services/session';
+import { getUnsaved, retryUnsaved, subscribeUnsaved } from '../services/cloudSaves';
 import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { crashReportsOn, setCrashReports } from '../services/crashReports';
 import { setThemeMode, getThemeMode, getCustomTheme, themeSwatches, type ThemeMode, type CustomTheme } from '../utils/theme';
@@ -364,6 +365,12 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   };
 
   // ── Delete account ──
+  // Sign out: changes the cloud refused live only in this session, so signing
+  // out would lose them. Warn first, with Try again (services/cloudSaves.ts).
+  const unsaved = useSyncExternalStore(subscribeUnsaved, getUnsaved);
+  const [outWarn, setOutWarn] = useState(false);
+  const signOutNow = () => { setOutWarn(false); if (onLogout) onLogout(); else void signOutOfDevice(); };
+  const askSignOut = () => { if (getUnsaved().count > 0) setOutWarn(true); else signOutNow(); };
   const [delOpen, setDelOpen] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');
   const [delPassword, setDelPassword] = useState('');
@@ -479,6 +486,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
   useBackHandler(mfaModal, () => { if (!mfaBusy) setMfaModal(false); });
   useBackHandler(pwModal, () => { if (!pwBusy) setPwModal(false); });
   useBackHandler(delOpen, () => { if (!delBusy) setDelOpen(false); });
+  useBackHandler(outWarn, () => setOutWarn(false));
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-[430px] md:max-w-2xl lg:max-w-3xl mx-auto overflow-x-hidden pb-32 lg:pb-12 bg-zen-bg">
@@ -552,7 +560,7 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
           </nav>
 
           <button
-            onClick={() => onLogout ? onLogout() : void signOutOfDevice()}
+            onClick={askSignOut}
             className="w-full bg-white text-rose py-3.5 rounded-3xl font-semibold text-[14px] shadow-soft border border-rose/15 flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[20px]" aria-hidden="true">logout</span>
@@ -920,6 +928,47 @@ const Profile: React.FC<ProfileProps> = ({ onNavigate, onLogout, page = 'hub' })
                 </p>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sign out with changes that didn't save ── */}
+      {outWarn && (
+        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-[100]" onClick={() => setOutWarn(false)}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="sign-out-unsaved-title"
+            aria-describedby="sign-out-unsaved-text"
+            className="bg-white w-full max-w-[430px] rounded-t-[32px] md:rounded-[32px] px-6 pt-6 pb-[calc(1.5rem_+_var(--sab))] animate-slide-up"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="sign-out-unsaved-title" className="text-lg font-display font-bold text-premium-charcoal mb-2">
+              {unsaved.count === 0 ? 'Everything saved' : `${unsaved.count} change${unsaved.count === 1 ? '' : 's'} didn't save`}
+            </h3>
+            <p id="sign-out-unsaved-text" className="text-[13px] text-muted-taupe leading-relaxed mb-5">
+              {unsaved.count === 0
+                ? 'Your account has all your changes now. You can sign out.'
+                : `Your account hasn't accepted ${unsaved.count === 1 ? 'it' : 'them'}. If you sign out now, ${unsaved.count === 1 ? "it's" : "they're"} lost. Try sending ${unsaved.count === 1 ? 'it' : 'them'} again first.`}
+            </p>
+            {unsaved.count > 0 && (
+              <button
+                onClick={retryUnsaved}
+                disabled={unsaved.retrying}
+                className="w-full bg-sage text-white py-3.5 rounded-2xl font-semibold shadow-soft active:scale-[0.98] transition-all disabled:opacity-60 mb-2"
+              >
+                {unsaved.retrying ? 'Sending…' : 'Try again'}
+              </button>
+            )}
+            <button
+              onClick={signOutNow}
+              className={`w-full py-3.5 rounded-2xl font-semibold active:scale-[0.98] transition-all mb-2 ${unsaved.count === 0 ? 'bg-sage text-white shadow-soft' : 'bg-white text-rose border border-rose/20'}`}
+            >
+              {unsaved.count === 0 ? 'Sign out' : 'Sign out anyway'}
+            </button>
+            <button onClick={() => setOutWarn(false)} className="w-full text-muted-taupe py-2 text-xs font-medium uppercase tracking-wider hover:text-premium-charcoal">
+              Cancel
+            </button>
           </div>
         </div>
       )}

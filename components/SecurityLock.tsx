@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { reauthenticateWithCredential, EmailAuthProvider, type MultiFactorResolver } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { isBiometricAvailable, isBiometricEnabled, authenticateBiometric, preloadBiometric } from '../utils/biometric';
 import { isMfaRequiredError, mfaResolverFromError, resolveTotpSignIn, mfaErrorMessage } from '../services/mfa';
 import { signOutOfDevice } from '../services/session';
+import { getUnsaved, subscribeUnsaved } from '../services/cloudSaves';
 import { googleErrorMessage, hasPassword, isGoogleCancel, reauthenticateWithGoogle, signsInWithGoogle } from '../services/googleSignIn';
 import { sendResetLink } from '../services/passwordReset';
 import { BrandIcon } from './ui/Brand';
@@ -21,6 +22,8 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const unsaved = useSyncExternalStore(subscribeUnsaved, getUnsaved);
+  const [outWarned, setOutWarned] = useState(false);
   // How this account signs in: a password, Google, or both. An account made
   // with Google has no password to type here.
   const google = signsInWithGoogle(auth.currentUser);
@@ -313,12 +316,21 @@ const SecurityLock: React.FC<SecurityLockProps> = ({ onUnlock }) => {
         )}
 
         <div className="mt-6 text-center border-t border-premium-charcoal/[0.08] pt-4">
+            {outWarned && unsaved.count > 0 && (
+                <p role="alert" className="text-[12px] text-rose leading-snug mb-2 px-2">
+                    {unsaved.count} change{unsaved.count === 1 ? '' : 's'} didn't save to your account. Signing out loses {unsaved.count === 1 ? 'it' : 'them'}.
+                </p>
+            )}
             <button
-                onClick={() => { setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false)); }}
+                onClick={() => {
+                    // Changes the cloud refused are lost on sign-out: the first tap warns.
+                    if (unsaved.count > 0 && !outWarned) { setOutWarned(true); return; }
+                    setSigningOut(true); signOutOfDevice().catch(() => setSigningOut(false));
+                }}
                 disabled={signingOut}
                 className="text-xs text-rose font-medium uppercase tracking-wider hover:text-rose/80 transition-colors disabled:opacity-60"
             >
-                {signingOut ? 'Signing out…' : 'Sign out'}
+                {signingOut ? 'Signing out…' : outWarned && unsaved.count > 0 ? 'Sign out anyway' : 'Sign out'}
             </button>
         </div>
       </div>
